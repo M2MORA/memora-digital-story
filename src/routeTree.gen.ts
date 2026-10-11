@@ -10,13 +10,56 @@
 
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as CartRouteImport } from './routes/cart'
+import { Route as ContactRouteImport } from './routes/contact'
+import { Route as DigitalMemoriesRouteImport } from './routes/digital-memories'
+import { Route as FaqRouteImport } from './routes/faq'
+import { Route as GiftFinderRouteImport } from './routes/gift-finder'
+import { Route as HowItWorksRouteImport } from './routes/how-it-works'
+import { Route as OurStoryRouteImport } from './routes/our-story'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as CreateProductIdRouteImport } from './routes/create.$productId'
+import { Route as MMemorySlugRouteImport } from './routes/m.$memorySlug'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CartRoute = CartRouteImport.update({
+  id: '/cart',
+  path: '/cart',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ContactRoute = ContactRouteImport.update({
+  id: '/contact',
+  path: '/contact',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DigitalMemoriesRoute = DigitalMemoriesRouteImport.update({
+  id: '/digital-memories',
+  path: '/digital-memories',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const FaqRoute = FaqRouteImport.update({
+  id: '/faq',
+  path: '/faq',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const GiftFinderRoute = GiftFinderRouteImport.update({
+  id: '/gift-finder',
+  path: '/gift-finder',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HowItWorksRoute = HowItWorksRouteImport.update({
+  id: '/how-it-works',
+  path: '/how-it-works',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OurStoryRoute = OurStoryRouteImport.update({
+  id: '/our-story',
+  path: '/our-story',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ShopRoute = ShopRouteImport.update({
@@ -29,6 +72,11 @@ const CreateProductIdRoute = CreateProductIdRouteImport.update({
   path: '/create/$productId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MMemorySlugRoute = MMemorySlugRouteImport.update({
+  id: '/m/$memorySlug',
+  path: '/m/$memorySlug',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ProductSlugRoute = ProductSlugRouteImport.update({
   id: '/product/$slug',
   path: '/product/$slug',
@@ -37,35 +85,104 @@ const ProductSlugRoute = ProductSlugRouteImport.update({
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
+  '/cart': typeof CartRoute
+  '/contact': typeof ContactRoute
+  '/digital-memories': typeof DigitalMemoriesRoute
+  '/faq': typeof FaqRoute
+  '/gift-finder': typeof GiftFinderRoute
+  '/how-it-works': typeof HowItWorksRoute
+  '/our-story': typeof OurStoryRoute
   '/shop': typeof ShopRoute
   '/create/$productId': typeof CreateProductIdRoute
+  '/m/$memorySlug': typeof MMemorySlugRoute
   '/product/$slug': typeof ProductSlugRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
+  '/cart': typeof CartRoute
+  '/contact': typeof ContactRoute
+  '/digital-memories': typeof DigitalMemoriesRoute
+  '/faq': typeof FaqRoute
+  '/gift-finder': typeof GiftFinderRoute
+  '/how-it-works': typeof HowItWorksRoute
+  '/our-story': typeof OurStoryRoute
   '/shop': typeof ShopRoute
   '/create/$productId': typeof CreateProductIdRoute
+  '/m/$memorySlug': typeof MMemorySlugRoute
   '/product/$slug': typeof ProductSlugRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
+  '/cart': typeof CartRoute
+  '/contact': typeof ContactRoute
+  '/digital-memories': typeof DigitalMemoriesRoute
+  '/faq': typeof FaqRoute
+  '/gift-finder': typeof GiftFinderRoute
+  '/how-it-works': typeof HowItWorksRoute
+  '/our-story': typeof OurStoryRoute
   '/shop': typeof ShopRoute
   '/create/$productId': typeof CreateProductIdRoute
+  '/m/$memorySlug': typeof MMemorySlugRoute
   '/product/$slug': typeof ProductSlugRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
-  fullPaths: '/' | '/shop' | '/create/$productId' | '/product/$slug'
+  fullPaths:
+    | '/'
+    | '/cart'
+    | '/contact'
+    | '/digital-memories'
+    | '/faq'
+    | '/gift-finder'
+    | '/how-it-works'
+    | '/our-story'
+    | '/shop'
+    | '/create/$productId'
+    | '/m/$memorySlug'
+    | '/product/$slug'
   fileRoutesByTo: FileRoutesByTo
-  to: '/' | '/shop' | '/create/$productId' | '/product/$slug'
-  id: '__root__' | '/' | '/shop' | '/create/$productId' | '/product/$slug'
+  to:
+    | '/'
+    | '/cart'
+    | '/contact'
+    | '/digital-memories'
+    | '/faq'
+    | '/gift-finder'
+    | '/how-it-works'
+    | '/our-story'
+    | '/shop'
+    | '/create/$productId'
+    | '/m/$memorySlug'
+    | '/product/$slug'
+  id:
+    | '__root__'
+    | '/'
+    | '/cart'
+    | '/contact'
+    | '/digital-memories'
+    | '/faq'
+    | '/gift-finder'
+    | '/how-it-works'
+    | '/our-story'
+    | '/shop'
+    | '/create/$productId'
+    | '/m/$memorySlug'
+    | '/product/$slug'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
+  CartRoute: typeof CartRoute
+  ContactRoute: typeof ContactRoute
+  DigitalMemoriesRoute: typeof DigitalMemoriesRoute
+  FaqRoute: typeof FaqRoute
+  GiftFinderRoute: typeof GiftFinderRoute
+  HowItWorksRoute: typeof HowItWorksRoute
+  OurStoryRoute: typeof OurStoryRoute
   ShopRoute: typeof ShopRoute
   CreateProductIdRoute: typeof CreateProductIdRoute
+  MMemorySlugRoute: typeof MMemorySlugRoute
   ProductSlugRoute: typeof ProductSlugRoute
 }
 
@@ -76,6 +193,55 @@ declare module '@tanstack/react-router' {
       path: '/'
       fullPath: '/'
       preLoaderRoute: typeof IndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/cart': {
+      id: '/cart'
+      path: '/cart'
+      fullPath: '/cart'
+      preLoaderRoute: typeof CartRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/contact': {
+      id: '/contact'
+      path: '/contact'
+      fullPath: '/contact'
+      preLoaderRoute: typeof ContactRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/digital-memories': {
+      id: '/digital-memories'
+      path: '/digital-memories'
+      fullPath: '/digital-memories'
+      preLoaderRoute: typeof DigitalMemoriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/faq': {
+      id: '/faq'
+      path: '/faq'
+      fullPath: '/faq'
+      preLoaderRoute: typeof FaqRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/gift-finder': {
+      id: '/gift-finder'
+      path: '/gift-finder'
+      fullPath: '/gift-finder'
+      preLoaderRoute: typeof GiftFinderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/how-it-works': {
+      id: '/how-it-works'
+      path: '/how-it-works'
+      fullPath: '/how-it-works'
+      preLoaderRoute: typeof HowItWorksRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/our-story': {
+      id: '/our-story'
+      path: '/our-story'
+      fullPath: '/our-story'
+      preLoaderRoute: typeof OurStoryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/shop': {
@@ -92,6 +258,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CreateProductIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/m/$memorySlug': {
+      id: '/m/$memorySlug'
+      path: '/m/$memorySlug'
+      fullPath: '/m/$memorySlug'
+      preLoaderRoute: typeof MMemorySlugRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/product/$slug': {
       id: '/product/$slug'
       path: '/product/$slug'
@@ -104,8 +277,16 @@ declare module '@tanstack/react-router' {
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
+  CartRoute: CartRoute,
+  ContactRoute: ContactRoute,
+  DigitalMemoriesRoute: DigitalMemoriesRoute,
+  FaqRoute: FaqRoute,
+  GiftFinderRoute: GiftFinderRoute,
+  HowItWorksRoute: HowItWorksRoute,
+  OurStoryRoute: OurStoryRoute,
   ShopRoute: ShopRoute,
   CreateProductIdRoute: CreateProductIdRoute,
+  MMemorySlugRoute: MMemorySlugRoute,
   ProductSlugRoute: ProductSlugRoute,
 }
 export const routeTree = rootRouteImport
