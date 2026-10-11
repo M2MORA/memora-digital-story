@@ -8,7 +8,6 @@ export function SiteFooter() {
         { to: "/shop", label: "Shop" },
         { to: "/gift-finder", label: "Gift finder" },
         { to: "/digital-memories", label: "Digital memories" },
-        { to: "/m/demo-leila-and-sami", label: "See a demo memory" },
       ],
     },
     {

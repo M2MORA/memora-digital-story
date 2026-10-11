@@ -26,10 +26,11 @@ function Finder() {
   const [a, setA] = useState<Record<string, string>>({});
   const step = Q.findIndex((q) => !a[q.key]);
   const done = step === -1;
+  const cur = Q[step === -1 ? 0 : step]!;
   const results = done
     ? PRODUCTS.map((p) => ({
         p,
-        s: (p.occasions.includes(a.occasion) ? 3 : 0) + (p.style === a.style ? 2 : 0) + (p.price <= +a.budget ? 2 : -5),
+        s: (p.occasions.includes(a["occasion"] ?? "") ? 3 : 0) + (p.style === a["style"] ? 2 : 0) + (p.price <= Number(a["budget"] ?? 999) ? 2 : -5),
       }))
         .sort((x, y) => y.s - x.s)
         .slice(0, 3)
@@ -43,10 +44,10 @@ function Finder() {
         {!done ? (
           <div key={step} className="animate-rise">
             <p className="eyebrow">Question {step + 1} of {Q.length}</p>
-            <h2 className="mt-4 text-4xl md:text-5xl">{Q[step].q}</h2>
+            <h2 className="mt-4 text-4xl md:text-5xl">{cur.q}</h2>
             <div className="mt-10 flex flex-wrap gap-3">
-              {Q[step].opts.map(([v, l]) => (
-                <button key={v} onClick={() => setA({ ...a, [Q[step].key]: v })} className="border border-border px-6 py-4 hover:border-foreground hover:bg-cream">
+              {cur.opts.map(([v, l]) => (
+                <button key={v} onClick={() => setA({ ...a, [cur.key]: v })} className="border border-border px-6 py-4 hover:border-foreground hover:bg-cream">
                   {l}
                 </button>
               ))}

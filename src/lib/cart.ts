@@ -4,9 +4,9 @@ export type Personalization = {
   title?: string;
   date?: string;
   message?: string;
-  template?: string;
+  template?: string | undefined;
   color?: string;
-  connectivity?: string;
+  connectivity?: string | undefined;
   photoCount?: number;
 };
 
@@ -14,7 +14,7 @@ export type CartItem = {
   key: string;
   productId: string;
   qty: number;
-  personalization?: Personalization;
+  personalization?: Personalization | undefined;
 };
 
 type State = { items: CartItem[]; wishlist: string[] };
