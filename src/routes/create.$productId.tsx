@@ -1,5 +1,5 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import { ImagePlus, Mic } from "lucide-react";
 import { toast } from "sonner";
 import { cart } from "@/lib/cart";
@@ -164,7 +164,7 @@ function Studio() {
   );
 }
 
-function Field({ n, label, children }: { n: string; label: string; children: React.ReactNode }) {
+function Field({ n, label, children }: { n: string; label: string; children: ReactNode }) {
   return (
     <div>
       <p className="mb-4 flex gap-3 text-xs uppercase tracking-[0.2em] text-muted-foreground"><span className="text-taupe">{n}</span>{label}</p>
