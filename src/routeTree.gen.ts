@@ -17,7 +17,11 @@ import { Route as FaqRouteImport } from './routes/faq'
 import { Route as GiftFinderRouteImport } from './routes/gift-finder'
 import { Route as HowItWorksRouteImport } from './routes/how-it-works'
 import { Route as OurStoryRouteImport } from './routes/our-story'
+import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
+import { Route as RefundPolicyRouteImport } from './routes/refund-policy'
+import { Route as ShippingPolicyRouteImport } from './routes/shipping-policy'
 import { Route as ShopRouteImport } from './routes/shop'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as CreateProductIdRouteImport } from './routes/create.$productId'
 import { Route as MMemorySlugRouteImport } from './routes/m.$memorySlug'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
@@ -62,9 +66,29 @@ const OurStoryRoute = OurStoryRouteImport.update({
   path: '/our-story',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PrivacyPolicyRoute = PrivacyPolicyRouteImport.update({
+  id: '/privacy-policy',
+  path: '/privacy-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RefundPolicyRoute = RefundPolicyRouteImport.update({
+  id: '/refund-policy',
+  path: '/refund-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ShippingPolicyRoute = ShippingPolicyRouteImport.update({
+  id: '/shipping-policy',
+  path: '/shipping-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ShopRoute = ShopRouteImport.update({
   id: '/shop',
   path: '/shop',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const CreateProductIdRoute = CreateProductIdRouteImport.update({
@@ -92,7 +116,11 @@ export interface FileRoutesByFullPath {
   '/gift-finder': typeof GiftFinderRoute
   '/how-it-works': typeof HowItWorksRoute
   '/our-story': typeof OurStoryRoute
+  '/privacy-policy': typeof PrivacyPolicyRoute
+  '/refund-policy': typeof RefundPolicyRoute
+  '/shipping-policy': typeof ShippingPolicyRoute
   '/shop': typeof ShopRoute
+  '/terms': typeof TermsRoute
   '/create/$productId': typeof CreateProductIdRoute
   '/m/$memorySlug': typeof MMemorySlugRoute
   '/product/$slug': typeof ProductSlugRoute
@@ -106,7 +134,11 @@ export interface FileRoutesByTo {
   '/gift-finder': typeof GiftFinderRoute
   '/how-it-works': typeof HowItWorksRoute
   '/our-story': typeof OurStoryRoute
+  '/privacy-policy': typeof PrivacyPolicyRoute
+  '/refund-policy': typeof RefundPolicyRoute
+  '/shipping-policy': typeof ShippingPolicyRoute
   '/shop': typeof ShopRoute
+  '/terms': typeof TermsRoute
   '/create/$productId': typeof CreateProductIdRoute
   '/m/$memorySlug': typeof MMemorySlugRoute
   '/product/$slug': typeof ProductSlugRoute
@@ -121,7 +153,11 @@ export interface FileRoutesById {
   '/gift-finder': typeof GiftFinderRoute
   '/how-it-works': typeof HowItWorksRoute
   '/our-story': typeof OurStoryRoute
+  '/privacy-policy': typeof PrivacyPolicyRoute
+  '/refund-policy': typeof RefundPolicyRoute
+  '/shipping-policy': typeof ShippingPolicyRoute
   '/shop': typeof ShopRoute
+  '/terms': typeof TermsRoute
   '/create/$productId': typeof CreateProductIdRoute
   '/m/$memorySlug': typeof MMemorySlugRoute
   '/product/$slug': typeof ProductSlugRoute
@@ -137,7 +173,11 @@ export interface FileRouteTypes {
     | '/gift-finder'
     | '/how-it-works'
     | '/our-story'
+    | '/privacy-policy'
+    | '/refund-policy'
+    | '/shipping-policy'
     | '/shop'
+    | '/terms'
     | '/create/$productId'
     | '/m/$memorySlug'
     | '/product/$slug'
@@ -151,7 +191,11 @@ export interface FileRouteTypes {
     | '/gift-finder'
     | '/how-it-works'
     | '/our-story'
+    | '/privacy-policy'
+    | '/refund-policy'
+    | '/shipping-policy'
     | '/shop'
+    | '/terms'
     | '/create/$productId'
     | '/m/$memorySlug'
     | '/product/$slug'
@@ -165,7 +209,11 @@ export interface FileRouteTypes {
     | '/gift-finder'
     | '/how-it-works'
     | '/our-story'
+    | '/privacy-policy'
+    | '/refund-policy'
+    | '/shipping-policy'
     | '/shop'
+    | '/terms'
     | '/create/$productId'
     | '/m/$memorySlug'
     | '/product/$slug'
@@ -180,7 +228,11 @@ export interface RootRouteChildren {
   GiftFinderRoute: typeof GiftFinderRoute
   HowItWorksRoute: typeof HowItWorksRoute
   OurStoryRoute: typeof OurStoryRoute
+  PrivacyPolicyRoute: typeof PrivacyPolicyRoute
+  RefundPolicyRoute: typeof RefundPolicyRoute
+  ShippingPolicyRoute: typeof ShippingPolicyRoute
   ShopRoute: typeof ShopRoute
+  TermsRoute: typeof TermsRoute
   CreateProductIdRoute: typeof CreateProductIdRoute
   MMemorySlugRoute: typeof MMemorySlugRoute
   ProductSlugRoute: typeof ProductSlugRoute
@@ -244,11 +296,39 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof OurStoryRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/privacy-policy': {
+      id: '/privacy-policy'
+      path: '/privacy-policy'
+      fullPath: '/privacy-policy'
+      preLoaderRoute: typeof PrivacyPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/refund-policy': {
+      id: '/refund-policy'
+      path: '/refund-policy'
+      fullPath: '/refund-policy'
+      preLoaderRoute: typeof RefundPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/shipping-policy': {
+      id: '/shipping-policy'
+      path: '/shipping-policy'
+      fullPath: '/shipping-policy'
+      preLoaderRoute: typeof ShippingPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/shop': {
       id: '/shop'
       path: '/shop'
       fullPath: '/shop'
       preLoaderRoute: typeof ShopRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/create/$productId': {
@@ -284,7 +364,11 @@ const rootRouteChildren: RootRouteChildren = {
   GiftFinderRoute: GiftFinderRoute,
   HowItWorksRoute: HowItWorksRoute,
   OurStoryRoute: OurStoryRoute,
+  PrivacyPolicyRoute: PrivacyPolicyRoute,
+  RefundPolicyRoute: RefundPolicyRoute,
+  ShippingPolicyRoute: ShippingPolicyRoute,
   ShopRoute: ShopRoute,
+  TermsRoute: TermsRoute,
   CreateProductIdRoute: CreateProductIdRoute,
   MMemorySlugRoute: MMemorySlugRoute,
   ProductSlugRoute: ProductSlugRoute,
