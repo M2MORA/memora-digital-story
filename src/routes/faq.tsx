@@ -4,41 +4,114 @@ import { PageHero } from "@/components/site/ProductCard";
 export const Route = createFileRoute("/faq")({
   head: () => ({
     meta: [
-      { title: "FAQ — MÉMORA" },
-      { name: "description", content: "Answers about MÉMORA products, personalization, NFC and QR, digital memories, privacy, delivery and payments." },
-      { property: "og:title", content: "Frequently asked questions — MÉMORA" },
-      { property: "og:description", content: "Everything you need to know before creating your memory." },
+      { title: "Foire aux Questions (FAQ) — MÉMORA" },
+      {
+        name: "description",
+        content:
+          "Toutes les réponses sur la photo connectée NFC Mémora : compatibilité smartphones, durée vidéo, notice au dos, livraison et sécurité.",
+      },
     ],
   }),
   component: Faq,
 });
 
 const FAQ: [string, [string, string][]][] = [
-  ["Products", [["What are MÉMORA pieces made of?", "Solid oak, glass, archival paper, linen and leather, crafted in Tunisia."]]],
-  ["Personalization", [["Can I preview my creation?", "Yes — the studio shows a live preview as you choose photos, text and finish."]]],
-  ["NFC and QR", [["Will it work with my phone?", "QR codes work with almost every smartphone camera. NFC depends on your device; most recent phones support it."]]],
-  ["Digital memories", [["Can I add content later?", "Yes. You can keep adding photos, videos and letters to your memory page from your account."]]],
-  ["Privacy and security", [["Who can see my memory?", "You decide: private, unlisted link, or password-protected. Memories are never listed publicly."]]],
-  ["Orders and delivery", [["How long does it take?", "Most pieces are crafted in 5–8 days, then delivered across Tunisia in 2–3 days."]]],
-  ["Payments", [["Which payment methods are accepted?", "Online payment is being set up. In the meantime, contact us to place an order."]]],
-  ["Storage and preservation", [["How long are memories kept?", "Your memories are preserved for as long as your account is active, with secure backups."]]],
+  [
+    "Fonctionnement & Technologie NFC",
+    [
+      [
+        "Comment fonctionne la photo connectée MÉMORA ?",
+        "Une puce NFC invisible et ultra-fine est intégrée à l'intérieur du tirage photo. Lorsque vous approchez votre smartphone (iPhone ou Android) de la photo, le téléphone détecte la puce et affiche une notification système. Il vous suffit d'appuyer dessus pour que votre vidéo se lance instantanément dans le navigateur web, sans aucune application.",
+      ],
+      [
+        "Faut-il installer une application ?",
+        "Non, absolument aucune application n'est nécessaire, ni pour vous lors de la commande, ni pour le destinataire lorsqu'il reçoit son souvenir.",
+      ],
+      [
+        "Le destinataire saura-t-il comment l'utiliser tout seul ?",
+        "Oui ! Chaque tirage photo Mémora comporte au verso une notice d'utilisation claire et soignée indiquant l'emplacement de contact et les 3 étapes simples. Il n'a besoin d'aucune assistance.",
+      ],
+      [
+        "Quels smartphones sont compatibles ?",
+        "Tous les iPhone à partir de l'iPhone XS (commercialisé en 2018) et ultérieurs, ainsi que la très grande majorité des smartphones Android récents dotés de la technologie NFC (Samsung, Google Pixel, Xiaomi, Huawei, etc.).",
+      ],
+    ],
+  ],
+  [
+    "Vidéos & Montage",
+    [
+      [
+        "Quelle est la durée maximale de la vidéo ?",
+        "8 minutes complètes de vidéo sont incluses d'office dans chaque tirage. Si votre vidéo dure plus de 8 minutes, un supplément modique de 1,50 DT par minute supplémentaire est calculé automatiquement, jusqu'à un maximum de 30 minutes.",
+      ],
+      [
+        "Je n'ai pas de montage tout fait, comment faire ?",
+        "Nous mettons à votre disposition notre outil gratuit 'Montage Automatique' (Mémora Studio) : glissez simplement vos photos et clips vidéo, choisissez une musique d'ambiance et notre système assemble votre film avec rythme.",
+      ],
+      [
+        "Quels formats de vidéo sont acceptés ?",
+        "Nous acceptons tous les formats vidéo standards : MP4, MOV (iPhone), WebM, AVI, jusqu'à 5 Go par fichier.",
+      ],
+    ],
+  ],
+  [
+    "Impression & Formats",
+    [
+      [
+        "Sur quel papier sont imprimées les photos ?",
+        "Nous utilisons un papier photographique d'art 300g/m² haute fidélité avec finition satinée anti-reflets pour garantir des couleurs profondes et une excellente longévité.",
+      ],
+      [
+        "Quelle est la différence entre le Classique et le Magnet ?",
+        "Le Classique est une carte photo d'art rigide 10×15 cm. Le Magnet possède en plus un dos entièrement magnétique qui adhère sur n'importe quel réfrigérateur ou surface métallique.",
+      ],
+    ],
+  ],
+  [
+    "Tarifs dégressifs & Livraison",
+    [
+      [
+        "Comment fonctionnent les tarifs dégressifs ?",
+        "Dès 5 exemplaires commandés (qu'il s'agisse de la même photo ou de photos différentes), vous bénéficiez de réductions automatiques sur le prix unitaire : -14% dès 5 ex., -34% dès 10 ex., -48% dès 50 ex., et jusqu'à -60% dès 100 ex.",
+      ],
+      [
+        "Quels sont les délais et frais de livraison ?",
+        "Vos créations sont fabriquées en 48h et expédiées sous 3 à 5 jours ouvrés. La livraison est 100% offerte dès 250 DT d'achat.",
+      ],
+    ],
+  ],
+  [
+    "Sécurité & Confidentialité",
+    [
+      [
+        "Où sont stockées mes vidéos et sont-elles privées ?",
+        "Vos vidéos sont hébergées sur des serveurs sécurisés, avec streaming ultra-rapide. Vos vidéos sont privées et ne sont jamais répertoriées publiquement sur internet.",
+      ],
+    ],
+  ],
 ];
 
 function Faq() {
   return (
     <>
-      <PageHero eyebrow="FAQ" title="Questions, gently answered." />
+      <PageHero
+        eyebrow="Make Memories Last"
+        title="Tout ce que vous devez savoir pour donner vie à vos souvenirs."
+        intro="Des questions sur l'impression d'art, la magie de la puce NFC ou la livraison en Tunisie ? Nous vous répondons en toute simplicité."
+      />
       <section className="container-x max-w-4xl pb-32">
         {FAQ.map(([cat, qs]) => (
           <div key={cat} className="mb-14">
-            <p className="eyebrow mb-4">{cat}</p>
+            <p className="eyebrow mb-4 text-deep-brown font-semibold">{cat}</p>
             {qs.map(([q, a]) => (
               <details key={q} className="group border-b border-border py-6">
-                <summary className="flex cursor-pointer list-none justify-between font-serif text-2xl">
+                <summary className="flex cursor-pointer list-none justify-between font-serif text-2xl text-charcoal">
                   {q}
-                  <span className="text-taupe transition-transform group-open:rotate-45">+</span>
+                  <span className="text-taupe transition-transform group-open:rotate-45 text-3xl font-light">
+                    +
+                  </span>
                 </summary>
-                <p className="mt-4 text-muted-foreground">{a}</p>
+                <p className="mt-4 text-sm sm:text-base text-muted-foreground leading-relaxed">{a}</p>
               </details>
             ))}
           </div>

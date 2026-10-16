@@ -11,7 +11,7 @@ export function ProductCard({ product }: { product: Product }) {
       <div className="relative overflow-hidden bg-cream">
         <Link to="/product/$slug" params={{ slug: product.slug }}>
           <img
-            src={product.images[0]}
+            src={product.images[0] ?? ""}
             alt={product.name}
             loading="lazy"
             width={1024}
@@ -30,7 +30,7 @@ export function ProductCard({ product }: { product: Product }) {
       <Link to="/product/$slug" params={{ slug: product.slug }} className="mt-5 block">
         <div className="flex items-baseline justify-between gap-4">
           <h3 className="font-serif text-2xl">{product.name}</h3>
-          <span className="text-sm text-muted-foreground">{formatPrice(product.price)}</span>
+          <span className="text-sm text-muted-foreground">{formatPrice(product.priceTND)}</span>
         </div>
         <p className="mt-1 text-sm text-muted-foreground">{product.tagline}</p>
       </Link>

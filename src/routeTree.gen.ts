@@ -11,13 +11,19 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as CartRouteImport } from './routes/cart'
+import { Route as CommanderRouteImport } from './routes/commander'
 import { Route as ContactRouteImport } from './routes/contact'
+import { Route as CreateRouteImport } from './routes/create'
 import { Route as DigitalMemoriesRouteImport } from './routes/digital-memories'
+import { Route as EditeasyRouteImport } from './routes/editeasy'
+import { Route as EspaceEntrepriseRouteImport } from './routes/espace-entreprise'
 import { Route as FaqRouteImport } from './routes/faq'
 import { Route as GiftFinderRouteImport } from './routes/gift-finder'
 import { Route as HowItWorksRouteImport } from './routes/how-it-works'
+import { Route as MRouteImport } from './routes/m'
 import { Route as OurStoryRouteImport } from './routes/our-story'
 import { Route as PrivacyPolicyRouteImport } from './routes/privacy-policy'
+import { Route as ProductRouteImport } from './routes/product'
 import { Route as RefundPolicyRouteImport } from './routes/refund-policy'
 import { Route as ShippingPolicyRouteImport } from './routes/shipping-policy'
 import { Route as ShopRouteImport } from './routes/shop'
@@ -36,14 +42,34 @@ const CartRoute = CartRouteImport.update({
   path: '/cart',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CommanderRoute = CommanderRouteImport.update({
+  id: '/commander',
+  path: '/commander',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ContactRoute = ContactRouteImport.update({
   id: '/contact',
   path: '/contact',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CreateRoute = CreateRouteImport.update({
+  id: '/create',
+  path: '/create',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DigitalMemoriesRoute = DigitalMemoriesRouteImport.update({
   id: '/digital-memories',
   path: '/digital-memories',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EditeasyRoute = EditeasyRouteImport.update({
+  id: '/editeasy',
+  path: '/editeasy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EspaceEntrepriseRoute = EspaceEntrepriseRouteImport.update({
+  id: '/espace-entreprise',
+  path: '/espace-entreprise',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FaqRoute = FaqRouteImport.update({
@@ -61,6 +87,11 @@ const HowItWorksRoute = HowItWorksRouteImport.update({
   path: '/how-it-works',
   getParentRoute: () => rootRouteImport,
 } as any)
+const MRoute = MRouteImport.update({
+  id: '/m',
+  path: '/m',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const OurStoryRoute = OurStoryRouteImport.update({
   id: '/our-story',
   path: '/our-story',
@@ -69,6 +100,11 @@ const OurStoryRoute = OurStoryRouteImport.update({
 const PrivacyPolicyRoute = PrivacyPolicyRouteImport.update({
   id: '/privacy-policy',
   path: '/privacy-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ProductRoute = ProductRouteImport.update({
+  id: '/product',
+  path: '/product',
   getParentRoute: () => rootRouteImport,
 } as any)
 const RefundPolicyRoute = RefundPolicyRouteImport.update({
@@ -92,31 +128,37 @@ const TermsRoute = TermsRouteImport.update({
   getParentRoute: () => rootRouteImport,
 } as any)
 const CreateProductIdRoute = CreateProductIdRouteImport.update({
-  id: '/create/$productId',
-  path: '/create/$productId',
-  getParentRoute: () => rootRouteImport,
+  id: '/$productId',
+  path: '/$productId',
+  getParentRoute: () => CreateRoute,
 } as any)
 const MMemorySlugRoute = MMemorySlugRouteImport.update({
-  id: '/m/$memorySlug',
-  path: '/m/$memorySlug',
-  getParentRoute: () => rootRouteImport,
+  id: '/$memorySlug',
+  path: '/$memorySlug',
+  getParentRoute: () => MRoute,
 } as any)
 const ProductSlugRoute = ProductSlugRouteImport.update({
-  id: '/product/$slug',
-  path: '/product/$slug',
-  getParentRoute: () => rootRouteImport,
+  id: '/$slug',
+  path: '/$slug',
+  getParentRoute: () => ProductRoute,
 } as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/cart': typeof CartRoute
+  '/commander': typeof CommanderRoute
   '/contact': typeof ContactRoute
+  '/create': typeof CreateRouteWithChildren
   '/digital-memories': typeof DigitalMemoriesRoute
+  '/editeasy': typeof EditeasyRoute
+  '/espace-entreprise': typeof EspaceEntrepriseRoute
   '/faq': typeof FaqRoute
   '/gift-finder': typeof GiftFinderRoute
   '/how-it-works': typeof HowItWorksRoute
+  '/m': typeof MRouteWithChildren
   '/our-story': typeof OurStoryRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/product': typeof ProductRouteWithChildren
   '/refund-policy': typeof RefundPolicyRoute
   '/shipping-policy': typeof ShippingPolicyRoute
   '/shop': typeof ShopRoute
@@ -128,13 +170,19 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/cart': typeof CartRoute
+  '/commander': typeof CommanderRoute
   '/contact': typeof ContactRoute
+  '/create': typeof CreateRouteWithChildren
   '/digital-memories': typeof DigitalMemoriesRoute
+  '/editeasy': typeof EditeasyRoute
+  '/espace-entreprise': typeof EspaceEntrepriseRoute
   '/faq': typeof FaqRoute
   '/gift-finder': typeof GiftFinderRoute
   '/how-it-works': typeof HowItWorksRoute
+  '/m': typeof MRouteWithChildren
   '/our-story': typeof OurStoryRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/product': typeof ProductRouteWithChildren
   '/refund-policy': typeof RefundPolicyRoute
   '/shipping-policy': typeof ShippingPolicyRoute
   '/shop': typeof ShopRoute
@@ -147,13 +195,19 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/cart': typeof CartRoute
+  '/commander': typeof CommanderRoute
   '/contact': typeof ContactRoute
+  '/create': typeof CreateRouteWithChildren
   '/digital-memories': typeof DigitalMemoriesRoute
+  '/editeasy': typeof EditeasyRoute
+  '/espace-entreprise': typeof EspaceEntrepriseRoute
   '/faq': typeof FaqRoute
   '/gift-finder': typeof GiftFinderRoute
   '/how-it-works': typeof HowItWorksRoute
+  '/m': typeof MRouteWithChildren
   '/our-story': typeof OurStoryRoute
   '/privacy-policy': typeof PrivacyPolicyRoute
+  '/product': typeof ProductRouteWithChildren
   '/refund-policy': typeof RefundPolicyRoute
   '/shipping-policy': typeof ShippingPolicyRoute
   '/shop': typeof ShopRoute
@@ -167,13 +221,19 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/cart'
+    | '/commander'
     | '/contact'
+    | '/create'
     | '/digital-memories'
+    | '/editeasy'
+    | '/espace-entreprise'
     | '/faq'
     | '/gift-finder'
     | '/how-it-works'
+    | '/m'
     | '/our-story'
     | '/privacy-policy'
+    | '/product'
     | '/refund-policy'
     | '/shipping-policy'
     | '/shop'
@@ -185,13 +245,19 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/cart'
+    | '/commander'
     | '/contact'
+    | '/create'
     | '/digital-memories'
+    | '/editeasy'
+    | '/espace-entreprise'
     | '/faq'
     | '/gift-finder'
     | '/how-it-works'
+    | '/m'
     | '/our-story'
     | '/privacy-policy'
+    | '/product'
     | '/refund-policy'
     | '/shipping-policy'
     | '/shop'
@@ -203,13 +269,19 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/cart'
+    | '/commander'
     | '/contact'
+    | '/create'
     | '/digital-memories'
+    | '/editeasy'
+    | '/espace-entreprise'
     | '/faq'
     | '/gift-finder'
     | '/how-it-works'
+    | '/m'
     | '/our-story'
     | '/privacy-policy'
+    | '/product'
     | '/refund-policy'
     | '/shipping-policy'
     | '/shop'
@@ -222,20 +294,23 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   CartRoute: typeof CartRoute
+  CommanderRoute: typeof CommanderRoute
   ContactRoute: typeof ContactRoute
+  CreateRoute: typeof CreateRouteWithChildren
   DigitalMemoriesRoute: typeof DigitalMemoriesRoute
+  EditeasyRoute: typeof EditeasyRoute
+  EspaceEntrepriseRoute: typeof EspaceEntrepriseRoute
   FaqRoute: typeof FaqRoute
   GiftFinderRoute: typeof GiftFinderRoute
   HowItWorksRoute: typeof HowItWorksRoute
+  MRoute: typeof MRouteWithChildren
   OurStoryRoute: typeof OurStoryRoute
   PrivacyPolicyRoute: typeof PrivacyPolicyRoute
+  ProductRoute: typeof ProductRouteWithChildren
   RefundPolicyRoute: typeof RefundPolicyRoute
   ShippingPolicyRoute: typeof ShippingPolicyRoute
   ShopRoute: typeof ShopRoute
   TermsRoute: typeof TermsRoute
-  CreateProductIdRoute: typeof CreateProductIdRoute
-  MMemorySlugRoute: typeof MMemorySlugRoute
-  ProductSlugRoute: typeof ProductSlugRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -254,6 +329,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CartRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/commander': {
+      id: '/commander'
+      path: '/commander'
+      fullPath: '/commander'
+      preLoaderRoute: typeof CommanderRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/contact': {
       id: '/contact'
       path: '/contact'
@@ -261,11 +343,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ContactRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/create': {
+      id: '/create'
+      path: '/create'
+      fullPath: '/create'
+      preLoaderRoute: typeof CreateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/digital-memories': {
       id: '/digital-memories'
       path: '/digital-memories'
       fullPath: '/digital-memories'
       preLoaderRoute: typeof DigitalMemoriesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/editeasy': {
+      id: '/editeasy'
+      path: '/editeasy'
+      fullPath: '/editeasy'
+      preLoaderRoute: typeof EditeasyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/espace-entreprise': {
+      id: '/espace-entreprise'
+      path: '/espace-entreprise'
+      fullPath: '/espace-entreprise'
+      preLoaderRoute: typeof EspaceEntrepriseRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/faq': {
@@ -289,6 +392,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof HowItWorksRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/m': {
+      id: '/m'
+      path: '/m'
+      fullPath: '/m'
+      preLoaderRoute: typeof MRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/our-story': {
       id: '/our-story'
       path: '/our-story'
@@ -301,6 +411,13 @@ declare module '@tanstack/react-router' {
       path: '/privacy-policy'
       fullPath: '/privacy-policy'
       preLoaderRoute: typeof PrivacyPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/product': {
+      id: '/product'
+      path: '/product'
+      fullPath: '/product'
+      preLoaderRoute: typeof ProductRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/refund-policy': {
@@ -333,45 +450,80 @@ declare module '@tanstack/react-router' {
     }
     '/create/$productId': {
       id: '/create/$productId'
-      path: '/create/$productId'
+      path: '/$productId'
       fullPath: '/create/$productId'
       preLoaderRoute: typeof CreateProductIdRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof CreateRoute
     }
     '/m/$memorySlug': {
       id: '/m/$memorySlug'
-      path: '/m/$memorySlug'
+      path: '/$memorySlug'
       fullPath: '/m/$memorySlug'
       preLoaderRoute: typeof MMemorySlugRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof MRoute
     }
     '/product/$slug': {
       id: '/product/$slug'
-      path: '/product/$slug'
+      path: '/$slug'
       fullPath: '/product/$slug'
       preLoaderRoute: typeof ProductSlugRouteImport
-      parentRoute: typeof rootRouteImport
+      parentRoute: typeof ProductRoute
     }
   }
 }
 
+interface CreateRouteChildren {
+  CreateProductIdRoute: typeof CreateProductIdRoute
+}
+
+const CreateRouteChildren: CreateRouteChildren = {
+  CreateProductIdRoute: CreateProductIdRoute,
+}
+
+const CreateRouteWithChildren =
+  CreateRoute._addFileChildren(CreateRouteChildren)
+
+interface MRouteChildren {
+  MMemorySlugRoute: typeof MMemorySlugRoute
+}
+
+const MRouteChildren: MRouteChildren = {
+  MMemorySlugRoute: MMemorySlugRoute,
+}
+
+const MRouteWithChildren = MRoute._addFileChildren(MRouteChildren)
+
+interface ProductRouteChildren {
+  ProductSlugRoute: typeof ProductSlugRoute
+}
+
+const ProductRouteChildren: ProductRouteChildren = {
+  ProductSlugRoute: ProductSlugRoute,
+}
+
+const ProductRouteWithChildren =
+  ProductRoute._addFileChildren(ProductRouteChildren)
+
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   CartRoute: CartRoute,
+  CommanderRoute: CommanderRoute,
   ContactRoute: ContactRoute,
+  CreateRoute: CreateRouteWithChildren,
   DigitalMemoriesRoute: DigitalMemoriesRoute,
+  EditeasyRoute: EditeasyRoute,
+  EspaceEntrepriseRoute: EspaceEntrepriseRoute,
   FaqRoute: FaqRoute,
   GiftFinderRoute: GiftFinderRoute,
   HowItWorksRoute: HowItWorksRoute,
+  MRoute: MRouteWithChildren,
   OurStoryRoute: OurStoryRoute,
   PrivacyPolicyRoute: PrivacyPolicyRoute,
+  ProductRoute: ProductRouteWithChildren,
   RefundPolicyRoute: RefundPolicyRoute,
   ShippingPolicyRoute: ShippingPolicyRoute,
   ShopRoute: ShopRoute,
   TermsRoute: TermsRoute,
-  CreateProductIdRoute: CreateProductIdRoute,
-  MMemorySlugRoute: MMemorySlugRoute,
-  ProductSlugRoute: ProductSlugRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

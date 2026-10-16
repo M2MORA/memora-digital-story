@@ -1,9 +1,20 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState, type ReactNode } from "react";
-import { ImagePlus, Mic } from "lucide-react";
+import { useState, useRef } from "react";
+import {
+  Upload,
+  Video,
+  Smartphone,
+  Sparkles,
+  CheckCircle2,
+  ArrowRight,
+  RotateCw,
+  Play,
+} from "lucide-react";
 import { toast } from "sonner";
 import { cart } from "@/lib/cart";
-import { formatPrice, getProduct } from "@/lib/products";
+import { getProduct, formatPrice } from "@/lib/products";
+import { MobileUploadModal } from "@/components/site/MobileUploadModal";
+import { getVideoSurcharge, INCLUDED_VIDEO_SECONDS, formatTND } from "@/lib/pricing";
 
 export const Route = createFileRoute("/create/$productId")({
   loader: ({ params }) => {
@@ -13,162 +24,260 @@ export const Route = createFileRoute("/create/$productId")({
   },
   head: ({ loaderData }) => ({
     meta: [
-      { title: loaderData ? `Create your ${loaderData.product.name} — MÉMORA Studio` : "Studio — MÉMORA" },
-      { name: "description", content: "Personalize your MÉMORA piece with photos, a title, a date and a personal message." },
-      { property: "og:title", content: "MÉMORA Studio" },
-      { property: "og:description", content: "Shape your memory into a timeless object." },
+      {
+        title: loaderData
+          ? `Personnaliser votre ${loaderData.product.name} — MÉMORA`
+          : "Studio — MÉMORA",
+      },
+      {
+        name: "description",
+        content: "Liez votre vidéo et votre photo à votre tirage connecté NFC.",
+      },
     ],
   }),
   component: Studio,
 });
 
-const TEMPLATES = ["Éternel", "Minimal", "Lettre", "Galerie"];
-const COLORS = [
-  { id: "ivory", cls: "bg-ivory" },
-  { id: "sand", cls: "bg-sand" },
-  { id: "taupe", cls: "bg-taupe" },
-  { id: "brown", cls: "bg-deep-brown" },
-  { id: "charcoal", cls: "bg-charcoal" },
-];
-const DRAFT = "memora-studio-draft";
-
 function Studio() {
   const { product } = Route.useLoaderData();
-  const nav = useNavigate();
-  const [photos, setPhotos] = useState<string[]>([]);
-  const [title, setTitle] = useState("Leila & Sami");
-  const [date, setDate] = useState("2026-06-14");
-  const [message, setMessage] = useState("The day the sea stood still.");
-  const [template, setTemplate] = useState(TEMPLATES[0]);
-  const [color, setColor] = useState("ivory");
-  const [conn, setConn] = useState(product.connectivity.length > 1 ? "both" : product.connectivity[0]);
-  const [media, setMedia] = useState<string | null>(null);
+  const navigate = useNavigate();
 
-  useEffect(() => {
-    const d = localStorage.getItem(`${DRAFT}-${product.id}`);
-    if (d) {
-      const v = JSON.parse(d);
-      setTitle(v.title); setDate(v.date); setMessage(v.message); setTemplate(v.template); setColor(v.color);
-    }
-  }, [product.id]);
-  useEffect(() => {
-    localStorage.setItem(`${DRAFT}-${product.id}`, JSON.stringify({ title, date, message, template, color }));
-  }, [product.id, title, date, message, template, color]);
+  const [step, setStep] = useState<"video" | "photo">("video");
+  const [videoFile, setVideoFile] = useState<File | null>(null);
+  const [videoUrl, setVideoUrl] = useState<string>(
+    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+  );
+  const [videoName, setVideoName] = useState("video_souvenir.mp4");
+  const [videoDuration, setVideoDuration] = useState(120);
 
-  const frame = COLORS.find((c) => c.id === color)!.cls;
-  const dark = color === "brown" || color === "charcoal";
+  const [photoUrl, setPhotoUrl] = useState<string>(product.images[0] ?? "");
+  const [photoName, setPhotoName] = useState("photo_recto.jpg");
+  const [withFrame, setWithFrame] = useState(product.category === "grand-format");
+  const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
+  const [previewSide, setPreviewSide] = useState<"recto" | "verso">("recto");
+
+  const [cardMessage, setCardMessage] = useState("Pour toujours, je t'aime.");
+  const [letterContent, setLetterContent] = useState("");
+
+  const surcharge = getVideoSurcharge(videoDuration, 1);
+
+  const handleValidate = () => {
+    cart.add(product.id, {
+      format: product.formatCode,
+      withFrame,
+      videoDurationSec: videoDuration,
+      photoPreviewUrl: photoUrl,
+      videoPreviewUrl: videoUrl,
+      videoName,
+      photoName,
+      cardMessage,
+      letterContent,
+      qty: 1,
+    });
+    toast.success("Votre création Mémora a été ajoutée au panier !");
+    navigate({ to: "/commander" });
+  };
 
   return (
-    <section className="container-x grid gap-14 pb-24 pt-32 lg:grid-cols-[1.2fr_1fr]">
-      <div className="lg:sticky lg:top-28 lg:self-start">
-        <p className="eyebrow">Live preview · {product.name}</p>
-        <div className="mt-6 flex aspect-[4/5] items-center justify-center bg-cream p-10">
-          <div className={`flex h-full w-full flex-col p-6 shadow-2xl transition-colors duration-700 ${frame}`}>
-            <div className="relative flex-1 overflow-hidden bg-muted">
-              {photos[0] ? (
-                <img src={photos[0]} alt="Your photograph" className="h-full w-full object-cover sepia-[.15]" />
+    <div className="min-h-screen bg-background pb-32 pt-28">
+      <div className="container-x max-w-5xl">
+        <div className="flex items-center justify-between border-b border-border pb-6">
+          <div>
+            <p className="eyebrow">Studio de création · {product.name}</p>
+            <h1 className="font-serif text-3xl sm:text-5xl">Liez votre souvenir au support</h1>
+          </div>
+          <span className="font-serif text-2xl font-semibold text-charcoal">
+            {formatPrice(product.priceTND)}
+          </span>
+        </div>
+
+        <div className="mt-10 grid gap-12 lg:grid-cols-[1fr_1.2fr]">
+          {/* Live Preview */}
+          <div className="lg:sticky lg:top-28 lg:self-start flex flex-col items-center">
+            <div className="relative aspect-[4/5] w-full max-w-[320px] rounded-2xl border-4 border-ivory bg-cream shadow-2xl overflow-hidden flex items-center justify-center">
+              {previewSide === "recto" ? (
+                <img src={photoUrl} alt="Photo sélectionnée" className="h-full w-full object-cover" />
               ) : (
-                <img src={product.images[0]} alt="" className="h-full w-full object-cover opacity-60" />
-              )}
-              {template === "Galerie" && photos.length > 1 && (
-                <div className="absolute bottom-3 right-3 flex gap-2">
-                  {photos.slice(1, 4).map((p) => <img key={p} src={p} alt="" className="h-14 w-14 border-2 border-ivory object-cover" />)}
+                <div className="h-full w-full bg-[#FBF9F5] p-6 text-center flex flex-col justify-between">
+                  <p className="font-serif text-xl tracking-wider text-charcoal">MÉMORA</p>
+                  <div className="my-auto rounded-xl border border-dashed border-taupe/40 bg-sand/20 p-4">
+                    <p className="text-xs font-semibold">Puce NFC intégrée</p>
+                    <p className="text-[11px] text-muted-foreground">Posez votre smartphone ici</p>
+                  </div>
+                  <p className="text-[10px] text-muted-foreground">Sans application · iOS & Android</p>
                 </div>
               )}
+
+              <button
+                type="button"
+                onClick={() => setPreviewSide(previewSide === "recto" ? "verso" : "recto")}
+                className="absolute bottom-3 right-3 rounded-full bg-charcoal/70 px-3 py-1.5 text-[11px] text-ivory uppercase tracking-wider backdrop-blur"
+              >
+                {previewSide === "recto" ? "Voir le verso (notice)" : "Voir la photo"}
+              </button>
             </div>
-            <div className={`pt-5 text-center ${dark ? "text-ivory" : "text-charcoal"}`}>
-              <p className={`font-serif ${template === "Lettre" ? "italic" : ""} text-3xl`}>{title || "Your title"}</p>
-              {date && <p className="mt-1 text-[10px] uppercase tracking-[0.3em] opacity-70">{new Date(date).toLocaleDateString("fr-FR", { day: "numeric", month: "long", year: "numeric" })}</p>}
-              {template !== "Minimal" && message && <p className="mt-2 font-serif text-sm italic opacity-80">{message}</p>}
-            </div>
+
+            <p className="mt-4 text-xs text-muted-foreground">
+              Format {product.dimensions} · Puce NFC invisible
+            </p>
           </div>
-        </div>
-      </div>
 
-      <div className="space-y-12">
-        <div>
-          <h1 className="text-5xl">The Studio</h1>
-          <p className="mt-3 text-muted-foreground">Shape your memory. Your choices are saved as you go.</p>
-        </div>
+          {/* Stepper Inputs */}
+          <div className="rounded-2xl border border-border bg-background p-6 sm:p-8 shadow-xs">
+            {step === "video" ? (
+              <div className="space-y-6 animate-in fade-in">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-deep-brown">
+                  <Video className="h-4 w-4" />
+                  <span>Étape 1 : Votre Vidéo</span>
+                </div>
+                <h2 className="font-serif text-2xl sm:text-3xl">Quelle vidéo voulez-vous faire vivre ?</h2>
+                <p className="text-sm text-muted-foreground">
+                  8 premières minutes incluses (+1,50 DT / min supplémentaire).
+                </p>
 
-        <Field n="01" label="Photographs">
-          <label className="flex cursor-pointer flex-col items-center gap-3 border border-dashed border-taupe py-10 text-sm text-muted-foreground hover:bg-cream">
-            <ImagePlus className="h-6 w-6" strokeWidth={1.2} />
-            {photos.length ? `${photos.length} photo(s) selected` : "Upload your photographs"}
-            <input type="file" accept="image/*" multiple className="hidden" onChange={(e) => setPhotos(Array.from(e.target.files ?? []).map((f) => URL.createObjectURL(f)))} />
-          </label>
-        </Field>
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-taupe/40 bg-cream/30 p-6 text-center hover:bg-cream/70">
+                    <Upload className="h-6 w-6 text-deep-brown" />
+                    <span className="mt-2 text-xs font-medium">Importer un fichier</span>
+                    <input
+                      type="file"
+                      accept="video/*"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) {
+                          setVideoFile(f);
+                          setVideoUrl(URL.createObjectURL(f));
+                          setVideoName(f.name);
+                          toast.success("Vidéo sélectionnée !");
+                        }
+                      }}
+                    />
+                  </label>
 
-        <Field n="02" label="Title & date">
-          <input value={title} onChange={(e) => setTitle(e.target.value)} maxLength={40} className="w-full border-b border-border bg-transparent py-3 font-serif text-2xl outline-hidden focus:border-foreground" />
-          <input type="date" value={date} onChange={(e) => setDate(e.target.value)} className="mt-4 w-full border-b border-border bg-transparent py-3 outline-hidden" />
-        </Field>
+                  <button
+                    type="button"
+                    onClick={() => setIsMobileModalOpen(true)}
+                    className="flex flex-col items-center justify-center rounded-xl border border-border p-6 text-center hover:bg-cream/40"
+                  >
+                    <Smartphone className="h-6 w-6 text-deep-brown" />
+                    <span className="mt-2 text-xs font-medium">Depuis mon téléphone</span>
+                  </button>
+                </div>
 
-        <Field n="03" label="Personal message">
-          <textarea value={message} onChange={(e) => setMessage(e.target.value)} maxLength={280} rows={3} className="w-full border border-border bg-transparent p-4 font-serif text-lg italic outline-hidden focus:border-foreground" />
-        </Field>
+                <div className="rounded-xl bg-charcoal/5 p-4 text-xs">
+                  <div className="flex justify-between font-medium">
+                    <span>Fichier : {videoName}</span>
+                    <span>Durée : {Math.floor(videoDuration / 60)}m {videoDuration % 60}s</span>
+                  </div>
+                  {surcharge > 0 && (
+                    <p className="mt-2 text-deep-brown font-semibold">
+                      Supplément durée : +{formatTND(surcharge)}
+                    </p>
+                  )}
+                </div>
 
-        <Field n="04" label="Template">
-          <div className="grid grid-cols-4 gap-2">
-            {TEMPLATES.map((t) => (
-              <button key={t} onClick={() => setTemplate(t)} className={`border py-3 text-sm ${template === t ? "border-foreground bg-foreground text-background" : "border-border"}`}>{t}</button>
-            ))}
-          </div>
-        </Field>
-
-        <Field n="05" label="Finish">
-          <div className="flex gap-3">
-            {COLORS.map((c) => (
-              <button key={c.id} aria-label={c.id} onClick={() => setColor(c.id)} className={`h-10 w-10 rounded-full border ${c.cls} ${color === c.id ? "ring-2 ring-foreground ring-offset-2 ring-offset-background" : "border-border"}`} />
-            ))}
-          </div>
-        </Field>
-
-        <Field n="06" label="Audio or video (optional)">
-          <label className="flex cursor-pointer items-center gap-3 border border-border px-4 py-4 text-sm text-muted-foreground hover:bg-cream">
-            <Mic className="h-5 w-5" strokeWidth={1.2} />
-            {media ?? "Add a voice message or a short video"}
-            <input type="file" accept="audio/*,video/*" className="hidden" onChange={(e) => setMedia(e.target.files?.[0]?.name ?? null)} />
-          </label>
-        </Field>
-
-        <Field n="07" label="Connection">
-          <div className="grid grid-cols-3 gap-2">
-            {(["qr", "nfc", "both"] as const).map((c) => {
-              const ok = c === "both" ? product.connectivity.length > 1 : product.connectivity.includes(c);
-              return (
-                <button key={c} disabled={!ok} onClick={() => setConn(c)} className={`border py-3 text-sm uppercase disabled:opacity-30 ${conn === c ? "border-foreground bg-foreground text-background" : "border-border"}`}>
-                  {c === "both" ? "NFC + QR" : c}
+                <button
+                  type="button"
+                  onClick={() => setStep("photo")}
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-sm bg-primary py-4 text-xs uppercase tracking-widest text-primary-foreground hover:bg-charcoal transition-colors shadow-xs"
+                >
+                  <span>Passer au choix de la photo</span>
+                  <ArrowRight className="h-4 w-4" />
                 </button>
-              );
-            })}
+              </div>
+            ) : (
+              <div className="space-y-6 animate-in fade-in">
+                <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-deep-brown">
+                  <Sparkles className="h-4 w-4" />
+                  <span>Étape 2 : La Photo Imprimée</span>
+                </div>
+                <h2 className="font-serif text-2xl sm:text-3xl">La photo qui habillera le recto</h2>
+
+                <label className="flex cursor-pointer flex-col items-center justify-center rounded-xl border-2 border-dashed border-taupe/40 bg-cream/30 p-8 text-center hover:bg-cream/70">
+                  <Upload className="h-8 w-8 text-deep-brown" />
+                  <span className="mt-2 text-sm font-medium">Choisir ma photo</span>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) {
+                        setPhotoUrl(URL.createObjectURL(f));
+                        setPhotoName(f.name);
+                        toast.success("Photo sélectionnée !");
+                      }
+                    }}
+                  />
+                </label>
+
+                {/* Card Message Input */}
+                <div className="rounded-xl border border-border bg-cream/30 p-4 space-y-3">
+                  <div>
+                    <label className="text-xs font-semibold uppercase tracking-wider text-charcoal flex justify-between">
+                      <span>Message sur la carte *</span>
+                      <span className="text-[11px] font-normal text-muted-foreground">{cardMessage.length}/140</span>
+                    </label>
+                    <input
+                      type="text"
+                      maxLength={140}
+                      value={cardMessage}
+                      onChange={(e) => setCardMessage(e.target.value)}
+                      placeholder="Ex: Pour toujours, je t'aime..."
+                      className="mt-1 w-full rounded-md border border-border bg-background px-3 py-2 text-xs outline-hidden focus:border-deep-brown"
+                    />
+                  </div>
+
+                  {product.formatCode === "box" && (
+                    <div>
+                      <label className="text-xs font-semibold uppercase tracking-wider text-charcoal flex justify-between">
+                        <span>Votre lettre d'émotion pour le coffret</span>
+                        <span className="text-[11px] font-serif italic text-deep-brown">Papier d'art</span>
+                      </label>
+                      <textarea
+                        rows={4}
+                        value={letterContent}
+                        onChange={(e) => setLetterContent(e.target.value)}
+                        placeholder="Rédigez la lettre qui sera délicatement insérée dans votre coffret cadeau..."
+                        className="mt-1 w-full rounded-md border border-border bg-background p-3 text-xs font-serif leading-relaxed outline-hidden focus:border-deep-brown"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                <div className="flex gap-4 pt-4 border-t border-border">
+                  <button
+                    type="button"
+                    onClick={() => setStep("video")}
+                    className="rounded-sm border border-border px-6 py-3 text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground"
+                  >
+                    Retour
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleValidate}
+                    className="flex-1 inline-flex items-center justify-center gap-2 rounded-sm bg-primary py-4 text-xs uppercase tracking-widest text-primary-foreground hover:bg-charcoal transition-colors shadow-md"
+                  >
+                    <span>Ajouter à ma commande</span>
+                    <ArrowRight className="h-4 w-4" />
+                  </button>
+                </div>
+              </div>
+            )}
           </div>
-        </Field>
-
-        <div className="flex items-center justify-between border-t border-border pt-8">
-          <span className="text-2xl">{formatPrice(product.price)}</span>
-          <button
-            onClick={() => {
-              cart.add(product.id, { title, date, message, template, color, connectivity: conn, photoCount: photos.length });
-              toast.success("Your creation was added to the cart");
-              nav({ to: "/cart" });
-            }}
-            className="bg-primary px-10 py-4 text-xs uppercase tracking-[0.2em] text-primary-foreground hover:bg-charcoal"
-          >
-            Add to cart
-          </button>
         </div>
-        <Link to="/product/$slug" params={{ slug: product.slug }} className="block text-sm text-muted-foreground underline">Back to product</Link>
       </div>
-    </section>
-  );
-}
 
-function Field({ n, label, children }: { n: string; label: string; children: ReactNode }) {
-  return (
-    <div>
-      <p className="mb-4 flex gap-3 text-xs uppercase tracking-[0.2em] text-muted-foreground"><span className="text-taupe">{n}</span>{label}</p>
-      {children}
+      <MobileUploadModal
+        isOpen={isMobileModalOpen}
+        onClose={() => setIsMobileModalOpen(false)}
+        onVideoReceived={(data) => {
+          setVideoUrl(data.url);
+          setVideoName(data.name);
+          setVideoDuration(data.durationSec);
+        }}
+      />
     </div>
   );
 }

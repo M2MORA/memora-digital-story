@@ -1,181 +1,247 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useRef, useState } from "react";
-import { Lock, Pause, Play, Share2 } from "lucide-react";
+import {
+  Volume2,
+  VolumeX,
+  Maximize,
+  Download,
+  Share2,
+  Sparkles,
+  Heart,
+  Smartphone,
+  Play,
+  Pause,
+} from "lucide-react";
 import { toast } from "sonner";
 import hero from "@/assets/hero.jpg";
 import moments from "@/assets/product-moments.jpg";
 import box from "@/assets/product-box.jpg";
 import scan from "@/assets/scan.jpg";
+import { getMemoryBySlug } from "@/lib/supabase";
 
 type Memory = {
   slug: string;
   title: string;
-  date: string;
+  subtitle: string;
+  videoUrl: string;
+  coverPhoto: string;
+  author: string;
+  recipient: string;
   message: string;
-  cover: string;
-  privacy: "unlisted" | "password";
-  password?: string;
-  gallery: string[];
-  timeline: { date: string; text: string }[];
-  letter: string;
+  date: string;
 };
 
-// Demonstration memories. Real memories will be loaded securely per owner and privacy setting.
 const MEMORIES: Record<string, Memory> = {
   "demo-leila-and-sami": {
     slug: "demo-leila-and-sami",
     title: "Leila & Sami",
-    date: "14 June 2026 · Sidi Bou Saïd",
-    message: "The day the sea stood still, and so did we.",
-    cover: moments,
-    privacy: "unlisted",
-    gallery: [hero, box, scan, moments],
-    timeline: [
-      { date: "2019", text: "We met on a rooftop in the medina." },
-      { date: "2022", text: "Our first journey together — Djerba, in a borrowed car." },
-      { date: "2026", text: "We said yes, facing the sea." },
-    ],
-    letter:
-      "Sami, I wanted to keep this day somewhere it couldn't be lost between thousands of photos. Whenever you hold this frame, I hope you hear the waves again. — Leila",
+    subtitle: "Le jour où la mer s'est arrêtée · Sidi Bou Saïd",
+    videoUrl:
+      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+    coverPhoto: moments,
+    author: "Leila",
+    recipient: "Sami",
+    message:
+      "Sami, je voulais garder ce souvenir vivant dans tes mains. À chaque fois que ton téléphone touchera cette photo, j'espère que tu réentendras le bruit des vagues et notre rire ce jour-là.",
+    date: "14 Juin 2026",
   },
-  "demo-family": {
-    slug: "demo-family",
-    title: "Our family",
-    date: "Since 1978",
-    message: "A home is a collection of moments.",
-    cover: scan,
-    privacy: "password",
-    password: "memora",
-    gallery: [scan, hero],
-    timeline: [{ date: "1978", text: "Grandpa opened the bakery." }],
-    letter: "To everyone who carries our name.",
+  "demo-famille": {
+    slug: "demo-famille",
+    title: "Notre Famille",
+    subtitle: "Rassemblement d'été · Depuis 1978",
+    videoUrl:
+      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+    coverPhoto: scan,
+    author: "Yasmine",
+    recipient: "À toute la famille",
+    message: "Parce que nos plus beaux rires ne doivent jamais disparaître dans les téléphones.",
+    date: "Août 2026",
   },
 };
 
 export const Route = createFileRoute("/m/$memorySlug")({
-  loader: ({ params }) => {
-    const m = MEMORIES[params.memorySlug];
-    if (!m) throw notFound();
-    const { password: _p, ...safe } = m;
-    return { memory: safe, locked: m.privacy === "password" };
+  loader: async ({ params }) => {
+    const dbRecord = await getMemoryBySlug(params.memorySlug);
+    if (dbRecord) {
+      const memory: Memory = {
+        slug: dbRecord.slug,
+        title: dbRecord.title,
+        subtitle: dbRecord.description || "Souvenir connecté MÉMORA",
+        videoUrl: dbRecord.video_url,
+        coverPhoto: dbRecord.photo_url || moments,
+        author: "MÉMORA",
+        recipient: "Destinataire",
+        message: dbRecord.description || "Approchez votre smartphone. Le souvenir prend vie instantanément.",
+        date: new Date(dbRecord.created_at).toLocaleDateString("fr-FR", { month: "long", year: "numeric" }),
+      };
+      return { memory };
+    }
+
+    const memory = MEMORIES[params.memorySlug] ?? MEMORIES["demo-leila-and-sami"];
+    return { memory };
   },
   head: ({ loaderData }) => ({
     meta: [
-      { title: loaderData ? `${loaderData.memory.title} — a MÉMORA memory` : "Memory — MÉMORA" },
-      { name: "description", content: "A private digital memory preserved by MÉMORA." },
-      { property: "og:title", content: loaderData?.memory.title ?? "A MÉMORA memory" },
-      { property: "og:description", content: "A story that lives forever." },
+      {
+        title: loaderData?.memory
+          ? `${loaderData.memory.title} — Votre Souvenir MÉMORA`
+          : "Souvenir — MÉMORA",
+      },
+      {
+        name: "description",
+        content: "Approchez votre smartphone. Le souvenir prend vie instantanément.",
+      },
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   notFoundComponent: () => (
-    <div className="flex min-h-screen flex-col items-center justify-center bg-charcoal text-ivory">
-      <p className="font-serif text-4xl">This memory is not available.</p>
-      <Link to="/" className="mt-6 text-sm text-sand underline">MÉMORA</Link>
+    <div className="flex min-h-screen flex-col items-center justify-center bg-charcoal px-6 text-center text-ivory">
+      <h1 className="font-serif text-4xl">Ce souvenir MÉMORA n'est pas disponible</h1>
+      <Link to="/" className="mt-6 rounded-full bg-sand px-6 py-2.5 text-xs uppercase tracking-widest text-charcoal">
+        Retour à l'accueil
+      </Link>
     </div>
   ),
-  component: MemoryPage,
+  component: MemoryPlaybackPage,
 });
 
-function MemoryPage() {
-  const { memory, locked } = Route.useLoaderData();
-  const [unlocked, setUnlocked] = useState(!locked);
-  const [pw, setPw] = useState("");
-  const [playing, setPlaying] = useState(false);
-  const audio = useRef<HTMLAudioElement>(null);
+function MemoryPlaybackPage() {
+  const loaderData = Route.useLoaderData();
+  const memory = loaderData?.memory ?? MEMORIES["demo-leila-and-sami"]!;
+  const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [isMuted, setIsMuted] = useState(true);
+  const [isPlaying, setIsPlaying] = useState(true);
 
-  if (!unlocked) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-charcoal px-6 text-ivory">
-        <form
-          onSubmit={(e) => {
-            e.preventDefault();
-            // Demo-only check; real memories verify the password on the server.
-            if (pw === "memora") setUnlocked(true);
-            else toast.error("Incorrect password");
-          }}
-          className="w-full max-w-sm text-center"
-        >
-          <Lock className="mx-auto h-6 w-6 text-sand" strokeWidth={1.2} />
-          <h1 className="mt-6 text-4xl">{memory.title}</h1>
-          <p className="mt-2 text-sm text-taupe">This memory is protected. (Demo password: memora)</p>
-          <input type="password" value={pw} onChange={(e) => setPw(e.target.value)} className="mt-8 w-full border-b border-taupe bg-transparent py-3 text-center outline-hidden" placeholder="Password" />
-          <button className="mt-8 w-full bg-ivory py-3 text-xs uppercase tracking-[0.2em] text-charcoal">Open memory</button>
-        </form>
-      </div>
-    );
-  }
+  const toggleSound = () => {
+    if (videoRef.current) {
+      videoRef.current.muted = !videoRef.current.muted;
+      setIsMuted(videoRef.current.muted);
+      if (videoRef.current.muted) {
+        toast("Son coupé");
+      } else {
+        toast.success("Son activé !");
+      }
+    }
+  };
+
+  const togglePlay = () => {
+    if (videoRef.current) {
+      if (videoRef.current.paused) {
+        videoRef.current.play();
+        setIsPlaying(true);
+      } else {
+        videoRef.current.pause();
+        setIsPlaying(false);
+      }
+    }
+  };
+
+  const handleShare = async () => {
+    const url = window.location.href;
+    if (navigator.share) {
+      await navigator.share({ title: memory.title, url }).catch(() => {});
+    } else {
+      await navigator.clipboard.writeText(url);
+      toast.success("Lien copié dans le presse-papiers !");
+    }
+  };
 
   return (
-    <div className="bg-charcoal text-ivory">
-      <audio ref={audio} loop src="https://cdn.pixabay.com/download/audio/2022/02/23/audio_ea70ad08e3.mp3" preload="none" />
-      <div className="fixed right-4 top-4 z-40 flex gap-2">
-        <button
-          aria-label={playing ? "Pause music" : "Play music"}
-          onClick={() => {
-            if (!audio.current) return;
-            if (playing) audio.current.pause();
-            else audio.current.play().catch(() => toast("Music unavailable"));
-            setPlaying(!playing);
-          }}
-          className="rounded-full bg-charcoal/60 p-3 backdrop-blur"
-        >
-          {playing ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-        </button>
-        <button
-          aria-label="Share"
-          onClick={async () => {
-            const url = window.location.href;
-            if (navigator.share) await navigator.share({ title: memory.title, url }).catch(() => {});
-            else { await navigator.clipboard.writeText(url); toast.success("Link copied"); }
-          }}
-          className="rounded-full bg-charcoal/60 p-3 backdrop-blur"
-        >
-          <Share2 className="h-4 w-4" />
-        </button>
-      </div>
-
-      <section className="relative flex min-h-screen items-end">
-        <img src={memory.cover} alt={memory.title} className="absolute inset-0 h-full w-full animate-slow-zoom object-cover" />
-        <div className="absolute inset-0 bg-linear-to-t from-charcoal via-charcoal/40 to-transparent" />
-        <div className="relative mx-auto w-full max-w-2xl px-6 pb-20 text-center">
-          <p className="eyebrow text-sand">{memory.date}</p>
-          <h1 className="mt-4 animate-rise text-6xl md:text-8xl">{memory.title}</h1>
-          <p className="mt-6 font-serif text-2xl italic text-ivory/80">{memory.message}</p>
+    <div className="min-h-screen bg-charcoal text-ivory selection:bg-sand selection:text-charcoal flex flex-col justify-between">
+      {/* Discreet Header */}
+      <header className="px-6 py-4 flex items-center justify-between border-b border-ivory/10 backdrop-blur-md bg-charcoal/80 sticky top-0 z-40">
+        <Link to="/" className="font-serif text-xl tracking-[0.25em] text-ivory">
+          MÉMORA
+        </Link>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={handleShare}
+            aria-label="Partager ce souvenir"
+            className="flex items-center gap-1.5 rounded-full bg-ivory/10 px-3.5 py-1.5 text-xs text-sand hover:bg-ivory/20 transition-colors"
+          >
+            <Share2 className="h-3.5 w-3.5" />
+            <span>Partager</span>
+          </button>
         </div>
-      </section>
+      </header>
 
-      <section className="mx-auto max-w-5xl px-4 py-20">
-        <p className="eyebrow mb-8 text-center text-sand">Gallery</p>
-        <div className="columns-2 gap-3 md:columns-3">
-          {memory.gallery.map((g, i) => (
-            <img key={i} src={g} alt="" loading="lazy" className="mb-3 w-full" />
-          ))}
+      {/* Main Playback Area */}
+      <main className="container-x max-w-4xl py-8 flex-1 flex flex-col justify-center">
+        {/* Memory Title */}
+        <div className="text-center mb-6">
+          <p className="eyebrow text-sand">{memory.date} · MÉMORA SOUVENIR NFC</p>
+          <h1 className="mt-2 font-serif text-4xl sm:text-6xl text-ivory tracking-tight">{memory.title}</h1>
+          <p className="mt-2 text-sm text-taupe">{memory.subtitle}</p>
         </div>
-      </section>
 
-      <section className="mx-auto max-w-2xl px-6 py-20">
-        <p className="eyebrow mb-10 text-center text-sand">Timeline</p>
-        <ol className="border-l border-ivory/20">
-          {memory.timeline.map((t) => (
-            <li key={t.date} className="relative pb-10 pl-8">
-              <span className="absolute -left-1 top-2 h-2 w-2 rounded-full bg-sand" />
-              <p className="font-serif text-3xl text-sand">{t.date}</p>
-              <p className="mt-2 text-ivory/80">{t.text}</p>
-            </li>
-          ))}
-        </ol>
-      </section>
+        {/* Video Player Box */}
+        <div className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-2xl bg-black shadow-2xl border border-ivory/15">
+          <video
+            ref={videoRef}
+            src={memory.videoUrl}
+            autoPlay
+            playsInline
+            loop
+            muted={isMuted}
+            className="aspect-video w-full object-cover"
+          />
 
-      <section className="bg-ivory px-6 py-24 text-charcoal">
-        <div className="mx-auto max-w-xl">
-          <p className="eyebrow text-center">A letter</p>
-          <p className="mt-8 font-serif text-2xl italic leading-relaxed">{memory.letter}</p>
+          {/* Floating Controls Overlay */}
+          <div className="absolute inset-x-0 bottom-0 flex items-center justify-between p-4 bg-linear-to-t from-charcoal/90 via-charcoal/40 to-transparent">
+            {/* Play/Pause */}
+            <button
+              onClick={togglePlay}
+              className="flex items-center gap-2 rounded-full bg-charcoal/80 px-3.5 py-2 text-xs font-medium text-ivory backdrop-blur hover:bg-charcoal"
+            >
+              {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
+              <span>{isPlaying ? "Pause" : "Lecture"}</span>
+            </button>
+
+            {/* Tap for sound button */}
+            <button
+              onClick={toggleSound}
+              className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wider backdrop-blur transition-all ${
+                isMuted
+                  ? "bg-sand text-charcoal hover:bg-sand/90 animate-pulse"
+                  : "bg-charcoal/80 text-ivory hover:bg-charcoal"
+              }`}
+            >
+              {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
+              <span>{isMuted ? "Activer le son" : "Couper le son"}</span>
+            </button>
+          </div>
         </div>
-      </section>
 
-      <footer className="py-12 text-center text-xs uppercase tracking-[0.3em] text-taupe">
-        Preserved by <Link to="/" className="text-sand">MÉMORA</Link>
+        {/* Card Note from author */}
+        <div className="mx-auto mt-8 w-full max-w-xl rounded-2xl border border-ivory/15 bg-ivory/5 p-6 sm:p-8 backdrop-blur-xs text-center">
+          <p className="eyebrow text-sand">Mot imprimé au dos</p>
+          <p className="mt-4 font-serif text-xl sm:text-2xl italic text-ivory/90 leading-relaxed">
+            “{memory.message}”
+          </p>
+          <p className="mt-4 text-xs tracking-widest uppercase text-taupe">
+            De la part de {memory.author} · Pour {memory.recipient}
+          </p>
+        </div>
+
+        {/* Viral loop: Create your own Mémora */}
+        <div className="mx-auto mt-12 w-full max-w-xl rounded-2xl border border-sand/30 bg-sand/10 p-6 text-center">
+          <Sparkles className="mx-auto h-6 w-6 text-sand mb-2" />
+          <h3 className="font-serif text-2xl text-ivory">Les instants passent. Les souvenirs restent.</h3>
+          <p className="mt-1 text-xs text-ivory/70 max-w-md mx-auto">
+            Vos plus belles photos méritent mieux qu'un écran. Offrez à ceux que vous aimez un souvenir physique à toucher et revivre pour toujours.
+          </p>
+          <Link
+            to="/commander"
+            className="mt-5 inline-flex items-center gap-2 rounded-full bg-sand px-6 py-3 text-xs uppercase tracking-widest text-charcoal font-semibold hover:bg-ivory transition-colors shadow-md"
+          >
+            <span>Créer un MÉMORA</span>
+          </Link>
+        </div>
+      </main>
+
+      {/* Footer */}
+      <footer className="py-6 text-center text-[11px] uppercase tracking-[0.25em] text-taupe border-t border-ivory/10">
+        MÉMORA · Make Memories Last · Des photos à toucher, des souvenirs à vivre
       </footer>
     </div>
   );

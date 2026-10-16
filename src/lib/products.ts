@@ -1,17 +1,17 @@
+import envelopeImg from "@/assets/product-envelope.jpg";
+import boxLetterImg from "@/assets/product-box-letter.jpg";
 import moments from "@/assets/product-moments.jpg";
 import box from "@/assets/product-box.jpg";
 import hero from "@/assets/hero.jpg";
 import scan from "@/assets/scan.jpg";
+import { formatTND, Format } from "./pricing";
 
-export type Category = "plaques" | "boxes" | "frames" | "gifts" | "collections";
+export type Category = "enveloppe" | "coffret-box" | "classique" | "magnet" | "grand-format" | "gift-card" | "sur-mesure";
 
 export const CATEGORIES: { id: Category | "all"; label: string }[] = [
-  { id: "all", label: "All products" },
-  { id: "plaques", label: "Photo plaques" },
-  { id: "boxes", label: "Memory boxes" },
-  { id: "frames", label: "Digital frames" },
-  { id: "gifts", label: "Personalized gifts" },
-  { id: "collections", label: "Collections" },
+  { id: "all", label: "Tous les produits" },
+  { id: "enveloppe", label: "L'Enveloppe & Carte" },
+  { id: "coffret-box", label: "Le Coffret Box & Lettre" },
 ];
 
 export type Product = {
@@ -21,7 +21,9 @@ export type Product = {
   tagline: string;
   description: string;
   category: Category;
-  price: number; // TND
+  priceTND: number; // TND base price
+  price: number; // backward compatibility alias
+  formatCode: Format;
   images: string[];
   materials: string[];
   dimensions: string;
@@ -29,115 +31,73 @@ export type Product = {
   occasions: string[];
   style: "minimal" | "classic" | "romantic" | "modern";
   delivery: string;
+  badge?: string;
+  includedVideoMin: number;
 };
 
-// Demonstration catalogue — prices and content are editable by the administrator.
 export const PRODUCTS: Product[] = [
   {
     id: "p1",
-    slug: "memora-moments",
-    name: "MÉMORA Moments",
-    tagline: "A single moment, held in oak and glass.",
+    slug: "memora-simple-enveloppe",
+    name: "Mémora Simple (Enveloppe & Carte)",
+    tagline: "La photo souvenir avec puce NFC dans son enveloppe d'art et sa carte avec message.",
     description:
-      "A floating glass photo plaque set in solid oak. A discreet engraved code opens a private digital page with the photos, videos and words behind the picture.",
-    category: "plaques",
-    price: 129,
-    images: [moments, hero],
-    materials: ["Solid oak", "Tempered glass"],
-    dimensions: "20 × 25 cm",
-    connectivity: ["nfc", "qr"],
-    occasions: ["love", "family", "special"],
-    style: "minimal",
-    delivery: "Crafted in 5–7 days. Delivery across Tunisia in 2–3 days.",
+      "L'émotion à l'état pur. Un tirage photographique d'art 10×15 cm sur papier noble 300g/m² avec puce invisible. Glissé délicatement dans une élégante enveloppe texturée cachetée, accompagné d'une carte avec votre message personnalisé. Approchez votre smartphone sans aucune application requise : votre vidéo se lance instantanément.",
+    category: "enveloppe",
+    priceTND: 49,
+    price: 49,
+    formatCode: "10x15",
+    images: [envelopeImg, moments, hero],
+    materials: [
+      "Tirage photo d'art 300g/m²",
+      "Puce NFC invisible intégrée",
+      "Enveloppe haut de gamme texturée",
+      "Carte avec message simple personnalisé",
+    ],
+    dimensions: "10 × 15 cm",
+    connectivity: ["nfc"],
+    occasions: ["love", "family", "special", "birthday", "travel"],
+    style: "classic",
+    delivery: "Fabrication artisanale en 48h. Livraison soignée en 2 à 3 jours.",
+    badge: "L'Essentiel",
+    includedVideoMin: 8,
   },
   {
     id: "p2",
-    slug: "memora-box",
-    name: "MÉMORA Box",
-    tagline: "Printed photographs, a sealed letter, a story inside.",
+    slug: "memora-coffret-box",
+    name: "Mémora Coffret (Box, Carte & Lettre)",
+    tagline: "Le coffret prestige : tirage photo NFC, boîte cadeau luxueuse, carte et lettre d'émotion.",
     description:
-      "A hand-wrapped leather keepsake box with twelve archival prints, a wax-sealed personal letter and a linen card linked to your digital memory.",
-    category: "boxes",
-    price: 189,
-    images: [box, hero],
-    materials: ["Vegan leather", "Archival paper", "Linen"],
-    dimensions: "28 × 18 × 6 cm",
-    connectivity: ["nfc", "qr"],
-    occasions: ["love", "birthday", "wedding"],
+      "L'expérience cadeau ultime et mémorable. Présenté dans un somptueux coffret rigide aux finitions d'exception, découvrez votre tirage photo connecté NFC, une carte souvenir dédiée et une véritable lettre personnalisée rédigée sur papier d'art pour immortaliser vos sentiments. Un déballage unique pour un moment inoubliable.",
+    category: "coffret-box",
+    priceTND: 89,
+    price: 89,
+    formatCode: "box",
+    images: [boxLetterImg, box, scan],
+    materials: [
+      "Coffret rigide luxueux à fermeture aimantée",
+      "Tirage photo d'art 300g/m² avec puce NFC",
+      "Lettre d'émotion rédigée sur papier vergé d'art",
+      "Carte souvenir personnalisée",
+    ],
+    dimensions: "Coffret 14 × 19 cm (Tirage 10 × 15 cm)",
+    connectivity: ["nfc"],
+    occasions: ["love", "wedding", "birthday", "family", "special"],
     style: "romantic",
-    delivery: "Crafted in 6–8 days. Delivery across Tunisia in 2–3 days.",
-  },
-  {
-    id: "p3",
-    slug: "memora-stories",
-    name: "MÉMORA Stories",
-    tagline: "A family album that keeps speaking.",
-    description:
-      "A linen-bound album of your chosen chapters, each page linked to voice messages, videos and letters through a single elegant code.",
-    category: "collections",
-    price: 249,
-    images: [hero, box],
-    materials: ["Linen cover", "Matte archival paper"],
-    dimensions: "24 × 30 cm, 40 pages",
-    connectivity: ["qr"],
-    occasions: ["family", "travel", "wedding"],
-    style: "classic",
-    delivery: "Crafted in 8–10 days. Delivery across Tunisia in 2–3 days.",
-  },
-  {
-    id: "p4",
-    slug: "memora-living",
-    name: "MÉMORA Living",
-    tagline: "A frame for the home, a doorway to every memory.",
-    description:
-      "An ivory frame with an integrated NFC tag. Tap a phone to open a living gallery that your family can keep adding to over the years.",
-    category: "frames",
-    price: 219,
-    images: [scan, moments],
-    materials: ["Lacquered wood", "Brass trim"],
-    dimensions: "30 × 24 cm",
-    connectivity: ["nfc", "qr"],
-    occasions: ["family", "special", "birthday"],
-    style: "modern",
-    delivery: "Crafted in 5–7 days. Delivery across Tunisia in 2–3 days.",
-  },
-  {
-    id: "p5",
-    slug: "memora-letter",
-    name: "MÉMORA Letter",
-    tagline: "Words you can hold, a voice you can hear.",
-    description:
-      "A letterpress card on cotton paper with a printed code linking to your recorded voice message.",
-    category: "gifts",
-    price: 49,
-    images: [hero, box],
-    materials: ["Cotton paper"],
-    dimensions: "A5",
-    connectivity: ["qr"],
-    occasions: ["love", "birthday", "special"],
-    style: "romantic",
-    delivery: "Crafted in 3 days. Delivery across Tunisia in 2–3 days.",
-  },
-  {
-    id: "p6",
-    slug: "memora-voyage",
-    name: "MÉMORA Voyage",
-    tagline: "Every journey, mapped and remembered.",
-    description:
-      "An engraved oak plaque for travellers, opening a timeline of places, photos and notes from the road.",
-    category: "plaques",
-    price: 149,
-    images: [moments, scan],
-    materials: ["Solid oak"],
-    dimensions: "15 × 20 cm",
-    connectivity: ["nfc", "qr"],
-    occasions: ["travel", "special"],
-    style: "minimal",
-    delivery: "Crafted in 5–7 days. Delivery across Tunisia in 2–3 days.",
+    delivery: "Confection artisanale en 48h. Livraison express Aramex en 2 à 3 jours.",
+    badge: "Coffret Cadeau Prestige",
+    includedVideoMin: 8,
   },
 ];
 
-export const getProduct = (slugOrId: string) =>
-  PRODUCTS.find((p) => p.slug === slugOrId || p.id === slugOrId);
+export const getProduct = (slugOrId: string) => {
+  const found = PRODUCTS.find((p) => p.slug === slugOrId || p.id === slugOrId);
+  if (found) return found;
+  if (slugOrId.includes("box") || slugOrId.includes("magnet") || slugOrId.includes("encadre") || slugOrId.includes("p2")) {
+    return PRODUCTS[1];
+  }
+  return PRODUCTS[0];
+};
 
-export const formatPrice = (n: number) => `${n.toLocaleString("fr-TN")} TND`;
+export const formatPrice = (n: number) => formatTND(n);
+

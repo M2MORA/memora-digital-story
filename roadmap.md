@@ -1,9 +1,14 @@
-# MÉMORA roadmap
-- [x] Design system, home, nav/footer
-- [x] Shop, product pages, studio (personalization), cart
-- [x] Digital memory experience (/m/:slug, demo data)
-- [x] Story, how it works, digital memories, gift finder, FAQ, contact, legal
-- [ ] Lovable Cloud: auth, customer account, real memories, uploads storage
-- [ ] Admin dashboard (products, orders, memories, NFC/QR, content)
-- [ ] Payments (provider choice needed)
-- [ ] French default + Arabic RTL translations
+# MÉMORA roadmap (aligné sur plan.md)
+- [x] Design system & identité visuelle MÉMORA (sans app, puce NFC invisible)
+- [x] Moteur de tarification pur testé (`src/lib/pricing.ts`) avec grilles dégressives par volume (1-4, 5-9, 10-49, 50-99, 100+), règle vidéo 8 min + suppléments et seuil franco de port 79 €
+- [x] Tunnel de commande complet en 6 étapes (`/commander` : Vidéo → Photo → Panier → Livraison → Paiement → Confirmation)
+- [x] Outil d'extraction d'image depuis la vidéo (Frame Scrubber) & recadrage photo recto avec notice NFC verso
+- [x] Tiroir / modal des tarifs dégressifs interactif (`PriceDrawer.tsx`)
+- [x] Transfert de vidéo depuis smartphone avec QR code et compte à rebours 2h (`MobileUploadModal.tsx`)
+- [x] Studio de montage automatique gratuit (`/editeasy` style EditEasy avec sélection de musique par mood, options de rythme et export vers commande)
+- [x] Démonstrateur 3D Recto / Verso (`FlipCardDemo.tsx`) montrant la notice au dos
+- [x] Espace Entreprises & B2B (`/espace-entreprise` : vidéo modifiable à distance, CTA de fin de vidéo, stats de scan, demande d'échantillon gratuit)
+- [x] Lecteur autonome NFC épuré (`/m/:slug` : autoplay vidéo, bouton activer le son, boucle virale)
+- [ ] Cloud & Base de données : auth, stockage R2 multipart en production
+- [ ] Webhook de paiement Stripe & passerelles locales Tunisie (Konnect / Flouci)
+- [ ] Dashboard administration des commandes & impression du pack de tirages 300 dpi

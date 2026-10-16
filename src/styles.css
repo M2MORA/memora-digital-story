@@ -57,6 +57,8 @@
   --color-taupe: var(--taupe);
   --color-deep-brown: var(--deep-brown);
   --color-charcoal: var(--charcoal);
+  --color-rose-poudre: var(--rose-poudre);
+  --color-rose-poudre-deep: var(--rose-poudre-deep);
   --font-serif: "Cormorant Garamond", ui-serif, Georgia, serif;
   --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
   --color-sidebar: var(--sidebar);
@@ -77,6 +79,8 @@
   --taupe: oklch(0.67 0.03 70);
   --deep-brown: oklch(0.35 0.03 50);
   --charcoal: oklch(0.25 0.008 80);
+  --rose-poudre: oklch(0.93 0.03 25);
+  --rose-poudre-deep: oklch(0.75 0.05 25);
   --background: var(--ivory);
   --foreground: var(--charcoal);
   --card: oklch(1 0 0);

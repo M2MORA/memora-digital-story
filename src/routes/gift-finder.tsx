@@ -6,20 +6,60 @@ import { PageHero, ProductCard } from "@/components/site/ProductCard";
 export const Route = createFileRoute("/gift-finder")({
   head: () => ({
     meta: [
-      { title: "Gift finder — MÉMORA" },
-      { name: "description", content: "Answer four questions and discover the MÉMORA keepsake made for your moment." },
-      { property: "og:title", content: "Find the perfect MÉMORA gift" },
-      { property: "og:description", content: "Four questions, one meaningful gift." },
+      { title: "Trouver un Cadeau — MÉMORA" },
+      {
+        name: "description",
+        content: "Répondez à 4 questions pour trouver le tirage photo connecté parfait pour votre proche.",
+      },
+      { property: "og:title", content: "Trouvez le cadeau MÉMORA idéal" },
+      { property: "og:description", content: "4 questions simples, un cadeau inoubliable." },
     ],
   }),
   component: Finder,
 });
 
 const Q = [
-  { key: "who", q: "Who is the gift for?", opts: [["partner", "My partner"], ["family", "Family"], ["friend", "A friend"], ["me", "Myself"]] },
-  { key: "occasion", q: "What is the occasion?", opts: [["love", "Love & anniversary"], ["birthday", "Birthday"], ["wedding", "Wedding"], ["family", "Family"], ["travel", "Travel"], ["special", "A special moment"]] },
-  { key: "budget", q: "What is your budget?", opts: [["100", "Under 100 TND"], ["200", "Up to 200 TND"], ["999", "No limit"]] },
-  { key: "style", q: "Which style do you prefer?", opts: [["minimal", "Minimal"], ["classic", "Classic"], ["romantic", "Romantic"], ["modern", "Modern"]] },
+  {
+    key: "who",
+    q: "À qui souhaitez-vous offrir ce cadeau ?",
+    opts: [
+      ["partner", "Mon / Ma partenaire"],
+      ["family", "Mes parents ou ma famille"],
+      ["friend", "Un(e) ami(e) proche"],
+      ["me", "Pour moi-même"],
+    ],
+  },
+  {
+    key: "occasion",
+    q: "Quelle est l'occasion célébrée ?",
+    opts: [
+      ["love", "Amour & Saint-Valentin"],
+      ["birthday", "Anniversaire"],
+      ["wedding", "Mariage ou fiançailles"],
+      ["family", "Fête des mères / pères"],
+      ["travel", "Voyage inoubliable"],
+      ["special", "Un moment précieux"],
+    ],
+  },
+  {
+    key: "budget",
+    q: "Quel est votre budget indicatif ?",
+    opts: [
+      ["50", "49 DT (Formule Simple : Enveloppe & Carte)"],
+      ["90", "89 DT (Formule Prestige : Coffret Box & Lettre)"],
+      ["999", "Plusieurs exemplaires (Tarif dégressif)"],
+    ],
+  },
+  {
+    key: "style",
+    q: "Quel style visuel préférez-vous ?",
+    opts: [
+      ["classic", "Classique & Authentique (Enveloppe d'art)"],
+      ["romantic", "Romantique & Précieux (Coffret & Lettre)"],
+      ["minimal", "Minimaliste & Sobre"],
+      ["modern", "Moderne"],
+    ],
+  },
 ] as const;
 
 function Finder() {
@@ -30,7 +70,10 @@ function Finder() {
   const results = done
     ? PRODUCTS.map((p) => ({
         p,
-        s: (p.occasions.includes(a["occasion"] ?? "") ? 3 : 0) + (p.style === a["style"] ? 2 : 0) + (p.price <= Number(a["budget"] ?? 999) ? 2 : -5),
+        s:
+          (p.occasions.includes(a["occasion"] ?? "") ? 3 : 0) +
+          (p.style === a["style"] ? 2 : 0) +
+          (p.priceTND <= Number(a["budget"] ?? 999) ? 2 : -5),
       }))
         .sort((x, y) => y.s - x.s)
         .slice(0, 3)
@@ -39,15 +82,23 @@ function Finder() {
 
   return (
     <>
-      <PageHero eyebrow="Gift finder" title="Let's find the piece made for your moment." />
+      <PageHero
+        eyebrow="Make Memories Last"
+        title="Gardez près de vous ce qui compte."
+        intro="Trouvons ensemble le cadeau qui touchera le cœur de vos proches. 4 questions pour transformer vos plus beaux moments en souvenirs éternels."
+      />
       <section className="container-x pb-32">
         {!done ? (
-          <div key={step} className="animate-rise">
-            <p className="eyebrow">Question {step + 1} of {Q.length}</p>
-            <h2 className="mt-4 text-4xl md:text-5xl">{cur.q}</h2>
+          <div key={step} className="animate-rise max-w-3xl">
+            <p className="eyebrow">Question {step + 1} sur {Q.length}</p>
+            <h2 className="mt-4 font-serif text-3xl sm:text-5xl">{cur.q}</h2>
             <div className="mt-10 flex flex-wrap gap-3">
               {cur.opts.map(([v, l]) => (
-                <button key={v} onClick={() => setA({ ...a, [cur.key]: v })} className="border border-border px-6 py-4 hover:border-foreground hover:bg-cream">
+                <button
+                  key={v}
+                  onClick={() => setA({ ...a, [cur.key]: v })}
+                  className="rounded-lg border border-border bg-background px-6 py-4 text-sm font-medium hover:border-deep-brown hover:bg-cream transition-all shadow-xs"
+                >
                   {l}
                 </button>
               ))}
@@ -55,12 +106,22 @@ function Finder() {
           </div>
         ) : (
           <div className="animate-rise">
-            <div className="flex items-end justify-between">
-              <h2 className="text-4xl">Our recommendations</h2>
-              <button onClick={() => setA({})} className="text-sm underline">Start again</button>
+            <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-border pb-6">
+              <div>
+                <p className="eyebrow">Sélection sur-mesure</p>
+                <h2 className="mt-1 font-serif text-3xl sm:text-5xl">Nos recommandations pour vous</h2>
+              </div>
+              <button
+                onClick={() => setA({})}
+                className="text-xs uppercase tracking-wider font-semibold text-deep-brown underline underline-offset-4"
+              >
+                Recommencer le questionnaire
+              </button>
             </div>
-            <div className="mt-12 grid gap-10 sm:grid-cols-2 lg:grid-cols-3">
-              {results.map((p) => <ProductCard key={p.id} product={p} />)}
+            <div className="mt-12 grid gap-10 sm:grid-cols-2 max-w-3xl mx-auto">
+              {results.map((p) => (
+                <ProductCard key={p.id} product={p} />
+              ))}
             </div>
           </div>
         )}
