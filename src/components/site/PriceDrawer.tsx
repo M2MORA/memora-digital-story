@@ -9,7 +9,7 @@ export function PriceDrawer({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  initialFormat?: "10x15" | "box";
+  initialFormat?: "10x15" | "box" | "magnet" | string;
 }) {
   if (!isOpen) return null;
 

@@ -36,6 +36,7 @@ import {
 import { toast } from "sonner";
 import { cart, useStore, CartItem } from "@/lib/cart";
 import { saveOrderToSupabase, uploadFromBrowserUrl } from "@/lib/supabase";
+import PhotoCustomizer, { type CropSettings } from "@/components/site/PhotoCustomizer";
 
 const TUNISIAN_GOVERNORATES = [
   "Tunis",
@@ -178,6 +179,8 @@ function CommanderPage() {
 
   const [photoZoom, setPhotoZoom] = useState(1);
   const [photoRotation, setPhotoRotation] = useState(0);
+  const [composedPhotoUrl, setComposedPhotoUrl] = useState<string>("");
+  const [photoCropSettings, setPhotoCropSettings] = useState<CropSettings | null>(null);
   const [previewSide, setPreviewSide] = useState<"recto" | "verso">("recto");
   const [cardMessage, setCardMessage] = useState<string>("Pour toujours, je t'aime.");
   const [letterContent, setLetterContent] = useState<string>("");
@@ -294,18 +297,19 @@ function CommanderPage() {
 
   // Add created item to cart
   const handleValidatePhotoAndAddToCart = () => {
+    const finalPhoto = composedPhotoUrl || photoUrl;
     cart.add(selectedFormat === "box" ? "p2" : "p1", {
       format: selectedFormat === "box" ? "box" : "10x15",
       withFrame: selectedWithFrame,
       videoDurationSec: videoDuration,
-      photoPreviewUrl: photoUrl,
+      photoPreviewUrl: finalPhoto,
       videoPreviewUrl: videoUrl,
       videoName: videoName,
       photoName: photoName,
       cardMessage,
       letterContent,
       qty: 1,
-      cropSettings: {
+      cropSettings: photoCropSettings ?? {
         zoom: photoZoom,
         rotation: photoRotation,
         aspect: selectedFormat,
@@ -1070,111 +1074,19 @@ function CommanderPage() {
               )}
             </div>
 
-            {/* Interactive Preview & Crop Controls */}
-            <div className="mt-10 grid gap-8 lg:grid-cols-[1.2fr_1fr] items-center">
-              {/* Photo Preview Container */}
-              <div className="relative mx-auto w-full max-w-sm rounded-2xl border-4 border-ivory bg-cream shadow-xl overflow-hidden aspect-[4/5] flex items-center justify-center">
-                {previewSide === "recto" ? (
-                  <img
-                    src={photoUrl}
-                    alt="Photo sélectionnée"
-                    style={{
-                      transform: `scale(${photoZoom}) rotate(${photoRotation}deg)`,
-                      transition: "transform 0.2s ease-out",
-                    }}
-                    className="h-full w-full object-cover"
-                  />
-                ) : (
-                  <div className="p-6 text-center bg-[#FBF9F5] h-full w-full flex flex-col justify-between">
-                    <div>
-                      <p className="font-serif text-xl tracking-wider text-charcoal">MÉMORA</p>
-                      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
-                        Notice d'utilisation au dos
-                      </p>
-                    </div>
-                    <div className="my-auto rounded-xl border border-dashed border-taupe/40 bg-sand/20 p-4">
-                      <p className="text-xs font-semibold">Zone de contact NFC</p>
-                      <p className="text-[11px] text-muted-foreground">Posez votre smartphone ici</p>
-                    </div>
-                    <p className="text-[10px] text-muted-foreground">Sans application · iOS & Android</p>
-                  </div>
-                )}
-
-                {/* Flip toggle on preview */}
-                <button
-                  type="button"
-                  onClick={() => setPreviewSide(previewSide === "recto" ? "verso" : "recto")}
-                  className="absolute bottom-3 right-3 rounded-full bg-charcoal/70 px-3 py-1.5 text-[11px] uppercase tracking-wider text-ivory backdrop-blur"
-                >
-                  {previewSide === "recto" ? "Voir le verso (notice)" : "Voir la photo"}
-                </button>
-              </div>
-
-              {/* Adjustments */}
-              <div className="space-y-6">
-                <div>
-                  <h3 className="font-serif text-2xl">Ajustements du tirage</h3>
-                  <p className="text-xs text-muted-foreground">Format {selectedFormat} (rapport 2:3)</p>
-                </div>
-
-                {/* Zoom */}
-                <div>
-                  <div className="flex justify-between text-xs font-medium text-muted-foreground">
-                    <span>Zoom</span>
-                    <span>{Math.round(photoZoom * 100)}%</span>
-                  </div>
-                  <input
-                    type="range"
-                    min={1}
-                    max={2.5}
-                    step={0.05}
-                    value={photoZoom}
-                    onChange={(e) => setPhotoZoom(parseFloat(e.target.value))}
-                    className="mt-2 w-full accent-deep-brown"
-                  />
-                </div>
-
-                {/* Rotate */}
-                <div>
-                  <div className="flex justify-between text-xs font-medium text-muted-foreground">
-                    <span>Rotation</span>
-                    <span>{photoRotation}°</span>
-                  </div>
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => setPhotoRotation((r) => (r + 90) % 360)}
-                      className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-cream"
-                    >
-                      Pivoter 90°
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setPhotoZoom(1);
-                        setPhotoRotation(0);
-                      }}
-                      className="rounded-md border border-border px-3 py-1.5 text-xs hover:bg-cream text-muted-foreground"
-                    >
-                      Réinitialiser
-                    </button>
-                  </div>
-                </div>
-
-                {/* Product Badge info */}
-                <div className="rounded-xl border border-sand bg-cream/40 p-4 text-xs">
-                  <p className="font-semibold text-deep-brown">
-                    {selectedFormat === "box"
-                      ? "Coffret Cadeau Prestige Sélectionné"
-                      : "Formule Simple (Enveloppe & Carte) Sélectionnée"}
-                  </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    {selectedFormat === "box"
-                      ? "Comprend la boîte coffret rigide, la photo NFC, une carte souvenir et votre lettre d'émotion personnalisée."
-                      : "Comprend la photo NFC sous enveloppe d'art élégante et une carte avec votre message simple."}
-                  </p>
-                </div>
-              </div>
+            {/* Interactive Preview, Free Pan/Zoom, Rotate, and Templates Studio */}
+            <div className="mt-8">
+              <PhotoCustomizer
+                rawPhotoUrl={photoUrl}
+                format={selectedFormat}
+                cardMessage={cardMessage}
+                onComposedChange={(composedUrl, settings) => {
+                  setComposedPhotoUrl(composedUrl);
+                  setPhotoCropSettings(settings);
+                  setPhotoZoom(settings.zoom);
+                  setPhotoRotation(settings.rotation);
+                }}
+              />
             </div>
 
             {/* Step 2.5: Message on Card & Letter Customization */}
@@ -1273,7 +1185,7 @@ function CommanderPage() {
             <div className="mt-8 grid gap-10 lg:grid-cols-[1.2fr_1fr] items-start">
               {/* Smartphone Simulator */}
               <div>
-                <TapDemo photoUrl={photoUrl} videoUrl={videoUrl} hideHeader={true} />
+                <TapDemo photoUrl={composedPhotoUrl || photoUrl} videoUrl={videoUrl} hideHeader={true} />
               </div>
 
               {/* Summary card */}
@@ -1295,7 +1207,7 @@ function CommanderPage() {
                 {/* Photo chosen */}
                 <div className="flex items-center gap-4 rounded-xl border border-border/80 bg-background p-3.5">
                   <img
-                    src={photoUrl}
+                    src={composedPhotoUrl || photoUrl}
                     alt="Photo sélectionnée"
                     className="h-16 w-14 rounded-md object-cover border border-border shrink-0"
                   />

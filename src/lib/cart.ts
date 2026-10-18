@@ -25,7 +25,12 @@ export type CartItem = {
   cropSettings?: {
     zoom: number;
     rotation: number;
-    aspect: string;
+    aspect?: string | undefined;
+    pan?: { x: number; y: number } | undefined;
+    fineAngle?: number | undefined;
+    flipH?: boolean | undefined;
+    template?: string | undefined;
+    caption?: string | undefined;
   } | undefined;
   noteForBack?: string | undefined;
   cardMessage?: string | undefined;

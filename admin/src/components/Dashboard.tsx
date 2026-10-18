@@ -10,6 +10,75 @@ const fmtDate = (d: string) =>
 
 const defaultEnvUrl = String(import.meta.env["VITE_SITE_URL"] ?? "http://localhost:3000").replace(/\/+$/, "");
 
+function PhotoCard10x15({
+  photoUrl,
+  orderNumber,
+  downloading,
+  onDownload10x15,
+  onDownloadOriginal,
+}: {
+  photoUrl: string;
+  orderNumber: string;
+  downloading: boolean;
+  onDownload10x15: () => void;
+  onDownloadOriginal: () => void;
+}) {
+  const [isLandscape, setIsLandscape] = useState(false);
+
+  return (
+    <>
+      <div className={`photo-frame-10x15 ${isLandscape ? "landscape" : "portrait"}`}>
+        <img
+          src={photoUrl}
+          alt={`Photo tirage #${orderNumber}`}
+          className="craft-preview-img"
+          onLoad={(e) => {
+            const img = e.currentTarget;
+            if (img.naturalWidth > img.naturalHeight) {
+              setIsLandscape(true);
+            }
+          }}
+        />
+        <span className="photo-ratio-badge">
+          {isLandscape ? "15 × 10 cm (3:2)" : "10 × 15 cm (2:3)"}
+        </span>
+      </div>
+
+      <div className="media-btn-group">
+        <button
+          type="button"
+          onClick={onDownload10x15}
+          className="btn btn-block btn-download"
+          disabled={downloading}
+          title="Télécharger la photo calibrée au format standard 10×15 cm à 300 DPI pour tirage d'art"
+        >
+          {downloading ? "⏳ Préparation 10×15..." : "⬇ Télécharger Photo 10×15 HD"}
+        </button>
+        <div className="sub-links-row">
+          <button
+            type="button"
+            onClick={onDownloadOriginal}
+            className="link-sub"
+            title="Télécharger l'image originale sans recadrage"
+          >
+            💾 Fichier brut
+          </button>
+          <span className="dot-sep">·</span>
+          <a
+            href={photoUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="link-sub"
+            title="Ouvrir dans un nouvel onglet"
+          >
+            🔍 Plein écran
+          </a>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function Dashboard({ email }: { email: string }) {
   const [tab, setTab] = useState<Tab>("workshop");
   const [orders, setOrders] = useState<Order[]>([]);
@@ -19,7 +88,8 @@ export default function Dashboard({ email }: { email: string }) {
   const [error, setError] = useState("");
   const [open, setOpen] = useState<string | null>(null);
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
-  
+  const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
+
   // URL de base configurable pour flasher les puces NFC
   const [siteUrl, setSiteUrl] = useState(() => {
     return localStorage.getItem("memora_admin_site_url") || defaultEnvUrl;
@@ -39,6 +109,136 @@ export default function Dashboard({ email }: { email: string }) {
     await navigator.clipboard.writeText(fullUrl);
     setCopiedSlug(slug);
     setTimeout(() => setCopiedSlug(null), 3000);
+  };
+
+  const getFilename = (url: string, prefix: string, defaultExt: string) => {
+    try {
+      const cleanUrl = url.split("?")[0].split("#")[0];
+      const match = cleanUrl.match(/\.([a-zA-Z0-9]+)$/);
+      if (match && match[1]) {
+        const ext = match[1].toLowerCase();
+        if (["jpg", "jpeg", "png", "webp", "gif", "mp4", "mov", "webm"].includes(ext)) {
+          return `${prefix}.${ext}`;
+        }
+      }
+    } catch {
+      // ignore
+    }
+    return `${prefix}.${defaultExt}`;
+  };
+
+  const downloadMedia = async (url: string, filename: string) => {
+    if (!url) return;
+    setDownloadingUrl(url);
+
+    try {
+      if (url.startsWith("data:")) {
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        return;
+      }
+
+      // Téléchargement par blob pour forcer le téléchargement local sans blocage Cross-Origin
+      const res = await fetch(url, { mode: "cors" });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = window.URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = blobUrl;
+      a.download = filename;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 2000);
+    } catch (err) {
+      console.warn("Échec du téléchargement direct blob, repli Supabase/navigateur:", err);
+      // Pour Supabase Storage, ?download force l'en-tête Content-Disposition: attachment
+      const downloadUrl = url.includes("supabase.co/storage/v1/object/public")
+        ? `${url}${url.includes("?") ? "&" : "?"}download=${encodeURIComponent(filename)}`
+        : url;
+
+      const a = document.createElement("a");
+      a.href = downloadUrl;
+      a.download = filename;
+      a.target = "_blank";
+      a.rel = "noreferrer";
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+    } finally {
+      setDownloadingUrl(null);
+    }
+  };
+
+  const downloadPhoto10x15 = async (url: string, filename: string) => {
+    if (!url) return;
+    setDownloadingUrl(url);
+
+    try {
+      // Préparation du tirage photo au ratio standard 10x15 cm à 300 DPI
+      const img = new Image();
+      img.crossOrigin = "anonymous";
+
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error("Image load failed"));
+        img.src = url;
+      });
+
+      const isLandscape = img.naturalWidth > img.naturalHeight;
+      // Standard tirage laboratoire 10x15 cm à 300 DPI = 1200 x 1800 px (ou 1800 x 1200 px)
+      const targetW = isLandscape ? 1800 : 1200;
+      const targetH = isLandscape ? 1200 : 1800;
+
+      const canvas = document.createElement("canvas");
+      canvas.width = targetW;
+      canvas.height = targetH;
+      const ctx = canvas.getContext("2d");
+
+      if (ctx) {
+        ctx.imageSmoothingEnabled = true;
+        ctx.imageSmoothingQuality = "high";
+
+        // Cadrage photo proportionnel centré sans déformation
+        const scale = Math.max(targetW / img.naturalWidth, targetH / img.naturalHeight);
+        const scaledW = img.naturalWidth * scale;
+        const scaledH = img.naturalHeight * scale;
+        const offsetX = (targetW - scaledW) / 2;
+        const offsetY = (targetH - scaledH) / 2;
+
+        ctx.fillStyle = "#ffffff";
+        ctx.fillRect(0, 0, targetW, targetH);
+        ctx.drawImage(img, offsetX, offsetY, scaledW, scaledH);
+
+        const blob = await new Promise<Blob | null>((resolve) =>
+          canvas.toBlob((b) => resolve(b), "image/jpeg", 0.96)
+        );
+
+        if (blob) {
+          const blobUrl = window.URL.createObjectURL(blob);
+          const a = document.createElement("a");
+          a.href = blobUrl;
+          const cleanName = filename.replace(/\.[a-zA-Z0-9]+$/, "");
+          a.download = `${cleanName}-10x15.jpg`;
+          document.body.appendChild(a);
+          a.click();
+          document.body.removeChild(a);
+          setTimeout(() => window.URL.revokeObjectURL(blobUrl), 2000);
+          return;
+        }
+      }
+      // Repli si échec canvas
+      await downloadMedia(url, filename);
+    } catch (err) {
+      console.warn("Échec du calibrage canvas 10x15, téléchargement direct:", err);
+      await downloadMedia(url, filename);
+    } finally {
+      setDownloadingUrl(null);
+    }
   };
 
   const load = useCallback(async () => {
@@ -73,8 +273,9 @@ export default function Dashboard({ email }: { email: string }) {
     const it = o.items[itemIndex];
     if (!it) return;
     const slug = slugFor(o, itemIndex);
-    const videoUrl = it["videoUrl"] as string | undefined;
-    const photoUrl = it["photoUrl"] as string | undefined;
+    const existingMemory = memories.find((m) => m.slug === slug);
+    const videoUrl = (it["videoUrl"] || it["video_url"] || it["videoPreviewUrl"] || existingMemory?.video_url) as string | undefined;
+    const photoUrl = (it["photoUrl"] || it["photo_url"] || it["photoPreviewUrl"] || it["photo"] || it["previewUrl"] || existingMemory?.photo_url) as string | undefined;
 
     if (!videoUrl) {
       alert("Attention : la vidéo de ce tirage n'a pas été reçue.");
@@ -225,8 +426,8 @@ export default function Dashboard({ email }: { email: string }) {
                         const existingMemory = memories.find((m) => m.slug === slug);
                         const nfcLink = `${siteUrl}/m/${slug}`;
                         const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(nfcLink)}`;
-                        const videoUrl = it["videoUrl"] as string | undefined;
-                        const photoUrl = it["photoUrl"] as string | undefined;
+                        const videoUrl = (it["videoUrl"] || it["video_url"] || it["videoPreviewUrl"] || existingMemory?.video_url) as string | undefined;
+                        const photoUrl = (it["photoUrl"] || it["photo_url"] || it["photoPreviewUrl"] || it["photo"] || it["previewUrl"] || existingMemory?.photo_url) as string | undefined;
 
                         return (
                           <div key={i} className="craft-item-card">
@@ -248,21 +449,16 @@ export default function Dashboard({ email }: { email: string }) {
                             <div className="craft-grid">
                               {/* Colonne 1 : Photo d'art */}
                               <div className="craft-col">
-                                <p className="col-label">🖼️ Photo à imprimer</p>
+                                <p className="col-label">🖼️ Photo à imprimer (10×15 cm)</p>
                                 <div className="photo-box">
                                   {photoUrl ? (
-                                    <>
-                                      <img src={photoUrl} alt="Photo tirage" className="craft-preview-img" />
-                                      <a
-                                        href={photoUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        download={`memora-photo-${o.order_number}.jpg`}
-                                        className="btn btn-block"
-                                      >
-                                        ⬇ Télécharger Photo HD
-                                      </a>
-                                    </>
+                                    <PhotoCard10x15
+                                      photoUrl={photoUrl}
+                                      orderNumber={o.order_number}
+                                      downloading={downloadingUrl === photoUrl}
+                                      onDownload10x15={() => downloadPhoto10x15(photoUrl, getFilename(photoUrl, `memora-photo-${o.order_number}`, "jpg"))}
+                                      onDownloadOriginal={() => downloadMedia(photoUrl, getFilename(photoUrl, `memora-photo-${o.order_number}-original`, "jpg"))}
+                                    />
                                   ) : (
                                     <div className="no-media-box">
                                       <p className="muted">Photo par défaut / Non chargée</p>
@@ -283,15 +479,26 @@ export default function Dashboard({ email }: { email: string }) {
                                         preload="metadata"
                                         className="craft-video-player"
                                       />
-                                      <a
-                                        href={videoUrl}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        download={`memora-video-${o.order_number}.mp4`}
-                                        className="btn btn-block"
-                                      >
-                                        ⬇ Télécharger Vidéo
-                                      </a>
+                                      <div className="media-btn-group">
+                                        <button
+                                          type="button"
+                                          onClick={() => downloadMedia(videoUrl, getFilename(videoUrl, `memora-video-${o.order_number}`, "mp4"))}
+                                          className="btn btn-block"
+                                          disabled={downloadingUrl === videoUrl}
+                                          title="Télécharger la vidéo souvenir"
+                                        >
+                                          {downloadingUrl === videoUrl ? "⏳ Téléchargement..." : "⬇ Télécharger Vidéo"}
+                                        </button>
+                                        <a
+                                          href={videoUrl}
+                                          target="_blank"
+                                          rel="noreferrer"
+                                          className="link-sub"
+                                          title="Ouvrir dans un nouvel onglet"
+                                        >
+                                          🔍 Plein écran
+                                        </a>
+                                      </div>
                                     </>
                                   ) : (
                                     <div className="no-media-box">
@@ -426,12 +633,66 @@ export default function Dashboard({ email }: { email: string }) {
                       {open === o.id && (
                         <tr key={`${o.id}-d`} className="details">
                           <td colSpan={6}>
-                            <p>
-                              <strong>Livraison :</strong> {o.shipping_address?.["address"]},{" "}
-                              {o.shipping_address?.["postalCode"]} {o.shipping_address?.["city"]} ·{" "}
-                              Tél {o.customer_phone ?? "—"}
-                            </p>
-                            <p className="muted-small">Règlement : Espèces à la livraison</p>
+                            <div className="order-details-content">
+                              <p>
+                                <strong>Livraison :</strong> {o.shipping_address?.["address"]},{" "}
+                                {o.shipping_address?.["postalCode"]} {o.shipping_address?.["city"]} ·{" "}
+                                Tél {o.customer_phone ?? "—"}
+                              </p>
+                              <p className="muted-small">Règlement : Espèces à la livraison</p>
+
+                              <div className="order-details-items">
+                                <p className="col-label" style={{ marginBottom: "0.5rem" }}>📦 Fichiers & Articles de la commande :</p>
+                                <div className="details-items-grid">
+                                  {o.items.map((it, idx) => {
+                                    const slug = slugFor(o, idx);
+                                    const existingMemory = memories.find((m) => m.slug === slug);
+                                    const itemPhoto = (it["photoUrl"] || it["photo_url"] || it["photoPreviewUrl"] || it["photo"] || it["previewUrl"] || existingMemory?.photo_url) as string | undefined;
+                                    const itemVideo = (it["videoUrl"] || it["video_url"] || it["videoPreviewUrl"] || existingMemory?.video_url) as string | undefined;
+
+                                    return (
+                                      <div key={idx} className="details-item-card">
+                                        {itemPhoto && (
+                                          <img src={itemPhoto} alt="Tirage" className="thumb" />
+                                        )}
+                                        <div className="details-item-info">
+                                          <span><strong>Format :</strong> {String(it["format"] ?? "10x15")} {Boolean(it["withFrame"]) && "· Avec cadre bois"} · Qté : {String(it["qty"] ?? 1)}</span>
+                                          {Boolean(it["cardMessage"]) && (
+                                            <span className="muted-small">« {String(it["cardMessage"])} »</span>
+                                          )}
+                                        </div>
+                                        <div className="details-item-actions">
+                                          {itemPhoto ? (
+                                            <button
+                                              type="button"
+                                              className="btn btn-sm btn-download"
+                                              onClick={() => downloadPhoto10x15(itemPhoto, getFilename(itemPhoto, `memora-photo-${o.order_number}`, "jpg"))}
+                                              disabled={downloadingUrl === itemPhoto}
+                                              title="Télécharger Photo 10×15 HD (300 DPI)"
+                                            >
+                                              {downloadingUrl === itemPhoto ? "⏳..." : "⬇ Photo 10×15 HD"}
+                                            </button>
+                                          ) : (
+                                            <span className="muted-small">Photo par défaut</span>
+                                          )}
+                                          {itemVideo && (
+                                            <button
+                                              type="button"
+                                              className="btn btn-sm"
+                                              onClick={() => downloadMedia(itemVideo, getFilename(itemVideo, `memora-video-${o.order_number}`, "mp4"))}
+                                              disabled={downloadingUrl === itemVideo}
+                                              title="Télécharger Vidéo"
+                                            >
+                                              {downloadingUrl === itemVideo ? "⏳..." : "⬇ Vidéo"}
+                                            </button>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            </div>
                           </td>
                         </tr>
                       )}
@@ -485,13 +746,25 @@ export default function Dashboard({ email }: { email: string }) {
                             <button className="btn btn-sm" onClick={() => copyLink(m.slug)}>
                               📋 Copier lien
                             </button>
-                            <a className="link" href={m.video_url} target="_blank" rel="noreferrer" download>
-                              Vidéo
-                            </a>
+                            <button
+                              type="button"
+                              className="btn btn-sm"
+                              onClick={() => downloadMedia(m.video_url, getFilename(m.video_url, `memora-video-${m.slug}`, "mp4"))}
+                              disabled={downloadingUrl === m.video_url}
+                              title="Télécharger la vidéo"
+                            >
+                              {downloadingUrl === m.video_url ? "⏳..." : "⬇ Vidéo"}
+                            </button>
                             {m.photo_url && (
-                              <a className="link" href={m.photo_url} target="_blank" rel="noreferrer" download>
-                                Photo
-                              </a>
+                              <button
+                                type="button"
+                                className="btn btn-sm btn-download"
+                                onClick={() => downloadPhoto10x15(m.photo_url!, getFilename(m.photo_url!, `memora-photo-${m.slug}`, "jpg"))}
+                                disabled={downloadingUrl === m.photo_url}
+                                title="Télécharger la photo calibrée 10×15 HD (300 DPI)"
+                              >
+                                {downloadingUrl === m.photo_url ? "⏳..." : "⬇ Photo 10×15 HD"}
+                              </button>
                             )}
                           </div>
                         </td>
