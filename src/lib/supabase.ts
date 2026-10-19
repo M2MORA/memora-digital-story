@@ -148,6 +148,71 @@ export async function saveOrderToSupabase(orderData: NewOrderPayload): Promise<{
   }
 }
 
+export interface FinalizeOrderParams {
+  orderPayload: Record<string, unknown>;
+  draftId: string;
+  draftToken: string;
+  intentMappings: Array<{
+    item_id: string;
+    intent_id: string;
+    file_kind: "photo" | "video";
+  }>;
+  idempotencyKey: string;
+}
+
+export interface FinalizeOrderResponse {
+  success: boolean;
+  order_id?: string;
+  order_number?: string;
+  total?: number;
+  idempotent_replay?: boolean;
+  error?: string;
+}
+
+/**
+ * Finalise atomiquement la commande avec ses upload intents validés sur Cloudflare R2
+ */
+export async function finalizeOrderWithIntents(
+  params: FinalizeOrderParams
+): Promise<FinalizeOrderResponse> {
+  if (!isSupabaseConfigured) {
+    return { success: false, error: "Supabase non configuré" };
+  }
+
+  try {
+    const { data, error } = await supabase.rpc("finalize_order_with_intents", {
+      p_order_payload: params.orderPayload,
+      p_draft_id: params.draftId,
+      p_draft_token: params.draftToken,
+      p_intent_mappings: params.intentMappings,
+      p_idempotency_key: params.idempotencyKey,
+    });
+
+    if (error) {
+      console.error("Erreur finalisation commande Supabase RPC:", error);
+      return { success: false, error: error.message };
+    }
+
+    if (!data || data.success === false) {
+      return {
+        success: false,
+        error: data?.message || data?.reason || "Échec de finalisation de la commande",
+      };
+    }
+
+    return {
+      success: true,
+      order_id: data.order_id,
+      order_number: data.order_number,
+      total: data.total,
+      idempotent_replay: Boolean(data.idempotent_replay),
+    };
+  } catch (err: any) {
+    console.error("Exception finalisation commande:", err);
+    return { success: false, error: err?.message || "Erreur interne de finalisation" };
+  }
+}
+
 const RESUMABLE_THRESHOLD = 6 * 1024 * 1024;
 
 /**

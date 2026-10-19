@@ -35,7 +35,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cart, useStore, CartItem } from "@/lib/cart";
-import { saveOrderToSupabase, uploadFromBrowserUrl } from "@/lib/supabase";
+import { finalizeOrderWithIntents } from "@/lib/supabase";
+import { putCachedMedia, getCachedMedia, clearDraftMedia, getMediaCacheKey } from "@/lib/media-cache";
+import { uploadMediaWithR2Intent } from "@/lib/r2-upload-client";
 import PhotoCustomizer, { type CropSettings } from "@/components/site/PhotoCustomizer";
 
 const TUNISIAN_GOVERNORATES = [
@@ -138,7 +140,7 @@ export const Route = createFileRoute("/commander")({
 function CommanderPage() {
   const navigate = useNavigate();
   const search = Route.useSearch();
-  const { items, discountPercent, promoCode } = useStore();
+  const { items, discountPercent, promoCode, draftId, draftToken } = useStore();
 
   // Mode: "picker" (choix du produit) ou "funnel" (étapes de création)
   const [funnelStage, setFunnelStage] = useState<
@@ -148,6 +150,11 @@ function CommanderPage() {
     if (search.format) return "video";
     return "picker";
   });
+
+  // Clé d'article stable pour la création en cours dans commander.tsx
+  const [currentItemKey, setCurrentItemKey] = useState(
+    () => `item_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`
+  );
 
   // Selected format for the current creation
   const [selectedFormat, setSelectedFormat] = useState<Format>(search.format ?? "10x15");
@@ -168,6 +175,7 @@ function CommanderPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   // Step 2: Photo & Message state (Live scrubber + frame extractor from original video)
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string>(hero);
   const [photoName, setPhotoName] = useState<string>("photo_principale.jpg");
   const [photoSource, setPhotoSource] = useState<"upload" | "frame">("frame");
@@ -200,7 +208,7 @@ function CommanderPage() {
     carrier: "aramex" as any,
   });
 
-  // Step 5: Payment state (COD by default for Tunisia)
+  // Step 5: Payment & Checkout pipeline states
   const [legalConsent, setLegalConsent] = useState(true);
   const [paymentMethod, setPaymentMethod] = useState<"stripe" | "cod">("cod");
   const [promoInput, setPromoInput] = useState("");
@@ -208,6 +216,22 @@ function CommanderPage() {
   const [orderNumber, setOrderNumber] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
+
+  // États détaillés du cycle d'upload et de commande R2
+  type CheckoutStep =
+    | "idle"
+    | "preparing"
+    | "uploading_photo"
+    | "uploading_video"
+    | "verifying"
+    | "finalizing"
+    | "confirmed"
+    | "error";
+
+  const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>("idle");
+  const [checkoutMessage, setCheckoutMessage] = useState("");
+  const [checkoutError, setCheckoutError] = useState<string | null>(null);
+  const [checkoutProgressIndex, setCheckoutProgressIndex] = useState(0);
 
   // Video duration surcharge calculation
   const extraVideoMinutes =
@@ -220,20 +244,45 @@ function CommanderPage() {
   const quote = cart.getQuote(shipping.country, shipping.carrier);
 
   // Handle Video file upload
-  const handleVideoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+
+    const ext = file.name.split(".").pop()?.toLowerCase() || "";
+    if (!["mp4", "mov", "webm"].includes(ext)) {
+      toast.error("Format vidéo non supporté (MP4, MOV, WEBM requis)");
+      return;
+    }
+    if (!file.type.startsWith("video/") && file.type !== "application/octet-stream") {
+      toast.error("Type MIME vidéo invalide");
+      return;
+    }
     if (file.size > 5 * 1024 * 1024 * 1024) {
       toast.error("Le fichier dépasse la taille maximale autorisée (5 Go)");
       return;
     }
-    const url = URL.createObjectURL(file);
-    setVideoFile(file);
-    setVideoUrl(url);
-    setVideoName(file.name);
-    setVideoScrubTime(0);
-    setCapturedTimestamp(null);
-    toast.success("Vidéo chargée avec succès !");
+    if (file.size <= 0) {
+      toast.error("Fichier vidéo vide");
+      return;
+    }
+
+    try {
+      const cacheKey = getMediaCacheKey(draftId, currentItemKey, "video");
+      await putCachedMedia(cacheKey, file);
+
+      if (videoUrl && videoUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(videoUrl);
+      }
+      const url = URL.createObjectURL(file);
+      setVideoFile(file);
+      setVideoUrl(url);
+      setVideoName(file.name);
+      setVideoScrubTime(0);
+      setCapturedTimestamp(null);
+      toast.success("Vidéo chargée et mise en cache avec succès !");
+    } catch {
+      toast.error("Erreur d'enregistrement local de la vidéo");
+    }
   };
 
   // Step time adjustment helpers for scrubber
@@ -282,11 +331,25 @@ function CommanderPage() {
       setPhotoSource("frame");
       const currentSec = Math.floor(video.currentTime || videoScrubTime);
       setCapturedTimestamp(currentSec);
-      setPhotoName(`capture_video_${currentSec}s.jpg`);
+      const fileName = `capture_video_${currentSec}s.jpg`;
+      setPhotoName(fileName);
+
+      canvas.toBlob(async (blob) => {
+        if (blob) {
+          const photoFileObj = new File([blob], fileName, { type: "image/jpeg" });
+          setPhotoFile(photoFileObj);
+          try {
+            const cacheKey = getMediaCacheKey(draftId, currentItemKey, "photo");
+            await putCachedMedia(cacheKey, photoFileObj);
+          } catch {
+            // Fallback mémoire interne
+          }
+        }
+      }, "image/jpeg", 0.95);
+
       toast.success(`Moment exact extrait à ${formatTime(currentSec)} !`);
     } catch (err) {
       console.warn("Échec d'extraction canvas (restriction CORS sur vidéo distante) :", err);
-      // Fallback
       setPhotoUrl(scan);
       setPhotoSource("frame");
       setCapturedTimestamp(Math.floor(videoScrubTime));
@@ -295,15 +358,57 @@ function CommanderPage() {
     }
   };
 
+  // Handle Photo file upload (Mode B)
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    const ext = f.name.split(".").pop()?.toLowerCase() || "";
+    if (!["jpg", "jpeg", "png", "webp"].includes(ext)) {
+      toast.error("Format photo non supporté (JPG, JPEG, PNG, WEBP)");
+      return;
+    }
+    if (!["image/jpeg", "image/png", "image/webp"].includes(f.type) && !f.type.startsWith("image/")) {
+      toast.error("Type MIME photo invalide");
+      return;
+    }
+    if (f.size > 25 * 1024 * 1024) {
+      toast.error("La photo dépasse la taille maximale autorisée (25 Mo)");
+      return;
+    }
+    if (f.size <= 0) {
+      toast.error("Fichier photo vide");
+      return;
+    }
+
+    try {
+      const cacheKey = getMediaCacheKey(draftId, currentItemKey, "photo");
+      await putCachedMedia(cacheKey, f);
+
+      if (photoUrl && photoUrl.startsWith("blob:")) {
+        URL.revokeObjectURL(photoUrl);
+      }
+      const preview = URL.createObjectURL(f);
+      setPhotoFile(f);
+      setPhotoUrl(preview);
+      setPhotoName(f.name);
+      setPhotoSource("upload");
+      setCapturedTimestamp(null);
+      toast.success("Photo importée avec succès !");
+    } catch {
+      toast.error("Erreur d'enregistrement local de la photo");
+    }
+  };
+
   // Add created item to cart
   const handleValidatePhotoAndAddToCart = () => {
     const finalPhoto = composedPhotoUrl || photoUrl;
     cart.add(selectedFormat === "box" ? "p2" : "p1", {
+      key: currentItemKey,
       format: selectedFormat === "box" ? "box" : "10x15",
       withFrame: selectedWithFrame,
       videoDurationSec: videoDuration,
-      photoPreviewUrl: finalPhoto,
-      videoPreviewUrl: videoUrl,
+      photoPreviewUrl: finalPhoto.startsWith("blob:") ? undefined : finalPhoto,
+      videoPreviewUrl: videoUrl.startsWith("blob:") ? undefined : videoUrl,
       videoName: videoName,
       photoName: photoName,
       cardMessage,
@@ -315,6 +420,8 @@ function CommanderPage() {
         aspect: selectedFormat,
       },
     });
+    // Génère un nouvel identifiant d'article pour la création suivante
+    setCurrentItemKey(`item_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`);
     toast.success("Création ajoutée à votre panier !");
     setFunnelStage("cart");
   };
@@ -329,81 +436,162 @@ function CommanderPage() {
     );
   };
 
-  // Final Checkout Submission
+  // Final Checkout Submission — DIRECT CLOUDFLARE R2 PIPELINE
   const handleConfirmOrder = async () => {
     if (isSubmitting) return;
     if (!legalConsent) {
       toast.error("Veuillez accepter les conditions générales de vente pour finaliser");
       return;
     }
+    if (items.length === 0) {
+      toast.error("Votre panier est vide");
+      return;
+    }
+
     setIsSubmitting(true);
+    setCheckoutError(null);
     const newOrderNum = `MEM-${Math.floor(100000 + Math.random() * 900000)}`;
     setOrderNumber(newOrderNum);
 
     try {
-      // 1. Envoi des vidéos / photos du client vers Supabase Storage
-      let mediaFailed = false;
-      const itemsWithMedia = [];
-      for (const [idx, it] of items.entries()) {
-        const n = idx + 1;
-        setUploadPct(0);
-        const video = await uploadFromBrowserUrl(
-          it.videoPreviewUrl,
-          "videos",
-          newOrderNum,
-          `video-${n}`,
-          setUploadPct,
-        );
-        const photo = await uploadFromBrowserUrl(it.photoPreviewUrl, "photos", newOrderNum, `photo-${n}`);
-        if (video.error || photo.error) {
-          mediaFailed = true;
-          console.error("❌ Upload média:", video.error, photo.error);
+      // Step A — Récupération des médias depuis IndexedDB pour chaque article
+      setCheckoutStep("preparing");
+      setCheckoutMessage("Vérification des fichiers locaux...");
+
+      const preparedMedia: Array<{
+        item: CartItem;
+        photoFile: File;
+        videoFile: File;
+      }> = [];
+
+      for (const [i, it] of items.entries()) {
+        setCheckoutProgressIndex(i + 1);
+
+        const photoFile = await getCachedMedia(getMediaCacheKey(draftId, it.key, "photo"));
+        const videoFile = await getCachedMedia(getMediaCacheKey(draftId, it.key, "video"));
+
+        if (!photoFile) {
+          const errMsg = `Fichier photo manquant pour l'article ${i + 1} (${it.photoName || "photo"}). Veuillez réimporter vos médias dans le Studio.`;
+          setCheckoutStep("error");
+          setCheckoutError(errMsg);
+          toast.error(errMsg);
+          setIsSubmitting(false);
+          return;
         }
-        itemsWithMedia.push({
-          key: it.key,
-          productId: it.productId,
-          format: it.format,
-          withFrame: it.withFrame ?? false,
-          videoDurationSec: it.videoDurationSec,
-          videoName: it.videoName,
-          photoName: it.photoName,
-          videoUrl: video.url,
-          photoUrl: photo.url,
-          cardMessage: it.cardMessage,
-          letterContent: it.letterContent,
-          qty: it.qty,
+
+        if (!videoFile) {
+          const errMsg = `Fichier vidéo manquant pour l'article ${i + 1} (${it.videoName || "vidéo"}). Veuillez réimporter vos médias dans le Studio.`;
+          setCheckoutStep("error");
+          setCheckoutError(errMsg);
+          toast.error(errMsg);
+          setIsSubmitting(false);
+          return;
+        }
+
+        preparedMedia.push({ item: it, photoFile, videoFile });
+      }
+
+      // Steps B, C, D — Upload direct vers R2 & Vérification backend pour chaque fichier
+      const intentMappings: Array<{
+        item_id: string;
+        intent_id: string;
+        file_kind: "photo" | "video";
+      }> = [];
+
+      for (const [i, media] of preparedMedia.entries()) {
+        const { item, photoFile, videoFile } = media;
+        setCheckoutProgressIndex(i + 1);
+
+        // Upload Photo
+        setCheckoutStep("uploading_photo");
+        setCheckoutMessage(`Envoi direct de la photo (${i + 1}/${items.length}) vers Cloudflare R2...`);
+        const photoIntentId = await uploadMediaWithR2Intent({
+          draftId,
+          draftToken,
+          itemId: item.key,
+          fileKind: "photo",
+          file: photoFile,
+        });
+        intentMappings.push({
+          item_id: item.key,
+          intent_id: photoIntentId,
+          file_kind: "photo",
+        });
+
+        // Upload Video
+        setCheckoutStep("uploading_video");
+        setCheckoutMessage(`Envoi direct de la vidéo (${i + 1}/${items.length}) vers Cloudflare R2...`);
+        const videoIntentId = await uploadMediaWithR2Intent({
+          draftId,
+          draftToken,
+          itemId: item.key,
+          fileKind: "video",
+          file: videoFile,
+        });
+        intentMappings.push({
+          item_id: item.key,
+          intent_id: videoIntentId,
+          file_kind: "video",
         });
       }
 
-      // 2. Enregistrement de la commande dans Supabase
-      const res = await saveOrderToSupabase({
-        order_number: newOrderNum,
-        customer_name: `${customer.firstName} ${customer.lastName}`.trim() || "Client Mémora",
-        customer_email: customer.email || "client@memora.tn",
-        customer_phone: customer.phone,
-        shipping_address: {
-          ...shipping,
-          recipient: `${customer.firstName} ${customer.lastName}`.trim(),
+      // Step E — Finalisation atomique & idempotente de la commande
+      setCheckoutStep("finalizing");
+      setCheckoutMessage("Finalisation et enregistrement de votre commande...");
+
+      const idempotencyKey = `idem_${draftId}_${newOrderNum}`;
+      const normalizedItems = items.map((it) => ({
+        id: it.key,
+        productId: it.productId,
+        format: it.format,
+        withFrame: it.withFrame ?? false,
+        videoDurationSec: it.videoDurationSec,
+        cardMessage: it.cardMessage,
+        letterContent: it.letterContent,
+        personalization: it.personalization,
+        qty: it.qty,
+      }));
+
+      const finalizeResult = await finalizeOrderWithIntents({
+        orderPayload: {
+          order_number: newOrderNum,
+          customer_name: `${customer.firstName} ${customer.lastName}`.trim() || "Client Mémora",
+          customer_email: customer.email || "client@memora.tn",
+          customer_phone: customer.phone,
+          shipping_address: {
+            ...shipping,
+            recipient: `${customer.firstName} ${customer.lastName}`.trim(),
+          },
+          items: normalizedItems,
+          promo_code: promoInput.trim() || undefined,
+          shipping_carrier: shipping.carrier || "aramex",
         },
-        items: itemsWithMedia,
-        subtotal: Number((quote.total - quote.shippingCost).toFixed(2)),
-        shipping_fee: quote.shippingCost,
-        total: quote.total,
-        currency: "TND",
-        status: "pending",
+        draftId,
+        draftToken,
+        intentMappings,
+        idempotencyKey,
       });
-      if (!res.success) console.error("❌ Commande non enregistrée dans Supabase:", res.error);
-      if (mediaFailed) {
-        toast.warning("Commande reçue, mais l'envoi d'un fichier a échoué. Nous vous contacterons.");
+
+      if (!finalizeResult.success) {
+        throw new Error(finalizeResult.error || "Échec de finalisation de la commande");
       }
-    } catch (err) {
-      console.error("Erreur Supabase:", err);
+
+      // Cleanup policy : suppression des fichiers locaux UNIQUEMENT après succès
+      await clearDraftMedia(draftId);
+      cart.clear();
+
+      setCheckoutStep("confirmed");
+      setFunnelStage("confirmation");
+      toast.success(`Commande #${newOrderNum} confirmée avec succès !`);
+    } catch (err: any) {
+      console.error("Erreur commande R2 / Finalisation:", err);
+      const msg = err?.message || "Une erreur est survenue lors de l'enregistrement de votre commande.";
+      setCheckoutStep("error");
+      setCheckoutError(msg);
+      toast.error(msg);
     } finally {
       setIsSubmitting(false);
     }
-
-    setFunnelStage("confirmation");
-    toast.success(`Commande #${newOrderNum} confirmée !`);
   };
 
   return (
@@ -1054,21 +1242,12 @@ function CommanderPage() {
                 <label className="mt-6 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-taupe/40 bg-cream/30 p-10 text-center transition-colors hover:bg-cream/70 animate-in fade-in">
                   <Upload className="h-9 w-9 text-deep-brown/80" />
                   <p className="mt-3 text-sm font-semibold">Cliquez pour importer votre photo</p>
-                  <p className="mt-1 text-xs text-muted-foreground">Format JPG, PNG, HEIC (iPhone) jusqu'à 50 Mo</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Format JPG, PNG, WEBP jusqu'à 25 Mo</p>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp"
                     className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) {
-                        setPhotoUrl(URL.createObjectURL(f));
-                        setPhotoName(f.name);
-                        setPhotoSource("upload");
-                        setCapturedTimestamp(null);
-                        toast.success("Photo importée avec succès !");
-                      }
-                    }}
+                    onChange={(e) => void handlePhotoUpload(e)}
                   />
                 </label>
               )}
@@ -1802,6 +1981,50 @@ function CommanderPage() {
               </label>
             </div>
 
+            {/* Status Feedback and Progress Indicator */}
+            {isSubmitting && (
+              <div className="mt-6 rounded-2xl border border-sand bg-cream/50 p-5 animate-in fade-in">
+                <div className="flex items-center gap-3">
+                  <RotateCw className="h-5 w-5 text-deep-brown animate-spin shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold uppercase tracking-wider text-deep-brown">
+                      {checkoutStep === "preparing" && "1/5 · Préparation des fichiers"}
+                      {checkoutStep === "uploading_photo" && `2/5 · Upload photo Cloudflare R2 (Article ${checkoutProgressIndex}/${items.length})`}
+                      {checkoutStep === "uploading_video" && `3/5 · Upload vidéo Cloudflare R2 (Article ${checkoutProgressIndex}/${items.length})`}
+                      {checkoutStep === "verifying" && "4/5 · Vérification de l'intégrité"}
+                      {checkoutStep === "finalizing" && "5/5 · Finalisation atomique"}
+                    </p>
+                    <p className="mt-0.5 text-xs text-charcoal">{checkoutMessage}</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Error & Retry Banner */}
+            {checkoutStep === "error" && checkoutError && !isSubmitting && (
+              <div className="mt-6 rounded-2xl border border-destructive/30 bg-destructive/10 p-5 animate-in fade-in">
+                <div className="flex items-start gap-3">
+                  <div className="rounded-full bg-destructive/20 p-1 text-destructive shrink-0 mt-0.5">
+                    <RotateCw className="h-4 w-4" />
+                  </div>
+                  <div className="flex-1">
+                    <p className="text-xs font-semibold text-destructive uppercase tracking-wider">
+                      Échec de la validation de la commande
+                    </p>
+                    <p className="mt-1 text-xs text-charcoal leading-relaxed">{checkoutError}</p>
+                    <button
+                      type="button"
+                      onClick={handleConfirmOrder}
+                      className="mt-3 inline-flex items-center gap-1.5 rounded-sm bg-destructive px-4 py-2 text-xs font-semibold uppercase tracking-wider text-destructive-foreground hover:bg-destructive/90 transition-colors shadow-xs"
+                    >
+                      <RotateCw className="h-3.5 w-3.5" />
+                      <span>Réessayer l'envoi et la commande</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Confirm Order CTA */}
             <div className="mt-8 flex items-center justify-between border-t border-border pt-6">
               <button
@@ -1816,10 +2039,16 @@ function CommanderPage() {
                 disabled={isSubmitting}
                 className="inline-flex items-center gap-2 rounded-sm bg-primary px-8 sm:px-10 py-4 text-xs uppercase tracking-widest text-primary-foreground hover:bg-charcoal transition-colors shadow-md disabled:opacity-60 disabled:cursor-wait"
               >
-                <ShieldCheck className="h-4 w-4 text-sand" />
+                {isSubmitting ? (
+                  <RotateCw className="h-4 w-4 text-sand animate-spin" />
+                ) : (
+                  <ShieldCheck className="h-4 w-4 text-sand" />
+                )}
                 <span>
                   {isSubmitting
-                    ? `Envoi de vos fichiers… ${uploadPct > 0 ? uploadPct + " %" : ""}`
+                    ? checkoutMessage || "Traitement en cours…"
+                    : checkoutStep === "error"
+                    ? `Réessayer (${formatTND(quote.total)})`
                     : `Confirmer ma commande (${formatTND(quote.total)})`}
                 </span>
               </button>

@@ -1,5 +1,5 @@
 import { createFileRoute, Link, notFound, useNavigate } from "@tanstack/react-router";
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import {
   Upload,
   Video,
@@ -11,10 +11,11 @@ import {
   Play,
 } from "lucide-react";
 import { toast } from "sonner";
-import { cart } from "@/lib/cart";
+import { cart, useStore } from "@/lib/cart";
 import { getProduct, formatPrice } from "@/lib/products";
 import { MobileUploadModal } from "@/components/site/MobileUploadModal";
 import { getVideoSurcharge, INCLUDED_VIDEO_SECONDS, formatTND } from "@/lib/pricing";
+import { putCachedMedia, getMediaCacheKey } from "@/lib/media-cache";
 
 export const Route = createFileRoute("/create/$productId")({
   loader: ({ params }) => {
@@ -41,6 +42,10 @@ export const Route = createFileRoute("/create/$productId")({
 function Studio() {
   const { product } = Route.useLoaderData();
   const navigate = useNavigate();
+  const { draftId } = useStore();
+
+  // Clé d'article stable pour la session Studio
+  const [itemKey] = useState(() => `item_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`);
 
   const [step, setStep] = useState<"video" | "photo">("video");
   const [videoFile, setVideoFile] = useState<File | null>(null);
@@ -50,6 +55,7 @@ function Studio() {
   const [videoName, setVideoName] = useState("video_souvenir.mp4");
   const [videoDuration, setVideoDuration] = useState(120);
 
+  const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string>(product.images[0] ?? "");
   const [photoName, setPhotoName] = useState("photo_recto.jpg");
   const [withFrame, setWithFrame] = useState(product.category === "grand-format");
@@ -61,13 +67,105 @@ function Studio() {
 
   const surcharge = getVideoSurcharge(videoDuration, 1);
 
+  // Nettoyage des object URLs temporaires lors du démontage
+  const prevVideoUrlRef = useRef<string | null>(null);
+  const prevPhotoUrlRef = useRef<string | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (prevVideoUrlRef.current && prevVideoUrlRef.current.startsWith("blob:")) {
+        URL.revokeObjectURL(prevVideoUrlRef.current);
+      }
+      if (prevPhotoUrlRef.current && prevPhotoUrlRef.current.startsWith("blob:")) {
+        URL.revokeObjectURL(prevPhotoUrlRef.current);
+      }
+    };
+  }, []);
+
+  const handleVideoSelect = async (f: File) => {
+    const ext = f.name.split(".").pop()?.toLowerCase() || "";
+    if (!["mp4", "mov", "webm"].includes(ext)) {
+      toast.error("Format vidéo non supporté. Formats acceptés : MP4, MOV, WEBM.");
+      return;
+    }
+    if (!f.type.startsWith("video/") && f.type !== "application/octet-stream") {
+      toast.error("Type MIME vidéo invalide.");
+      return;
+    }
+    if (f.size > 5 * 1024 * 1024 * 1024) {
+      toast.error("La vidéo dépasse la taille maximale autorisée (5 Go).");
+      return;
+    }
+    if (f.size <= 0) {
+      toast.error("Le fichier vidéo est vide.");
+      return;
+    }
+
+    try {
+      const cacheKey = getMediaCacheKey(draftId, itemKey, "video");
+      await putCachedMedia(cacheKey, f);
+
+      if (prevVideoUrlRef.current && prevVideoUrlRef.current.startsWith("blob:")) {
+        URL.revokeObjectURL(prevVideoUrlRef.current);
+      }
+      const preview = URL.createObjectURL(f);
+      prevVideoUrlRef.current = preview;
+
+      setVideoFile(f);
+      setVideoUrl(preview);
+      setVideoName(f.name);
+      toast.success("Vidéo sélectionnée et mise en cache !");
+    } catch {
+      toast.error("Erreur lors de l'enregistrement local de la vidéo.");
+    }
+  };
+
+  const handlePhotoSelect = async (f: File) => {
+    const ext = f.name.split(".").pop()?.toLowerCase() || "";
+    if (!["jpg", "jpeg", "png", "webp"].includes(ext)) {
+      toast.error("Format photo non supporté. Formats acceptés : JPG, JPEG, PNG, WEBP.");
+      return;
+    }
+    if (!["image/jpeg", "image/png", "image/webp"].includes(f.type) && !f.type.startsWith("image/")) {
+      toast.error("Type MIME photo invalide.");
+      return;
+    }
+    if (f.size > 25 * 1024 * 1024) {
+      toast.error("La photo dépasse la taille maximale autorisée (25 Mo).");
+      return;
+    }
+    if (f.size <= 0) {
+      toast.error("Le fichier photo est vide.");
+      return;
+    }
+
+    try {
+      const cacheKey = getMediaCacheKey(draftId, itemKey, "photo");
+      await putCachedMedia(cacheKey, f);
+
+      if (prevPhotoUrlRef.current && prevPhotoUrlRef.current.startsWith("blob:")) {
+        URL.revokeObjectURL(prevPhotoUrlRef.current);
+      }
+      const preview = URL.createObjectURL(f);
+      prevPhotoUrlRef.current = preview;
+
+      setPhotoFile(f);
+      setPhotoUrl(preview);
+      setPhotoName(f.name);
+      toast.success("Photo sélectionnée et mise en cache !");
+    } catch {
+      toast.error("Erreur lors de l'enregistrement local de la photo.");
+    }
+  };
+
   const handleValidate = () => {
     cart.add(product.id, {
+      key: itemKey,
       format: product.formatCode,
       withFrame,
       videoDurationSec: videoDuration,
-      photoPreviewUrl: photoUrl,
-      videoPreviewUrl: videoUrl,
+      photoPreviewUrl: photoUrl.startsWith("blob:") ? undefined : photoUrl,
+      videoPreviewUrl: videoUrl.startsWith("blob:") ? undefined : videoUrl,
       videoName,
       photoName,
       cardMessage,
@@ -141,16 +239,11 @@ function Studio() {
                     <span className="mt-2 text-xs font-medium">Importer un fichier</span>
                     <input
                       type="file"
-                      accept="video/*"
+                      accept="video/mp4,video/quicktime,video/webm"
                       className="hidden"
                       onChange={(e) => {
                         const f = e.target.files?.[0];
-                        if (f) {
-                          setVideoFile(f);
-                          setVideoUrl(URL.createObjectURL(f));
-                          setVideoName(f.name);
-                          toast.success("Vidéo sélectionnée !");
-                        }
+                        if (f) void handleVideoSelect(f);
                       }}
                     />
                   </label>
@@ -199,15 +292,11 @@ function Studio() {
                   <span className="mt-2 text-sm font-medium">Choisir ma photo</span>
                   <input
                     type="file"
-                    accept="image/*"
+                    accept="image/jpeg,image/png,image/webp"
                     className="hidden"
                     onChange={(e) => {
                       const f = e.target.files?.[0];
-                      if (f) {
-                        setPhotoUrl(URL.createObjectURL(f));
-                        setPhotoName(f.name);
-                        toast.success("Photo sélectionnée !");
-                      }
+                      if (f) void handlePhotoSelect(f);
                     }}
                   />
                 </label>

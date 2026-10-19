@@ -1,5 +1,6 @@
 import { useSyncExternalStore } from "react";
 import { Format, calculateQuote, QuoteResult } from "./pricing";
+import { getOrCreateDraftCredentials, resetDraftCredentials } from "./draft-manager";
 
 export type RecipientAllocation = {
   recipientId: string;
@@ -60,20 +61,14 @@ type State = {
 
 const KEY = "memora-cart-v2";
 
-function generateDraftId(): string {
-  return "dft_" + Math.random().toString(36).substring(2, 10) + Date.now().toString(36);
-}
-
-function generateDraftToken(): string {
-  return "tok_" + Math.random().toString(36).substring(2, 15) + Math.random().toString(36).substring(2, 15);
-}
+const initialCreds = getOrCreateDraftCredentials();
 
 let state: State = {
   items: [],
   wishlist: [],
   discountPercent: 0,
-  draftId: generateDraftId(),
-  draftToken: generateDraftToken(),
+  draftId: initialCreds.draftId,
+  draftToken: initialCreds.draftToken,
 };
 
 let loaded = false;
@@ -83,14 +78,21 @@ function load() {
   if (loaded || typeof window === "undefined") return;
   loaded = true;
   try {
+    const creds = getOrCreateDraftCredentials();
     const raw = localStorage.getItem(KEY);
     if (raw) {
       const parsed = JSON.parse(raw);
       state = {
         ...state,
         ...parsed,
-        draftId: parsed.draftId || generateDraftId(),
-        draftToken: parsed.draftToken || generateDraftToken(),
+        draftId: creds.draftId,
+        draftToken: creds.draftToken,
+      };
+    } else {
+      state = {
+        ...state,
+        draftId: creds.draftId,
+        draftToken: creds.draftToken,
       };
     }
   } catch {
@@ -275,12 +277,13 @@ export const cart = {
   },
 
   clear() {
+    const nextCreds = resetDraftCredentials();
     set({
       items: [],
       wishlist: state.wishlist,
       discountPercent: 0,
-      draftId: generateDraftId(),
-      draftToken: generateDraftToken(),
+      draftId: nextCreds.draftId,
+      draftToken: nextCreds.draftToken,
     });
   },
 };
