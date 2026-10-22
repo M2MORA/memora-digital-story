@@ -73,6 +73,40 @@ input:focus, select:focus { outline: 2px solid var(--sand); }
 .order-actions { display: flex; align-items: center; gap: 0.8rem; }
 .order-total { font-family: "Cormorant Garamond", serif; font-size: 1.5rem; font-weight: 600; color: var(--brown); }
 
+.btn-delete {
+  background: transparent;
+  border: 1px solid #fecaca;
+  color: #dc2626;
+  padding: 0.35rem 0.65rem;
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.85rem;
+  transition: all 0.2s ease;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+}
+.btn-delete:hover {
+  background: #fee2e2;
+  border-color: #f87171;
+  color: #b91c1c;
+  transform: translateY(-1px);
+}
+.btn-delete-sm {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0.2rem 0.4rem;
+  border-radius: 4px;
+  font-size: 0.9rem;
+  opacity: 0.7;
+  transition: opacity 0.2s;
+}
+.btn-delete-sm:hover {
+  opacity: 1;
+  background: #fee2e2;
+}
+
 .delivery-strip { background: var(--ivory); padding: 0.6rem 0.9rem; border-radius: 10px; font-size: 0.8rem; border: 1px solid var(--border); }
 
 /* Items list inside card */
@@ -135,6 +169,16 @@ tr:hover > td { background: #fdfaf5; }
 .pill.paid, .pill.delivered { background: #e0f0e6; color: var(--ok); }
 .pill.printing, .pill.shipped { background: #e7eaf5; color: #4a5a9a; }
 .pill.cancelled { background: #f8e6e3; color: var(--bad); }
+.pill.locked-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border: 1px solid #a7f3d0;
+  box-shadow: 0 1px 3px rgba(16, 185, 129, 0.12);
+  user-select: none;
+  cursor: default;
+  font-weight: 700;
+}
 
 /* Download & Media actions */
 .media-btn-group { display: flex; flex-direction: column; gap: 0.4rem; margin-top: 0.6rem; align-items: center; width: 100%; }

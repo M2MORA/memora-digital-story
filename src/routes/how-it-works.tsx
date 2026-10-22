@@ -37,22 +37,29 @@ function How() {
       />
 
       {/* 6 Steps Grid */}
-      <section className="container-x grid gap-px bg-border pb-px md:grid-cols-3">
-        {STEPS.map(([t, d], i) => (
-          <div key={t} className="bg-background p-10">
-            <span className="font-serif text-5xl text-taupe">0{i + 1}</span>
-            <h2 className="mt-6 font-serif text-2xl">{t}</h2>
-            <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{d}</p>
-          </div>
-        ))}
+      <section className="container-x py-12">
+        <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-3">
+          {STEPS.map(([t, d], i) => (
+            <div
+              key={t}
+              className="rounded-3xl border border-sand/25 bg-card p-8 sm:p-10 shadow-luxury hover:shadow-luxury-lg hover:border-sand/60 transition-all duration-300 flex flex-col justify-between"
+            >
+              <div>
+                <span className="font-serif text-5xl text-sand font-bold tracking-tight">0{i + 1}</span>
+                <h2 className="mt-5 font-serif text-2xl text-charcoal">{t}</h2>
+                <p className="mt-3 text-sm text-muted-foreground leading-relaxed">{d}</p>
+              </div>
+            </div>
+          ))}
+        </div>
       </section>
 
       {/* Flip Card Section */}
-      <section className="container-x py-28">
+      <section className="container-x py-20 sm:py-28">
         <div className="grid gap-16 lg:grid-cols-2 items-center">
           <div>
-            <p className="eyebrow">Autonomie du destinataire</p>
-            <h2 className="mt-3 font-serif text-3xl sm:text-5xl">
+            <p className="eyebrow text-deep-brown font-semibold tracking-[0.2em]">Autonomie du destinataire</p>
+            <h2 className="mt-3 font-serif text-3xl sm:text-5xl text-charcoal tracking-tight">
               Le secret : tout est expliqué au verso.
             </h2>
             <p className="mt-6 text-base text-muted-foreground leading-relaxed">
@@ -62,25 +69,31 @@ function How() {
               Le dos de chaque carte Mémora comporte un schéma clair indiquant l'emplacement de contact et les 3 étapes simples pour lancer la vidéo.
             </p>
 
-            <div className="mt-8 space-y-3 text-sm">
-              <div className="flex items-center gap-3">
-                <CheckCircle2 className="h-5 w-5 text-deep-brown" />
-                <span>Compatible avec 100% des iPhone récents (iPhone XS et ultérieurs)</span>
+            <div className="mt-8 space-y-3.5 text-sm">
+              <div className="flex items-center gap-3.5">
+                <div className="h-8 w-8 rounded-full bg-sand/20 border border-sand/30 flex items-center justify-center text-deep-brown shrink-0">
+                  <CheckCircle2 className="h-4 w-4" />
+                </div>
+                <span className="text-charcoal font-medium">Compatible avec 100% des iPhone récents (iPhone XS et ultérieurs)</span>
               </div>
-              <div className="flex items-center gap-3">
-                <CheckCircle2 className="h-5 w-5 text-deep-brown" />
-                <span>Compatible avec tous les smartphones Android dotés du NFC</span>
+              <div className="flex items-center gap-3.5">
+                <div className="h-8 w-8 rounded-full bg-sand/20 border border-sand/30 flex items-center justify-center text-deep-brown shrink-0">
+                  <CheckCircle2 className="h-4 w-4" />
+                </div>
+                <span className="text-charcoal font-medium">Compatible avec tous les smartphones Android dotés du NFC</span>
               </div>
-              <div className="flex items-center gap-3">
-                <CheckCircle2 className="h-5 w-5 text-deep-brown" />
-                <span>8 minutes de vidéo incluses par tirage (jusqu'à 30 minutes)</span>
+              <div className="flex items-center gap-3.5">
+                <div className="h-8 w-8 rounded-full bg-sand/20 border border-sand/30 flex items-center justify-center text-deep-brown shrink-0">
+                  <CheckCircle2 className="h-4 w-4" />
+                </div>
+                <span className="text-charcoal font-medium">8 minutes de vidéo incluses par tirage (jusqu'à 30 minutes)</span>
               </div>
             </div>
 
             <div className="mt-10">
               <Link
                 to="/commander"
-                className="inline-flex items-center gap-2 rounded-sm bg-primary px-8 py-4 text-xs uppercase tracking-widest text-primary-foreground hover:bg-charcoal transition-colors shadow-md"
+                className="inline-flex items-center gap-2.5 rounded-full bg-primary px-8 py-4 text-xs uppercase tracking-[0.2em] text-primary-foreground hover:bg-charcoal transition-all shadow-luxury hover:shadow-luxury-lg font-semibold"
               >
                 <span>Créer mon tirage Mémora</span>
                 <ArrowRight className="h-4 w-4" />

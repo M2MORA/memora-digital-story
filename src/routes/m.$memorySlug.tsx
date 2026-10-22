@@ -111,6 +111,39 @@ function MemoryPlaybackPage() {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isMuted, setIsMuted] = useState(true);
   const [isPlaying, setIsPlaying] = useState(true);
+  const [isLandscape, setIsLandscape] = useState(true);
+  const [videoDuration, setVideoDuration] = useState(0);
+  const [currentTime, setCurrentTime] = useState(0);
+
+  const formatTime = (secs: number) => {
+    if (!secs || isNaN(secs)) return "0:00";
+    const m = Math.floor(secs / 60);
+    const s = Math.floor(secs % 60);
+    return `${m}:${s < 10 ? "0" : ""}${s}`;
+  };
+
+  const handleLoadedMetadata = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    const v = e.currentTarget;
+    if (v.videoWidth && v.videoHeight) {
+      setIsLandscape(v.videoWidth >= v.videoHeight);
+    }
+    if (v.duration && !isNaN(v.duration)) {
+      setVideoDuration(v.duration);
+    }
+  };
+
+  const handleTimeUpdate = (e: React.SyntheticEvent<HTMLVideoElement>) => {
+    setCurrentTime(e.currentTarget.currentTime || 0);
+  };
+
+  const handleSeek = (e: React.MouseEvent<HTMLDivElement>) => {
+    if (!videoRef.current || !videoDuration) return;
+    const rect = e.currentTarget.getBoundingClientRect();
+    const pos = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
+    const newTime = pos * videoDuration;
+    videoRef.current.currentTime = newTime;
+    setCurrentTime(newTime);
+  };
 
   const toggleSound = () => {
     if (videoRef.current) {
@@ -136,6 +169,16 @@ function MemoryPlaybackPage() {
     }
   };
 
+  const handleFullscreen = () => {
+    if (videoRef.current) {
+      if (videoRef.current.requestFullscreen) {
+        videoRef.current.requestFullscreen();
+      } else if ((videoRef.current as any).webkitRequestFullscreen) {
+        (videoRef.current as any).webkitRequestFullscreen();
+      }
+    }
+  };
+
   const handleShare = async () => {
     const url = window.location.href;
     if (navigator.share) {
@@ -146,36 +189,59 @@ function MemoryPlaybackPage() {
     }
   };
 
+  const progressPercent = videoDuration > 0 ? (currentTime / videoDuration) * 100 : 0;
+
   return (
-    <div className="min-h-screen bg-charcoal text-ivory selection:bg-sand selection:text-charcoal flex flex-col justify-between">
+    <div className="min-h-screen bg-charcoal text-ivory selection:bg-sand selection:text-charcoal flex flex-col justify-between relative overflow-x-hidden">
+      {/* Ambient background glow for luxury depth */}
+      <div className="pointer-events-none absolute -top-40 left-1/2 -translate-x-1/2 h-[550px] w-[550px] sm:w-[850px] rounded-full bg-radial from-sand/15 via-sand/5 to-transparent blur-3xl opacity-70" />
+
       {/* Discreet Header */}
-      <header className="px-6 py-4 flex items-center justify-between border-b border-ivory/10 backdrop-blur-md bg-charcoal/80 sticky top-0 z-40">
-        <Link to="/" className="font-serif text-xl tracking-[0.25em] text-ivory">
+      <header className="px-4 sm:px-6 py-4 flex items-center justify-between border-b border-ivory/10 backdrop-blur-md bg-charcoal/80 sticky top-0 z-40">
+        <Link to="/" className="font-serif text-lg sm:text-xl tracking-[0.28em] text-ivory hover:text-sand transition-colors">
           MÉMORA
         </Link>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2.5">
+          <span className="hidden sm:inline-flex items-center gap-1.5 rounded-full border border-ivory/10 bg-ivory/5 px-3 py-1 text-[10px] tracking-widest uppercase text-sand/90 backdrop-blur-sm">
+            <Smartphone className="h-3 w-3 text-sand" />
+            <span>NFC Connecté</span>
+          </span>
           <button
             onClick={handleShare}
             aria-label="Partager ce souvenir"
-            className="flex items-center gap-1.5 rounded-full bg-ivory/10 px-3.5 py-1.5 text-xs text-sand hover:bg-ivory/20 transition-colors"
+            className="flex items-center gap-1.5 rounded-full border border-ivory/15 bg-ivory/10 px-3.5 py-1.5 text-xs text-sand hover:bg-ivory/20 hover:border-sand/40 transition-all"
           >
             <Share2 className="h-3.5 w-3.5" />
-            <span>Partager</span>
+            <span className="hidden xs:inline">Partager</span>
           </button>
         </div>
       </header>
 
-      {/* Main Playback Area */}
-      <main className="container-x max-w-4xl py-8 flex-1 flex flex-col justify-center">
+      {/* Main Playback Area - Fully flexible container */}
+      <main className="w-full max-w-5xl mx-auto px-4 sm:px-6 py-6 sm:py-10 flex-1 flex flex-col justify-center items-center relative z-10">
         {/* Memory Title */}
-        <div className="text-center mb-6">
-          <p className="eyebrow text-sand">{memory.date} · MÉMORA SOUVENIR NFC</p>
-          <h1 className="mt-2 font-serif text-4xl sm:text-6xl text-ivory tracking-tight">{memory.title}</h1>
-          <p className="mt-2 text-sm text-taupe">{memory.subtitle}</p>
+        <div className="text-center mb-6 w-full max-w-2xl px-2">
+          <div className="inline-flex items-center gap-2 rounded-full border border-sand/30 bg-sand/10 px-3.5 py-1 text-[10px] sm:text-[11px] uppercase tracking-[0.2em] text-sand shadow-xs">
+            <Sparkles className="h-3 w-3 text-sand" />
+            <span>{memory.date} · SOUVENIR SCELLÉ NFC</span>
+          </div>
+          <h1 className="mt-3 font-serif text-3xl sm:text-5xl md:text-6xl text-ivory tracking-tight leading-tight drop-shadow-sm">
+            {memory.title}
+          </h1>
+          {memory.subtitle && (
+            <p className="mt-2 text-xs sm:text-sm text-taupe font-serif italic">
+              {memory.subtitle}
+            </p>
+          )}
         </div>
 
-        {/* Video Player Box */}
-        <div className="relative mx-auto w-full max-w-2xl overflow-hidden rounded-2xl bg-black shadow-2xl border border-ivory/15">
+        {/* Video Player Box - Adapts dynamically to video's natural real proportions */}
+        <div
+          className={`relative mx-auto w-full transition-all duration-300 ease-out overflow-hidden rounded-2xl sm:rounded-3xl bg-black/95 shadow-luxury-lg ring-1 ring-ivory/15 border border-ivory/10 ${
+            isLandscape ? "max-w-3xl sm:max-w-4xl" : "max-w-xs sm:max-w-sm md:max-w-md"
+          }`}
+        >
+          {/* Natural Real-size Video */}
           <video
             ref={videoRef}
             src={memory.videoUrl}
@@ -183,56 +249,110 @@ function MemoryPlaybackPage() {
             playsInline
             loop
             muted={isMuted}
-            className="aspect-video w-full object-cover"
+            onLoadedMetadata={handleLoadedMetadata}
+            onTimeUpdate={handleTimeUpdate}
+            onClick={togglePlay}
+            className="w-full h-auto max-h-[75vh] object-contain mx-auto block cursor-pointer"
           />
 
-          {/* Floating Controls Overlay */}
-          <div className="absolute inset-x-0 bottom-0 flex items-center justify-between p-4 bg-linear-to-t from-charcoal/90 via-charcoal/40 to-transparent">
-            {/* Play/Pause */}
+          {/* Pause overlay icon in center when paused */}
+          {!isPlaying && (
             <button
               onClick={togglePlay}
-              className="flex items-center gap-2 rounded-full bg-charcoal/80 px-3.5 py-2 text-xs font-medium text-ivory backdrop-blur hover:bg-charcoal"
+              aria-label="Reprendre la lecture"
+              className="absolute inset-0 flex items-center justify-center bg-black/40 backdrop-blur-xs transition-opacity"
             >
-              {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4 fill-current" />}
-              <span>{isPlaying ? "Pause" : "Lecture"}</span>
+              <div className="rounded-full bg-sand/95 text-charcoal p-5 sm:p-6 shadow-luxury hover:bg-ivory hover:scale-105 active:scale-95 transition-all">
+                <Play className="h-8 w-8 fill-current ml-1" />
+              </div>
             </button>
+          )}
 
-            {/* Tap for sound button */}
-            <button
-              onClick={toggleSound}
-              className={`flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-wider backdrop-blur transition-all ${
-                isMuted
-                  ? "bg-sand text-charcoal hover:bg-sand/90 animate-pulse"
-                  : "bg-charcoal/80 text-ivory hover:bg-charcoal"
-              }`}
+          {/* Floating Controls Overlay with timeline progress */}
+          <div className="absolute inset-x-0 bottom-0 bg-linear-to-t from-charcoal/95 via-charcoal/60 to-transparent p-3 sm:p-4 flex flex-col gap-2.5">
+            {/* Timeline Seek Bar */}
+            <div
+              onClick={handleSeek}
+              className="group relative h-2 w-full cursor-pointer rounded-full bg-ivory/20 flex items-center transition-all hover:h-2.5"
             >
-              {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-              <span>{isMuted ? "Activer le son" : "Couper le son"}</span>
-            </button>
+              <div
+                className="h-full rounded-full bg-linear-to-r from-sand to-champagne transition-all duration-100"
+                style={{ width: `${progressPercent}%` }}
+              />
+              <span className="sr-only">Barre de progression</span>
+            </div>
+
+            {/* Controls Row */}
+            <div className="flex items-center justify-between text-xs text-ivory">
+              {/* Left: Play/Pause and Time */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={togglePlay}
+                  className="flex items-center gap-1.5 rounded-full bg-charcoal/85 border border-ivory/15 px-3 py-1.5 font-medium text-ivory backdrop-blur-md hover:bg-charcoal hover:border-sand/40 transition-colors"
+                >
+                  {isPlaying ? <Pause className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5 fill-current" />}
+                  <span className="hidden sm:inline">{isPlaying ? "Pause" : "Lecture"}</span>
+                </button>
+                <span className="text-[11px] text-taupe font-mono">
+                  {formatTime(currentTime)} / {formatTime(videoDuration)}
+                </span>
+              </div>
+
+              {/* Right: Sound & Fullscreen */}
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={toggleSound}
+                  className={`flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold uppercase tracking-wider backdrop-blur-md transition-all ${
+                    isMuted
+                      ? "bg-sand text-charcoal hover:bg-ivory shadow-luxury animate-pulse"
+                      : "bg-charcoal/85 border border-ivory/15 text-ivory hover:border-sand/40"
+                  }`}
+                >
+                  {isMuted ? <VolumeX className="h-3.5 w-3.5" /> : <Volume2 className="h-3.5 w-3.5" />}
+                  <span className="hidden sm:inline">{isMuted ? "Activer le son" : "Couper"}</span>
+                </button>
+
+                <button
+                  onClick={handleFullscreen}
+                  aria-label="Plein écran"
+                  className="rounded-full bg-charcoal/85 border border-ivory/15 p-1.5 text-ivory hover:border-sand/40 backdrop-blur-md transition-colors"
+                  title="Plein écran"
+                >
+                  <Maximize className="h-3.5 w-3.5" />
+                </button>
+              </div>
+            </div>
           </div>
         </div>
 
-        {/* Card Note from author */}
-        <div className="mx-auto mt-8 w-full max-w-xl rounded-2xl border border-ivory/15 bg-ivory/5 p-6 sm:p-8 backdrop-blur-xs text-center">
-          <p className="eyebrow text-sand">Mot imprimé au dos</p>
-          <p className="mt-4 font-serif text-xl sm:text-2xl italic text-ivory/90 leading-relaxed">
-            “{memory.message}”
-          </p>
-          <p className="mt-4 text-xs tracking-widest uppercase text-taupe">
-            De la part de {memory.author} · Pour {memory.recipient}
-          </p>
-        </div>
+        {/* Card Note from author - Luxury stationery card */}
+        {memory.message && (
+          <div className="mx-auto mt-8 w-full max-w-xl rounded-2xl sm:rounded-3xl border border-ivory/15 bg-linear-to-b from-ivory/[0.08] to-ivory/[0.03] p-6 sm:p-8 backdrop-blur-md text-center shadow-luxury">
+            <p className="eyebrow text-sand text-[10px] sm:text-[11px] uppercase tracking-[0.25em]">
+              Mot imprimé au dos du tirage
+            </p>
+            <p className="mt-3 font-serif text-lg sm:text-2xl italic text-ivory/95 leading-relaxed">
+              “{memory.message}”
+            </p>
+            {memory.author && (
+              <p className="mt-4 text-[10px] sm:text-xs tracking-widest uppercase text-taupe font-medium">
+                De la part de <span className="text-sand">{memory.author}</span>
+                {memory.recipient ? ` · Pour ${memory.recipient}` : ""}
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Viral loop: Create your own Mémora */}
-        <div className="mx-auto mt-12 w-full max-w-xl rounded-2xl border border-sand/30 bg-sand/10 p-6 text-center">
-          <Sparkles className="mx-auto h-6 w-6 text-sand mb-2" />
-          <h3 className="font-serif text-2xl text-ivory">Les instants passent. Les souvenirs restent.</h3>
-          <p className="mt-1 text-xs text-ivory/70 max-w-md mx-auto">
-            Vos plus belles photos méritent mieux qu'un écran. Offrez à ceux que vous aimez un souvenir physique à toucher et revivre pour toujours.
+        <div className="mx-auto mt-10 w-full max-w-xl rounded-2xl sm:rounded-3xl border border-sand/30 bg-linear-to-b from-sand/15 via-sand/5 to-charcoal/90 p-6 sm:p-8 text-center shadow-luxury backdrop-blur-md">
+          <Sparkles className="mx-auto h-5 w-5 text-sand mb-2" />
+          <h3 className="font-serif text-xl sm:text-2xl text-ivory">Les instants passent. Les souvenirs restent.</h3>
+          <p className="mt-2 text-xs sm:text-sm text-ivory/70 max-w-md mx-auto leading-relaxed">
+            Vos plus belles vidéos méritent mieux qu'un écran éphémère. Offrez à ceux qui comptent un souvenir physique précieux à toucher et revivre à l'infini.
           </p>
           <Link
             to="/commander"
-            className="mt-5 inline-flex items-center gap-2 rounded-full bg-sand px-6 py-3 text-xs uppercase tracking-widest text-charcoal font-semibold hover:bg-ivory transition-colors shadow-md"
+            className="mt-5 inline-flex items-center gap-2 rounded-full bg-sand px-6 py-3 text-xs uppercase tracking-[0.2em] text-charcoal font-semibold hover:bg-ivory transition-all shadow-luxury hover:shadow-luxury-lg hover:scale-[1.02] active:scale-[0.98]"
           >
             <span>Créer un MÉMORA</span>
           </Link>
@@ -240,7 +360,7 @@ function MemoryPlaybackPage() {
       </main>
 
       {/* Footer */}
-      <footer className="py-6 text-center text-[11px] uppercase tracking-[0.25em] text-taupe border-t border-ivory/10">
+      <footer className="py-6 text-center text-[10px] sm:text-[11px] uppercase tracking-[0.25em] text-taupe border-t border-ivory/10">
         MÉMORA · Make Memories Last · Des photos à toucher, des souvenirs à vivre
       </footer>
     </div>

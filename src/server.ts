@@ -11,6 +11,8 @@ import {
   timingSafeCompare,
 } from "./lib/r2-backend";
 import { createClient } from "@supabase/supabase-js";
+import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -546,6 +548,207 @@ async function handleOrphanPurgeRoute(request: Request, env: any): Promise<Respo
   }
 }
 
+export async function handleProxyPutRoute(request: Request, _env: any): Promise<Response> {
+  const uploadUrl = request.headers.get("x-upload-url");
+  if (!uploadUrl) {
+    return new Response(JSON.stringify({ error: "En-tête x-upload-url requis" }), {
+      status: 400,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  // Sécurité SSRF: vérification stricte du domaine de destination (Cloudflare R2 uniquement)
+  let parsedUrl: URL;
+  try {
+    parsedUrl = new URL(uploadUrl);
+  } catch {
+    return new Response(JSON.stringify({ error: "URL d'upload invalide" }), {
+      status: 400,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  if (
+    parsedUrl.protocol !== "https:" ||
+    !parsedUrl.hostname.endsWith(".r2.cloudflarestorage.com")
+  ) {
+    return new Response(JSON.stringify({ error: "Destination non autorisée" }), {
+      status: 403,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  const contentType = request.headers.get("content-type") || "application/octet-stream";
+  const body = await request.arrayBuffer();
+
+  try {
+    const r2Response = await fetch(uploadUrl, {
+      method: "PUT",
+      headers: {
+        "Content-Type": contentType,
+      },
+      body,
+    });
+
+    if (!r2Response.ok) {
+      const errText = await r2Response.text().catch(() => "");
+      return new Response(
+        JSON.stringify({ error: `Erreur R2: ${r2Response.status} ${errText}` }),
+        {
+          status: r2Response.status,
+          headers: { "content-type": "application/json" },
+        }
+      );
+    }
+
+    return new Response(JSON.stringify({ success: true }), {
+      status: 200,
+      headers: { "content-type": "application/json" },
+    });
+  } catch (err: any) {
+    console.error("[proxy-put] Erreur de transfert R2:", err);
+    return new Response(
+      JSON.stringify({ error: "Échec de transmission du fichier vers R2" }),
+      {
+        status: 502,
+        headers: { "content-type": "application/json" },
+      }
+    );
+  }
+}
+
+export async function handleMediaRoute(request: Request, env: any): Promise<Response> {
+  const url = new URL(request.url);
+  const key = url.searchParams.get("key");
+  if (!key || typeof key !== "string" || !key.trim()) {
+    return new Response(JSON.stringify({ error: "Paramètre key requis" }), {
+      status: 400,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  const cleanKey = key.trim().replace(/^\/+/, "");
+  if (cleanKey.includes("..") || cleanKey.includes("\0")) {
+    return new Response(JSON.stringify({ error: "Clé non autorisée" }), {
+      status: 403,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  const accountId = env?.R2_ACCOUNT_ID || (typeof process !== "undefined" ? process.env?.["R2_ACCOUNT_ID"] : "") || "";
+  const accessKeyId = env?.R2_ACCESS_KEY_ID || (typeof process !== "undefined" ? process.env?.["R2_ACCESS_KEY_ID"] : "") || "";
+  const secretAccessKey = env?.R2_SECRET_ACCESS_KEY || (typeof process !== "undefined" ? process.env?.["R2_SECRET_ACCESS_KEY"] : "") || "";
+  const bucketName = env?.R2_BUCKET_NAME || (typeof process !== "undefined" ? process.env?.["R2_BUCKET_NAME"] : "") || "memora-videos";
+
+  if (!accountId || !accessKeyId || !secretAccessKey) {
+    return new Response(JSON.stringify({ error: "Configuration stockage indisponible" }), {
+      status: 500,
+      headers: { "content-type": "application/json" },
+    });
+  }
+
+  try {
+    const s3 = new S3Client({
+      region: "auto",
+      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      credentials: { accessKeyId, secretAccessKey },
+    });
+
+    const signedUrl = await getSignedUrl(
+      s3,
+      new GetObjectCommand({
+        Bucket: bucketName,
+        Key: cleanKey,
+      }),
+      { expiresIn: 3600 }
+    );
+
+    return new Response(null, {
+      status: 302,
+      headers: {
+        Location: signedUrl,
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "public, max-age=3600",
+      },
+    });
+  } catch (err: any) {
+    console.error("[media] Erreur génération URL présignée:", err);
+    return new Response(JSON.stringify({ error: "Fichier média introuvable" }), {
+      status: 404,
+      headers: { "content-type": "application/json" },
+    });
+  }
+}
+
+export async function handleDeleteOrderRoute(request: Request, env: any): Promise<Response> {
+  const url = new URL(request.url);
+  const id = url.searchParams.get("id");
+  if (!id) {
+    return new Response(JSON.stringify({ error: "Paramètre id requis" }), {
+      status: 400,
+      headers: { "content-type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  const supabaseUrl =
+    env?.VITE_SUPABASE_URL ||
+    env?.SUPABASE_URL ||
+    (typeof process !== "undefined"
+      ? process.env?.["VITE_SUPABASE_URL"] || process.env?.["SUPABASE_URL"]
+      : "");
+  const serviceKey =
+    env?.SUPABASE_SERVICE_ROLE_KEY ||
+    (typeof process !== "undefined" ? process.env?.["SUPABASE_SERVICE_ROLE_KEY"] : "");
+
+  if (!supabaseUrl || !serviceKey) {
+    return new Response(JSON.stringify({ error: "Supabase service role non configuré" }), {
+      status: 500,
+      headers: { "content-type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  const supabase = createClient(supabaseUrl, serviceKey);
+
+  // Règle de sécurité stricte : seule une commande avec le statut 'cancelled' peut être supprimée
+  const { data: order, error: fetchErr } = await supabase
+    .from("orders")
+    .select("id, status, order_number")
+    .eq("id", id)
+    .single();
+
+  if (fetchErr || !order) {
+    return new Response(JSON.stringify({ error: "Commande introuvable" }), {
+      status: 404,
+      headers: { "content-type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  if (order.status !== "cancelled") {
+    return new Response(
+      JSON.stringify({
+        error: `Suppression interdite : la commande #${order.order_number} est au statut '${order.status}'. Seules les commandes annulées peuvent être supprimées. Une commande payée ne peut jamais être supprimée.`,
+      }),
+      {
+        status: 400,
+        headers: { "content-type": "application/json", "Access-Control-Allow-Origin": "*" },
+      }
+    );
+  }
+
+  const { error } = await supabase.from("orders").delete().eq("id", id);
+  if (error) {
+    return new Response(JSON.stringify({ error: error.message }), {
+      status: 500,
+      headers: { "content-type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+  }
+
+  return new Response(JSON.stringify({ success: true }), {
+    status: 200,
+    headers: { "content-type": "application/json", "Access-Control-Allow-Origin": "*" },
+  });
+}
+
 export default {
   async fetch(request: Request, env: unknown, ctx: unknown) {
     try {
@@ -559,6 +762,25 @@ export default {
       }
       if (url.pathname === "/api/upload/purge" && request.method === "POST") {
         return await handleOrphanPurgeRoute(request, env);
+      }
+      if (url.pathname === "/api/upload/proxy-put" && (request.method === "PUT" || request.method === "POST")) {
+        return await handleProxyPutRoute(request, env);
+      }
+      if (url.pathname === "/api/media" && request.method === "GET") {
+        return await handleMediaRoute(request, env);
+      }
+      if (url.pathname === "/api/admin/orders" && request.method === "OPTIONS") {
+        return new Response(null, {
+          status: 204,
+          headers: {
+            "Access-Control-Allow-Origin": "*",
+            "Access-Control-Allow-Methods": "DELETE, OPTIONS",
+            "Access-Control-Allow-Headers": "Content-Type",
+          },
+        });
+      }
+      if (url.pathname === "/api/admin/orders" && request.method === "DELETE") {
+        return await handleDeleteOrderRoute(request, env);
       }
 
       const handler = await getServerEntry();

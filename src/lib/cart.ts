@@ -148,7 +148,7 @@ export const cart = {
         ? "30x45"
         : "10x15");
 
-    const key = `item_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
+    const key = itemData?.key ?? `item_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const newItem: CartItem = {
       key,
       productId,

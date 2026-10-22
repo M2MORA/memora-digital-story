@@ -43,29 +43,29 @@ export function SiteFooter() {
   ];
 
   return (
-    <footer className="bg-charcoal text-ivory">
+    <footer className="bg-charcoal text-ivory border-t border-deep-brown/40">
       {/* Reassurance Bar */}
-      <div className="border-b border-ivory/10 py-10">
-        <div className="container-x grid gap-8 sm:grid-cols-3 text-center sm:text-left">
-          <div className="flex items-center justify-center sm:justify-start gap-3.5">
-            <Smartphone className="h-6 w-6 text-sand shrink-0" />
+      <div className="border-b border-ivory/10 py-12">
+        <div className="container-x grid gap-6 sm:grid-cols-3 text-center sm:text-left">
+          <div className="flex items-center justify-center sm:justify-start gap-4 rounded-xl p-4 bg-ivory/[0.03] border border-ivory/8">
+            <Smartphone className="h-6 w-6 text-champagne shrink-0" strokeWidth={1.5} />
             <div>
-              <p className="text-sm font-semibold">100% Sans Application</p>
-              <p className="text-xs text-taupe">Compatible nativement avec iPhone et Android</p>
+              <p className="text-sm font-semibold tracking-wide text-ivory">100% Sans Application</p>
+              <p className="text-xs text-taupe mt-0.5">Compatible nativement avec iPhone et Android</p>
             </div>
           </div>
-          <div className="flex items-center justify-center sm:justify-start gap-3.5">
-            <Truck className="h-6 w-6 text-sand shrink-0" />
+          <div className="flex items-center justify-center sm:justify-start gap-4 rounded-xl p-4 bg-ivory/[0.03] border border-ivory/8">
+            <Truck className="h-6 w-6 text-champagne shrink-0" strokeWidth={1.5} />
             <div>
-              <p className="text-sm font-semibold">Livraison Offerte dès 250 DT</p>
-              <p className="text-xs text-taupe">Expédié sous 5 à 7 jours avec numéro de suivi</p>
+              <p className="text-sm font-semibold tracking-wide text-ivory">Livraison Partout en Tunisie</p>
+              <p className="text-xs text-taupe mt-0.5">Paiement à la livraison · Offerte dès 250 DT</p>
             </div>
           </div>
-          <div className="flex items-center justify-center sm:justify-start gap-3.5">
-            <ShieldCheck className="h-6 w-6 text-sand shrink-0" />
+          <div className="flex items-center justify-center sm:justify-start gap-4 rounded-xl p-4 bg-ivory/[0.03] border border-ivory/8">
+            <ShieldCheck className="h-6 w-6 text-champagne shrink-0" strokeWidth={1.5} />
             <div>
-              <p className="text-sm font-semibold">Hébergement Sécurisé</p>
-              <p className="text-xs text-taupe">Vos vidéos protégées et accessibles à vie sans abonnement</p>
+              <p className="text-sm font-semibold tracking-wide text-ivory">Garantie & Hébergement à Vie</p>
+              <p className="text-xs text-taupe mt-0.5">Vidéos protégées sans abonnement récurrent</p>
             </div>
           </div>
         </div>
@@ -74,8 +74,8 @@ export function SiteFooter() {
       {/* Main Links */}
       <div className="container-x grid gap-12 py-16 md:grid-cols-[1.4fr_1fr_1fr_1fr_1fr]">
         <div>
-          <p className="font-serif text-3xl tracking-[0.25em]">MÉMORA</p>
-          <p className="mt-2 text-xs uppercase tracking-[0.2em] text-sand font-medium">Make Memories Last</p>
+          <p className="font-serif text-3xl tracking-[0.25em] text-ivory">MÉMORA</p>
+          <p className="mt-2 text-[10px] uppercase tracking-[0.24em] text-champagne font-medium">Make Memories Last</p>
           <p className="mt-3 max-w-xs font-serif text-lg italic text-ivory/90 leading-relaxed">
             Les instants passent. Les souvenirs restent.
           </p>
@@ -86,11 +86,11 @@ export function SiteFooter() {
 
         {cols.map((c) => (
           <div key={c.title}>
-            <p className="text-xs uppercase tracking-[0.2em] font-semibold text-sand">{c.title}</p>
+            <p className="text-[11px] uppercase tracking-[0.22em] font-semibold text-champagne">{c.title}</p>
             <ul className="mt-5 space-y-2.5">
               {c.links.map((l) => (
                 <li key={l.label}>
-                  <Link to={l.href} className="text-xs text-ivory/75 hover:text-ivory transition-colors">
+                  <Link to={l.href} className="text-xs text-ivory/70 hover:text-champagne transition-colors py-0.5 block">
                     {l.label}
                   </Link>
                 </li>
@@ -102,7 +102,7 @@ export function SiteFooter() {
 
       {/* Bottom Legal */}
       <div className="container-x flex flex-col justify-between items-center gap-3 border-t border-ivory/10 py-6 text-xs text-taupe md:flex-row">
-        <span>© {new Date().getFullYear()} MÉMORA. Tous droits réservés.</span>
+        <span>© {new Date().getFullYear()} MÉMORA. Fait avec passion en Tunisie 🇹🇳 · Tous droits réservés.</span>
         <span>Paiement sécurisé · Prix TTC en Dinars tunisiens (DT)</span>
       </div>
     </footer>

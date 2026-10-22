@@ -3,6 +3,17 @@ import { supabase, STATUSES, type Order, type OrderStatus, type Memory } from ".
 
 type Tab = "workshop" | "orders" | "memories";
 
+type UploadIntent = {
+  id: string;
+  order_id: string | null;
+  draft_id: string;
+  item_id: string;
+  file_kind: "photo" | "video";
+  storage_key: string;
+  file_name: string;
+  status?: string;
+};
+
 const fmt = (n: number, cur = "TND") =>
   `${Number(n).toFixed(2)} ${cur === "TND" ? "DT" : cur}`;
 const fmtDate = (d: string) =>
@@ -83,6 +94,7 @@ export default function Dashboard({ email }: { email: string }) {
   const [tab, setTab] = useState<Tab>("workshop");
   const [orders, setOrders] = useState<Order[]>([]);
   const [memories, setMemories] = useState<Memory[]>([]);
+  const [uploadIntents, setUploadIntents] = useState<UploadIntent[]>([]);
   const [filter, setFilter] = useState<OrderStatus | "all">("all");
   const [search, setSearch] = useState("");
   const [error, setError] = useState("");
@@ -109,6 +121,39 @@ export default function Dashboard({ email }: { email: string }) {
     await navigator.clipboard.writeText(fullUrl);
     setCopiedSlug(slug);
     setTimeout(() => setCopiedSlug(null), 3000);
+  };
+
+  const resolveMedia = (o: Order, it: Record<string, unknown>, kind: "photo" | "video", itemIndex?: number) => {
+    const idx = itemIndex !== undefined ? itemIndex : o.items.indexOf(it);
+    const slug = slugFor(o, idx >= 0 ? idx : 0);
+    const existingMemory = memories.find((m) => m.slug === slug);
+    if (kind === "photo" && existingMemory?.photo_url) return existingMemory.photo_url;
+    if (kind === "video" && existingMemory?.video_url) return existingMemory.video_url;
+
+    const direct = (kind === "photo"
+      ? it["photoUrl"] || it["photo_url"] || it["photoPreviewUrl"] || it["photo"] || it["previewUrl"]
+      : it["videoUrl"] || it["video_url"] || it["videoPreviewUrl"]) as string | undefined;
+    if (direct) return direct;
+
+    const itemId = (it["id"] || it["key"]) as string | undefined;
+    const matchingIntents = uploadIntents
+      .filter(
+        (ui) =>
+          (ui.order_id === o.id || (o.draft_id && ui.draft_id === o.draft_id)) &&
+          (!itemId || ui.item_id === itemId) &&
+          ui.file_kind === kind
+      )
+      .sort((a, b) => {
+        const scoreA = (a.order_id === o.id ? 10 : 0) + (a.status === "consumed" ? 5 : 0);
+        const scoreB = (b.order_id === o.id ? 10 : 0) + (b.status === "consumed" ? 5 : 0);
+        return scoreB - scoreA;
+      });
+
+    const intent = matchingIntents[0];
+    if (intent?.storage_key) {
+      return `${siteUrl}/api/media?key=${encodeURIComponent(intent.storage_key)}`;
+    }
+    return undefined;
   };
 
   const getFilename = (url: string, prefix: string, defaultExt: string) => {
@@ -243,14 +288,16 @@ export default function Dashboard({ email }: { email: string }) {
 
   const load = useCallback(async () => {
     setError("");
-    const [o, m] = await Promise.all([
+    const [o, m, u] = await Promise.all([
       supabase.from("orders").select("*").order("created_at", { ascending: false }),
       supabase.from("memories").select("*").order("created_at", { ascending: false }),
+      supabase.from("upload_intents").select("*"),
     ]);
     if (o.error) setError(o.error.message);
     else setOrders(o.data as Order[]);
     if (m.error) setError(m.error.message);
     else setMemories(m.data as Memory[]);
+    if (!u.error && u.data) setUploadIntents(u.data as UploadIntent[]);
   }, []);
 
   useEffect(() => {
@@ -258,9 +305,59 @@ export default function Dashboard({ email }: { email: string }) {
   }, [load]);
 
   const updateStatus = async (id: string, status: OrderStatus) => {
+    const currentOrder = orders.find((o) => o.id === id);
+    if (currentOrder?.status === "paid") {
+      alert("Cette commande a été marquée comme 'Payée'. Elle est définitivement verrouillée et ne peut plus être modifiée ou supprimée.");
+      return;
+    }
+
+    if (status === "paid") {
+      const confirmPaid = window.confirm(
+        `Êtes-vous sûr de marquer la commande #${currentOrder?.order_number || ""} comme 'Payée' ?\n\nATTENTION : Une fois marquée comme Payée, cette commande sera définitivement verrouillée : son statut ne pourra plus jamais être changé et elle ne pourra JAMAIS être supprimée.`
+      );
+      if (!confirmPaid) return;
+    }
+
     const { error } = await supabase.from("orders").update({ status }).eq("id", id);
     if (error) return setError(error.message);
     setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+  };
+
+  const deleteOrder = async (id: string, orderNumber: string) => {
+    const target = orders.find((o) => o.id === id);
+    if (target?.status === "paid") {
+      alert("Action impossible : une commande payée ne peut JAMAIS être supprimée.");
+      return;
+    }
+    if (target?.status !== "cancelled") {
+      alert("Seules les commandes ayant le statut 'Annulée' peuvent être supprimées de la base de données.");
+      return;
+    }
+
+    if (!window.confirm(`Voulez-vous vraiment supprimer définitivement la commande annulée #${orderNumber} de la base de données ?`)) {
+      return;
+    }
+    setError("");
+    try {
+      // 1. Tenter via le point de terminaison sécurisé du serveur
+      const res = await fetch(`${siteUrl}/api/admin/orders?id=${encodeURIComponent(id)}`, {
+        method: "DELETE",
+      });
+      if (res.ok) {
+        setOrders((prev) => prev.filter((o) => o.id !== id));
+        return;
+      }
+      const data = await res.json().catch(() => null);
+      if (data?.error) {
+        throw new Error(data.error);
+      }
+      // 2. Repli direct Supabase si l'API serveur n'est pas joignable
+      const { error: delError } = await supabase.from("orders").delete().eq("id", id);
+      if (delError) throw delError;
+      setOrders((prev) => prev.filter((o) => o.id !== id));
+    } catch (err: any) {
+      setError(`Échec de la suppression de la commande #${orderNumber}: ${err.message || err}`);
+    }
   };
 
   const setMemoryStatus = async (id: string, status: Memory["status"]) => {
@@ -273,14 +370,16 @@ export default function Dashboard({ email }: { email: string }) {
     const it = o.items[itemIndex];
     if (!it) return;
     const slug = slugFor(o, itemIndex);
-    const existingMemory = memories.find((m) => m.slug === slug);
-    const videoUrl = (it["videoUrl"] || it["video_url"] || it["videoPreviewUrl"] || existingMemory?.video_url) as string | undefined;
-    const photoUrl = (it["photoUrl"] || it["photo_url"] || it["photoPreviewUrl"] || it["photo"] || it["previewUrl"] || existingMemory?.photo_url) as string | undefined;
+    const videoUrl = resolveMedia(o, it, "video", itemIndex);
+    const photoUrl = resolveMedia(o, it, "photo", itemIndex);
 
     if (!videoUrl) {
       alert("Attention : la vidéo de ce tirage n'a pas été reçue.");
       return;
     }
+
+    const userRes = await supabase.auth.getUser();
+    const currentUserId = userRes.data.user?.id ?? null;
 
     const { data, error } = await supabase
       .from("memories")
@@ -292,6 +391,8 @@ export default function Dashboard({ email }: { email: string }) {
           video_url: videoUrl,
           photo_url: photoUrl ?? null,
           status: "active",
+          order_id: o.id,
+          user_id: currentUserId,
         },
       ])
       .select()
@@ -402,15 +503,34 @@ export default function Dashboard({ email }: { email: string }) {
 
                       <div className="order-actions">
                         <span className="order-total">{fmt(o.total, o.currency)}</span>
-                        <select
-                          className={`pill ${o.status}`}
-                          value={o.status}
-                          onChange={(e) => updateStatus(o.id, e.target.value as OrderStatus)}
-                        >
-                          {STATUSES.map((s) => (
-                            <option key={s.value} value={s.value}>{s.label}</option>
-                          ))}
-                        </select>
+                        {o.status === "paid" ? (
+                          <span
+                            className="pill paid locked-badge"
+                            title="Commande payée : statut verrouillé définitivement (non modifiable, non supprimable)"
+                          >
+                            🔒 Payée
+                          </span>
+                        ) : (
+                          <select
+                            className={`pill ${o.status}`}
+                            value={o.status}
+                            onChange={(e) => updateStatus(o.id, e.target.value as OrderStatus)}
+                          >
+                            {STATUSES.map((s) => (
+                              <option key={s.value} value={s.value}>{s.label}</option>
+                            ))}
+                          </select>
+                        )}
+                        {o.status === "cancelled" && (
+                          <button
+                            type="button"
+                            className="btn-delete"
+                            onClick={() => deleteOrder(o.id, o.order_number)}
+                            title="Supprimer définitivement cette commande annulée de la base de données"
+                          >
+                            🗑️ Supprimer
+                          </button>
+                        )}
                       </div>
                     </div>
 
@@ -426,8 +546,8 @@ export default function Dashboard({ email }: { email: string }) {
                         const existingMemory = memories.find((m) => m.slug === slug);
                         const nfcLink = `${siteUrl}/m/${slug}`;
                         const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(nfcLink)}`;
-                        const videoUrl = (it["videoUrl"] || it["video_url"] || it["videoPreviewUrl"] || existingMemory?.video_url) as string | undefined;
-                        const photoUrl = (it["photoUrl"] || it["photo_url"] || it["photoPreviewUrl"] || it["photo"] || it["previewUrl"] || existingMemory?.photo_url) as string | undefined;
+                        const videoUrl = resolveMedia(o, it, "video", i);
+                        const photoUrl = resolveMedia(o, it, "photo", i);
 
                         return (
                           <div key={i} className="craft-item-card">
@@ -614,20 +734,41 @@ export default function Dashboard({ email }: { email: string }) {
                         <td>{o.customer_name}<br /><span className="muted">{o.customer_email}</span></td>
                         <td>{fmt(o.total, o.currency)}</td>
                         <td>
-                          <select
-                            className={`pill ${o.status}`}
-                            value={o.status}
-                            onChange={(e) => updateStatus(o.id, e.target.value as OrderStatus)}
-                          >
-                            {STATUSES.map((s) => (
-                              <option key={s.value} value={s.value}>{s.label}</option>
-                            ))}
-                          </select>
+                          {o.status === "paid" ? (
+                            <span
+                              className="pill paid locked-badge"
+                              title="Commande payée : statut verrouillé définitivement (non modifiable, non supprimable)"
+                            >
+                              🔒 Payée
+                            </span>
+                          ) : (
+                            <select
+                              className={`pill ${o.status}`}
+                              value={o.status}
+                              onChange={(e) => updateStatus(o.id, e.target.value as OrderStatus)}
+                            >
+                              {STATUSES.map((s) => (
+                                <option key={s.value} value={s.value}>{s.label}</option>
+                              ))}
+                            </select>
+                          )}
                         </td>
                         <td>
-                          <button className="link" onClick={() => setOpen(open === o.id ? null : o.id)}>
-                            {open === o.id ? "Masquer" : "Voir"}
-                          </button>
+                          <div style={{ display: "flex", alignItems: "center", gap: "0.5rem" }}>
+                            <button className="link" onClick={() => setOpen(open === o.id ? null : o.id)}>
+                              {open === o.id ? "Masquer" : "Voir"}
+                            </button>
+                            {o.status === "cancelled" && (
+                              <button
+                                type="button"
+                                className="btn-delete-sm"
+                                onClick={() => deleteOrder(o.id, o.order_number)}
+                                title="Supprimer définitivement cette commande annulée"
+                              >
+                                🗑️
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                       {open === o.id && (
@@ -647,8 +788,8 @@ export default function Dashboard({ email }: { email: string }) {
                                   {o.items.map((it, idx) => {
                                     const slug = slugFor(o, idx);
                                     const existingMemory = memories.find((m) => m.slug === slug);
-                                    const itemPhoto = (it["photoUrl"] || it["photo_url"] || it["photoPreviewUrl"] || it["photo"] || it["previewUrl"] || existingMemory?.photo_url) as string | undefined;
-                                    const itemVideo = (it["videoUrl"] || it["video_url"] || it["videoPreviewUrl"] || existingMemory?.video_url) as string | undefined;
+                                    const itemPhoto = resolveMedia(o, it, "photo", idx);
+                                    const itemVideo = resolveMedia(o, it, "video", idx);
 
                                     return (
                                       <div key={idx} className="details-item-card">

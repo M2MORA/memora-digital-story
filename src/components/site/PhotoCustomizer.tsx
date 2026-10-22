@@ -327,7 +327,7 @@ export default function PhotoCustomizer({
             onPointerDown={handlePointerDown}
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerUp}
-            className={`relative w-full max-w-[310px] sm:max-w-[340px] aspect-[10/15] rounded-2xl shadow-2xl overflow-hidden select-none touch-none transition-shadow ${
+            className={`relative w-full max-w-[310px] sm:max-w-[340px] aspect-[10/15] rounded-2xl shadow-luxury-lg overflow-hidden select-none touch-none transition-all ring-1 ring-black/5 ${
               isDragging ? "cursor-grabbing shadow-2xl ring-2 ring-deep-brown" : "cursor-grab"
             } ${template === "cinematic" ? "bg-[#181513]" : "bg-white"} border-4 border-white`}
           >
@@ -453,12 +453,12 @@ export default function PhotoCustomizer({
                 )}
 
                 {/* Floating Guide badge */}
-                <div className="pointer-events-none absolute top-3 left-3 flex items-center gap-1.5 rounded-full bg-charcoal/70 px-2.5 py-1 text-[10px] text-ivory backdrop-blur-xs">
-                  <Move className="h-3 w-3" />
+                <div className="pointer-events-none absolute top-3 left-3 flex items-center gap-1.5 rounded-full bg-charcoal/80 px-3 py-1 text-[10px] text-ivory backdrop-blur-md shadow-sm font-medium">
+                  <Move className="h-3 w-3 text-champagne" />
                   <span>Glissez pour cadrer</span>
                 </div>
 
-                <div className="pointer-events-none absolute top-3 right-3 rounded-full bg-deep-brown/85 px-2 py-0.5 text-[9px] font-semibold text-ivory">
+                <div className="pointer-events-none absolute top-3 right-3 rounded-full bg-deep-brown/95 backdrop-blur-md px-2.5 py-0.5 text-[9px] font-semibold text-ivory shadow-xs">
                   10 × 15 cm
                 </div>
               </div>
@@ -471,7 +471,7 @@ export default function PhotoCustomizer({
                     Tirage Photo NFC Authentique
                   </p>
                 </div>
-                <div className="my-auto rounded-xl border border-dashed border-taupe/40 bg-sand/20 p-5">
+                <div className="my-auto rounded-2xl border border-dashed border-taupe/40 bg-sand/20 p-5 shadow-xs">
                   <p className="text-xs font-semibold text-charcoal">Puce NFC Haute Précision</p>
                   <p className="text-[11px] text-muted-foreground mt-1">
                     Approchez votre téléphone ici pour lancer la vidéo
@@ -488,7 +488,7 @@ export default function PhotoCustomizer({
             <button
               type="button"
               onClick={() => setPreviewSide(previewSide === "recto" ? "verso" : "recto")}
-              className="absolute bottom-3 right-3 z-10 rounded-full bg-charcoal/80 px-3 py-1.5 text-[10px] uppercase tracking-wider text-ivory backdrop-blur hover:bg-charcoal transition-all shadow-md"
+              className="absolute bottom-3 right-3 z-10 rounded-full bg-charcoal/90 px-3.5 py-2 text-[10px] uppercase tracking-wider text-ivory backdrop-blur hover:bg-charcoal transition-all shadow-md active:scale-95"
             >
               {previewSide === "recto" ? "Voir le verso (NFC)" : "Voir la photo"}
             </button>
@@ -504,7 +504,7 @@ export default function PhotoCustomizer({
            ========================================================= */}
         <div className="space-y-6">
           {/* Header Controls */}
-          <div className="flex items-center justify-between border-b border-border pb-3">
+          <div className="flex items-center justify-between border-b border-border/80 pb-3">
             <div>
               <h3 className="font-serif text-2xl text-charcoal">Personnalisation du Tirage</h3>
               <p className="text-xs text-muted-foreground">Format 10×15 cm standard d'art</p>
@@ -512,7 +512,7 @@ export default function PhotoCustomizer({
             <button
               type="button"
               onClick={handleReset}
-              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-deep-brown"
+              className="inline-flex items-center gap-1.5 text-xs text-muted-foreground hover:text-deep-brown transition-colors py-1"
               title="Réinitialiser tous les réglages"
             >
               <RefreshCcw className="h-3 w-3" />
@@ -521,41 +521,41 @@ export default function PhotoCustomizer({
           </div>
 
           {/* Navigation Tabs */}
-          <div className="flex gap-2 rounded-xl bg-cream/50 p-1 border border-border">
+          <div className="flex gap-2 rounded-2xl bg-cream/60 p-1.5 border border-border/80 shadow-xs">
             <button
               type="button"
               onClick={() => setActiveTab("templates")}
-              className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
+              className={`flex-1 rounded-xl py-2 text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
                 activeTab === "templates"
-                  ? "bg-white text-deep-brown shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-card text-deep-brown shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-charcoal"
               }`}
             >
-              <Layers className="h-3.5 w-3.5" />
+              <Layers className="h-3.5 w-3.5 text-champagne" />
               <span>1. Modèles & Cadres</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveTab("crop")}
-              className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
+              className={`flex-1 rounded-xl py-2 text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
                 activeTab === "crop"
-                  ? "bg-white text-deep-brown shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-card text-deep-brown shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-charcoal"
               }`}
             >
-              <Sliders className="h-3.5 w-3.5" />
+              <Sliders className="h-3.5 w-3.5 text-champagne" />
               <span>2. Taille & Zoom</span>
             </button>
             <button
               type="button"
               onClick={() => setActiveTab("text")}
-              className={`flex-1 rounded-lg py-2 text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
+              className={`flex-1 rounded-xl py-2 text-xs font-medium transition-all flex items-center justify-center gap-1.5 ${
                 activeTab === "text"
-                  ? "bg-white text-deep-brown shadow-xs"
-                  : "text-muted-foreground hover:text-foreground"
+                  ? "bg-card text-deep-brown shadow-xs font-semibold"
+                  : "text-muted-foreground hover:text-charcoal"
               }`}
             >
-              <Type className="h-3.5 w-3.5" />
+              <Type className="h-3.5 w-3.5 text-champagne" />
               <span>3. Légende</span>
             </button>
           </div>
@@ -563,7 +563,7 @@ export default function PhotoCustomizer({
           {/* TAB 1: TEMPLATES */}
           {activeTab === "templates" && (
             <div className="space-y-3 animate-in fade-in">
-              <p className="text-xs font-semibold uppercase tracking-wider text-taupe">
+              <p className="text-xs font-semibold uppercase tracking-wider text-charcoal">
                 Choisissez votre style de tirage d'art :
               </p>
               <div className="grid gap-2.5 sm:grid-cols-2">
@@ -574,23 +574,23 @@ export default function PhotoCustomizer({
                       key={t.id}
                       type="button"
                       onClick={() => setTemplate(t.id)}
-                      className={`flex flex-col items-start rounded-xl border p-3.5 text-left transition-all ${
+                      className={`flex flex-col items-start rounded-2xl border p-4 text-left transition-all ${
                         isSelected
-                          ? "border-deep-brown bg-sand/20 shadow-xs ring-1 ring-deep-brown"
-                          : "border-border bg-background hover:bg-cream/40"
+                          ? "border-deep-brown bg-sand/25 shadow-xs ring-1 ring-deep-brown/20"
+                          : "border-border/80 bg-background hover:bg-cream/40"
                       }`}
                     >
                       <div className="flex w-full items-center justify-between">
                         <span className="font-serif text-sm font-semibold text-charcoal">{t.name}</span>
                         {isSelected && (
-                          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-deep-brown text-ivory">
+                          <span className="flex h-4 w-4 items-center justify-center rounded-full bg-deep-brown text-ivory shadow-xs">
                             <Check className="h-2.5 w-2.5" />
                           </span>
                         )}
                       </div>
                       <p className="text-[11px] text-muted-foreground mt-0.5">{t.tagline}</p>
                       {t.badge && (
-                        <span className="mt-2 rounded-full bg-cream px-2 py-0.5 text-[9px] font-medium text-deep-brown">
+                        <span className="mt-2 rounded-full bg-cream border border-border/60 px-2 py-0.5 text-[9px] font-medium text-deep-brown">
                           {t.badge}
                         </span>
                       )}
@@ -619,10 +619,10 @@ export default function PhotoCustomizer({
               <div>
                 <div className="flex justify-between items-center text-xs font-medium text-muted-foreground">
                   <span className="flex items-center gap-1.5 font-semibold text-charcoal">
-                    <ZoomIn className="h-3.5 w-3.5" />
+                    <ZoomIn className="h-3.5 w-3.5 text-champagne" />
                     Zoom & Redimensionnement
                   </span>
-                  <span className="rounded-md bg-cream px-2 py-0.5 font-mono text-[11px] text-deep-brown">
+                  <span className="rounded-md bg-cream border border-border/60 px-2 py-0.5 font-mono text-[11px] text-deep-brown font-semibold">
                     {Math.round(zoom * 100)}%
                   </span>
                 </div>
@@ -631,7 +631,7 @@ export default function PhotoCustomizer({
                   <button
                     type="button"
                     onClick={() => setZoom((z) => Math.max(0.6, parseFloat((z - 0.1).toFixed(2))))}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-background hover:bg-cream"
+                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background hover:bg-cream transition-colors shadow-xs"
                     title="Zoom arrière"
                   >
                     <ZoomOut className="h-3.5 w-3.5" />
@@ -648,7 +648,7 @@ export default function PhotoCustomizer({
                   <button
                     type="button"
                     onClick={() => setZoom((z) => Math.min(2.5, parseFloat((z + 0.1).toFixed(2))))}
-                    className="flex h-8 w-8 items-center justify-center rounded-lg border border-border bg-background hover:bg-cream"
+                    className="flex h-9 w-9 items-center justify-center rounded-xl border border-border/80 bg-background hover:bg-cream transition-colors shadow-xs"
                     title="Zoom avant"
                   >
                     <ZoomIn className="h-3.5 w-3.5" />
@@ -656,11 +656,11 @@ export default function PhotoCustomizer({
                 </div>
 
                 {/* Quick Presets */}
-                <div className="mt-2 flex gap-2">
+                <div className="mt-3 flex gap-2">
                   <button
                     type="button"
                     onClick={handleFill}
-                    className="flex-1 rounded-lg border border-border bg-background py-1.5 text-[11px] font-medium hover:bg-cream flex items-center justify-center gap-1"
+                    className="flex-1 rounded-xl border border-border/80 bg-background py-2 text-[11px] font-medium hover:bg-cream transition-colors flex items-center justify-center gap-1 shadow-xs"
                   >
                     <Maximize2 className="h-3 w-3" />
                     <span>Remplir (10×15)</span>
@@ -668,7 +668,7 @@ export default function PhotoCustomizer({
                   <button
                     type="button"
                     onClick={handleFit}
-                    className="flex-1 rounded-lg border border-border bg-background py-1.5 text-[11px] font-medium hover:bg-cream flex items-center justify-center gap-1"
+                    className="flex-1 rounded-xl border border-border/80 bg-background py-2 text-[11px] font-medium hover:bg-cream transition-colors flex items-center justify-center gap-1 shadow-xs"
                   >
                     <Minimize2 className="h-3 w-3" />
                     <span>Photo entière (Fit)</span>
@@ -676,7 +676,7 @@ export default function PhotoCustomizer({
                   <button
                     type="button"
                     onClick={() => setPan({ x: 0, y: 0 })}
-                    className="rounded-lg border border-border bg-background px-3 py-1.5 text-[11px] font-medium hover:bg-cream"
+                    className="rounded-xl border border-border/80 bg-background px-3 py-2 text-[11px] font-medium hover:bg-cream transition-colors shadow-xs"
                     title="Recentrer"
                   >
                     Centrer
@@ -688,16 +688,16 @@ export default function PhotoCustomizer({
               <div className="pt-2 border-t border-border/60">
                 <div className="flex justify-between items-center text-xs font-medium text-muted-foreground mb-2">
                   <span className="flex items-center gap-1.5 font-semibold text-charcoal">
-                    <RotateCw className="h-3.5 w-3.5" />
+                    <RotateCw className="h-3.5 w-3.5 text-champagne" />
                     Orientation & Miroir
                   </span>
-                  <span className="text-[11px]">{rotation}°</span>
+                  <span className="text-[11px] font-mono font-semibold text-charcoal">{rotation}°</span>
                 </div>
                 <div className="flex gap-2">
                   <button
                     type="button"
                     onClick={() => setRotation((r) => (r + 90) % 360)}
-                    className="flex-1 rounded-lg border border-border bg-background py-2 text-xs font-medium hover:bg-cream flex items-center justify-center gap-1.5"
+                    className="flex-1 rounded-xl border border-border/80 bg-background py-2.5 text-xs font-medium hover:bg-cream transition-colors flex items-center justify-center gap-1.5 shadow-xs"
                   >
                     <RotateCw className="h-3.5 w-3.5" />
                     <span>Pivoter 90°</span>
@@ -705,10 +705,10 @@ export default function PhotoCustomizer({
                   <button
                     type="button"
                     onClick={() => setFlipH((f) => !f)}
-                    className={`flex-1 rounded-lg border py-2 text-xs font-medium transition-colors flex items-center justify-center gap-1.5 ${
+                    className={`flex-1 rounded-xl border py-2.5 text-xs font-medium transition-colors flex items-center justify-center gap-1.5 shadow-xs ${
                       flipH
                         ? "border-deep-brown bg-sand/30 text-deep-brown"
-                        : "border-border bg-background hover:bg-cream"
+                        : "border-border/80 bg-background hover:bg-cream"
                     }`}
                   >
                     <FlipHorizontal className="h-3.5 w-3.5" />
@@ -721,7 +721,7 @@ export default function PhotoCustomizer({
               <div className="pt-2 border-t border-border/60">
                 <div className="flex justify-between items-center text-xs font-medium text-muted-foreground mb-1">
                   <span>Redresser l'horizon (alignement fin)</span>
-                  <span className="font-mono text-[11px]">{fineAngle > 0 ? `+${fineAngle}` : fineAngle}°</span>
+                  <span className="font-mono text-[11px] font-semibold text-charcoal">{fineAngle > 0 ? `+${fineAngle}` : fineAngle}°</span>
                 </div>
                 <input
                   type="range"
@@ -750,16 +750,16 @@ export default function PhotoCustomizer({
                   value={caption}
                   onChange={(e) => setCaption(e.target.value)}
                   placeholder="Ex : Mariage de Sarah & Yassine · 2026"
-                  className="mt-1.5 w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-hidden focus:border-deep-brown"
+                  className="mt-1.5 w-full rounded-xl border border-border/80 bg-background px-4 py-3 text-sm outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-xs"
                 />
                 <p className="mt-1.5 text-[11px] text-muted-foreground">
                   Cette légende apparaît élégamment sur les modèles <strong>Polaroid</strong>, <strong>Galerie d'Art</strong> et <strong>Cinématique</strong>.
                 </p>
               </div>
 
-              <div className="rounded-xl border border-border bg-cream/40 p-4">
+              <div className="rounded-2xl border border-border/80 bg-cream/40 p-4 shadow-xs">
                 <p className="text-xs font-semibold text-charcoal">Exemples d'inspirations :</p>
-                <div className="mt-2 flex flex-wrap gap-1.5">
+                <div className="mt-2.5 flex flex-wrap gap-2">
                   {[
                     "Pour toujours, je t'aime.",
                     "Notre plus beau voyage",
@@ -771,7 +771,7 @@ export default function PhotoCustomizer({
                       key={phrase}
                       type="button"
                       onClick={() => setCaption(phrase)}
-                      className="rounded-full border border-border bg-background px-2.5 py-1 text-[11px] hover:border-deep-brown hover:text-deep-brown transition-colors"
+                      className="rounded-full border border-border/80 bg-background px-3 py-1.5 text-xs hover:border-champagne hover:text-deep-brown transition-colors shadow-xs"
                     >
                       {phrase}
                     </button>

@@ -44,16 +44,16 @@ function Shop() {
 
       <section className="container-x pb-32">
         {/* Filter bar */}
-        <div className="flex flex-col gap-6 border-y border-border py-6 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-6 border-y border-sand/20 py-6 lg:flex-row lg:items-center lg:justify-between">
           <div className="flex flex-wrap gap-2">
             {CATEGORIES.map((c) => (
               <button
                 key={c.id}
                 onClick={() => setCat(c.id)}
-                className={`px-4 py-2 text-xs uppercase tracking-[0.15em] transition-colors rounded-sm ${
+                className={`px-4 py-2 text-xs uppercase tracking-[0.15em] transition-all rounded-full ${
                   cat === c.id
-                    ? "bg-foreground text-background font-semibold"
-                    : "text-muted-foreground hover:text-foreground"
+                    ? "bg-foreground text-background font-semibold shadow-xs"
+                    : "border border-sand/30 text-muted-foreground hover:text-foreground hover:bg-sand/15"
                 }`}
               >
                 {c.label}
@@ -62,18 +62,18 @@ function Shop() {
           </div>
 
           <div className="flex flex-wrap items-center gap-5 text-sm">
-            <label className="flex items-center gap-2 border-b border-border pb-1">
+            <label className="flex items-center gap-2 rounded-full border border-sand/30 bg-card/60 px-3.5 py-1.5 focus-within:border-deep-brown transition-all">
               <Search className="h-4 w-4 text-muted-foreground" />
               <input
                 value={q}
                 onChange={(e) => setQ(e.target.value)}
-                placeholder="Rechercher"
-                className="w-36 bg-transparent outline-hidden text-xs"
+                placeholder="Rechercher..."
+                className="w-36 bg-transparent outline-hidden text-xs text-charcoal"
               />
             </label>
             <button
               onClick={() => setIsPriceDrawerOpen(true)}
-              className="text-xs uppercase tracking-wider font-semibold text-deep-brown underline underline-offset-4"
+              className="text-xs uppercase tracking-wider font-semibold text-deep-brown underline underline-offset-4 hover:text-charcoal transition-colors"
             >
               Grille des tarifs
             </button>
@@ -85,31 +85,31 @@ function Shop() {
           {list.map((p) => (
             <div
               key={p.id}
-              className="group flex flex-col justify-between rounded-2xl border border-border bg-background p-6 sm:p-8 shadow-xs hover:border-deep-brown hover:shadow-lg transition-all"
+              className="group flex flex-col justify-between rounded-3xl border border-sand/25 bg-card p-6 sm:p-8 shadow-luxury hover:shadow-luxury-lg hover:border-sand/60 transition-all duration-300"
             >
               <div>
-                <div className="relative aspect-4/3 overflow-hidden rounded-xl bg-cream">
+                <div className="relative aspect-4/3 overflow-hidden rounded-2xl bg-cream border border-sand/15">
                   <img
                     src={p.images[0]}
                     alt={p.name}
                     className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                   />
                   {p.badge && (
-                    <span className="absolute left-3 top-3 rounded-full bg-deep-brown px-3 py-1 text-[11px] uppercase tracking-wider text-ivory font-medium shadow-xs">
+                    <span className="absolute left-3.5 top-3.5 rounded-full bg-linear-to-r from-deep-brown to-charcoal px-3.5 py-1 text-[11px] uppercase tracking-wider text-ivory font-medium shadow-xs">
                       {p.badge}
                     </span>
                   )}
                 </div>
-                <h3 className="mt-5 font-serif text-2xl sm:text-3xl">{p.name}</h3>
+                <h3 className="mt-5 font-serif text-2xl sm:text-3xl text-charcoal">{p.name}</h3>
                 <p className="mt-2 text-xs text-muted-foreground leading-relaxed">{p.tagline}</p>
 
-                <div className="mt-4 rounded-xl bg-cream/50 p-3.5 text-xs text-charcoal border border-border/60">
-                  <p className="font-semibold text-deep-brown mb-1.5 uppercase tracking-wider text-[10px]">
+                <div className="mt-4 rounded-2xl bg-cream/70 p-4 text-xs text-charcoal border border-sand/25">
+                  <p className="font-semibold text-deep-brown mb-2 uppercase tracking-wider text-[10px]">
                     Ce qui est inclus :
                   </p>
-                  <ul className="space-y-1 text-muted-foreground">
+                  <ul className="space-y-1.5 text-muted-foreground">
                     {p.materials.map((mat, i) => (
-                      <li key={i} className="flex items-center gap-1.5">
+                      <li key={i} className="flex items-center gap-2">
                         <span className="h-1.5 w-1.5 rounded-full bg-deep-brown shrink-0" />
                         <span>{mat}</span>
                       </li>
@@ -118,7 +118,7 @@ function Shop() {
                 </div>
 
                 <div className="mt-5 flex items-baseline gap-2">
-                  <span className="text-3xl font-serif text-charcoal">{formatTND(p.priceTND)}</span>
+                  <span className="text-3xl font-serif font-bold text-charcoal">{formatTND(p.priceTND)}</span>
                   <span className="text-xs text-muted-foreground">/ pack complet</span>
                 </div>
               </div>
@@ -127,14 +127,14 @@ function Shop() {
                 <Link
                   to="/commander"
                   search={{ format: p.formatCode, stage: "video" }}
-                  className="flex w-full items-center justify-center rounded-sm bg-primary py-3.5 text-xs uppercase tracking-widest text-primary-foreground hover:bg-charcoal transition-colors shadow-xs"
+                  className="flex w-full items-center justify-center rounded-full bg-primary py-3.5 text-xs uppercase tracking-[0.2em] text-primary-foreground hover:bg-charcoal transition-all shadow-luxury hover:shadow-luxury-lg font-semibold"
                 >
-                  Personnaliser & Commander
+                  Personnaliser &amp; Commander
                 </Link>
                 <Link
                   to="/product/$slug"
                   params={{ slug: p.slug }}
-                  className="block text-center text-xs text-muted-foreground hover:text-foreground py-1"
+                  className="block text-center text-xs text-muted-foreground hover:text-foreground py-1 transition-colors"
                 >
                   Voir tous les détails du produit →
                 </Link>

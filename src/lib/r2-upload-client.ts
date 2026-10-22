@@ -75,14 +75,48 @@ export async function uploadBinaryToR2(
   // Ne JAMAIS ajouter d'en-tête Authorization ou de secrets
   const headers: Record<string, string> = { ...requiredHeaders };
 
-  const response = await fetch(uploadUrl, {
-    method: "PUT",
-    headers,
-    body: file,
-  });
+  try {
+    const response = await fetch(uploadUrl, {
+      method: "PUT",
+      headers,
+      body: file,
+    });
 
-  if (!response.ok) {
-    throw new Error(`Échec du transfert vers Cloudflare R2 (HTTP ${response.status})`);
+    if (!response.ok) {
+      throw new Error(`Échec du transfert vers Cloudflare R2 (HTTP ${response.status})`);
+    }
+  } catch (err: any) {
+    // Si l'upload direct échoue (ex: CORS browser "Failed to fetch"), basculer de manière transparente vers le proxy local
+    const isNetworkOrCors =
+      err?.name === "TypeError" ||
+      (typeof err?.message === "string" && (
+        err.message.includes("fetch") ||
+        err.message.includes("NetworkError") ||
+        err.message.includes("CORS")
+      ));
+
+    if (isNetworkOrCors) {
+      console.warn("[R2 Upload] Upload direct bloqué par CORS, bascule automatique vers le proxy applicatif...");
+      const proxyHeaders: Record<string, string> = {
+        ...headers,
+        "x-upload-url": uploadUrl,
+      };
+
+      const proxyResponse = await fetch("/api/upload/proxy-put", {
+        method: "PUT",
+        headers: proxyHeaders,
+        body: file,
+      });
+
+      if (!proxyResponse.ok) {
+        const errText = await proxyResponse.text().catch(() => "");
+        throw new Error(`Échec du transfert via proxy R2 (HTTP ${proxyResponse.status}): ${errText || "Erreur"}`);
+      }
+
+      return;
+    }
+
+    throw err;
   }
 }
 

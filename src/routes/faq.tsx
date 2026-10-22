@@ -101,19 +101,21 @@ function Faq() {
       />
       <section className="container-x max-w-4xl pb-32">
         {FAQ.map(([cat, qs]) => (
-          <div key={cat} className="mb-14">
-            <p className="eyebrow mb-4 text-deep-brown font-semibold">{cat}</p>
-            {qs.map(([q, a]) => (
-              <details key={q} className="group border-b border-border py-6">
-                <summary className="flex cursor-pointer list-none justify-between font-serif text-2xl text-charcoal">
-                  {q}
-                  <span className="text-taupe transition-transform group-open:rotate-45 text-3xl font-light">
-                    +
-                  </span>
-                </summary>
-                <p className="mt-4 text-sm sm:text-base text-muted-foreground leading-relaxed">{a}</p>
-              </details>
-            ))}
+          <div key={cat} className="mb-12">
+            <p className="eyebrow mb-4 text-deep-brown font-semibold tracking-[0.2em]">{cat}</p>
+            <div className="space-y-3">
+              {qs.map(([q, a]) => (
+                <details key={q} className="group rounded-2xl border border-sand/25 bg-card p-5 sm:p-6 shadow-2xs hover:shadow-luxury hover:border-sand/50 transition-all">
+                  <summary className="flex cursor-pointer list-none items-center justify-between font-serif text-lg sm:text-xl text-charcoal font-medium">
+                    <span>{q}</span>
+                    <span className="text-sand group-open:rotate-45 transition-transform text-2xl font-light shrink-0 ml-4">
+                      +
+                    </span>
+                  </summary>
+                  <p className="mt-4 text-sm sm:text-base text-muted-foreground leading-relaxed pt-3 border-t border-sand/15">{a}</p>
+                </details>
+              ))}
+            </div>
           </div>
         ))}
       </section>

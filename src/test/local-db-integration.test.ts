@@ -148,4 +148,19 @@ async function main() {
   console.log("=".repeat(60));
 }
 
-main().catch((e) => { console.error("Fatal:", e); process.exit(1); });
+import { describe, it } from "vitest";
+
+describe("Local DB Integration", () => {
+  it.skipIf(!process.env.LOCAL_DB_TEST)("executes local db integration tests", async () => {
+    await main();
+  });
+});
+
+// Permet l'exécution directe autonome via: npx tsx src/test/local-db-integration.test.ts
+if (typeof process !== "undefined" && process.argv[1] && process.argv[1].includes("local-db-integration") && !process.env.VITEST) {
+  main().catch((e) => {
+    console.error("Fatal:", e);
+    process.exit(1);
+  });
+}
+

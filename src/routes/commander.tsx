@@ -310,7 +310,7 @@ function CommanderPage() {
   };
 
   // Capture frame directly from user's original video onto a high-res canvas
-  const handleCaptureFrame = () => {
+  const handleCaptureFrame = async () => {
     const video = scrubVideoRef.current || videoRef.current;
     if (!video) {
       toast.error("Vidéo non disponible pour l'extraction");
@@ -324,37 +324,39 @@ function CommanderPage() {
       const ctx = canvas.getContext("2d");
       if (!ctx) throw new Error("Impossible de créer le contexte 2D");
 
+      // drawImage will throw a SecurityError if video is cross-origin (CORS)
       ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
       const dataUrl = canvas.toDataURL("image/jpeg", 0.95);
 
+      const currentSec = Math.floor(video.currentTime || videoScrubTime);
+      const fileName = `capture_video_${currentSec}s.jpg`;
+
+      // Convert dataUrl → Blob → File synchronously (no async gap before cache write)
+      const res = await fetch(dataUrl);
+      const blob = await res.blob();
+      const photoFileObj = new File([blob], fileName, { type: "image/jpeg" });
+
+      // Cache the file BEFORE updating React state so checkout validation always finds it
+      try {
+        const cacheKey = getMediaCacheKey(draftId, currentItemKey, "photo");
+        await putCachedMedia(cacheKey, photoFileObj);
+      } catch {
+        // memoryStore fallback is handled inside putCachedMedia
+      }
+
       setPhotoUrl(dataUrl);
       setPhotoSource("frame");
-      const currentSec = Math.floor(video.currentTime || videoScrubTime);
       setCapturedTimestamp(currentSec);
-      const fileName = `capture_video_${currentSec}s.jpg`;
       setPhotoName(fileName);
-
-      canvas.toBlob(async (blob) => {
-        if (blob) {
-          const photoFileObj = new File([blob], fileName, { type: "image/jpeg" });
-          setPhotoFile(photoFileObj);
-          try {
-            const cacheKey = getMediaCacheKey(draftId, currentItemKey, "photo");
-            await putCachedMedia(cacheKey, photoFileObj);
-          } catch {
-            // Fallback mémoire interne
-          }
-        }
-      }, "image/jpeg", 0.95);
+      setPhotoFile(photoFileObj);
 
       toast.success(`Moment exact extrait à ${formatTime(currentSec)} !`);
     } catch (err) {
+      // CORS or canvas taint — the frame cannot be exported as a File
       console.warn("Échec d'extraction canvas (restriction CORS sur vidéo distante) :", err);
-      setPhotoUrl(scan);
-      setPhotoSource("frame");
-      setCapturedTimestamp(Math.floor(videoScrubTime));
-      setPhotoName(`capture_video_${Math.floor(videoScrubTime)}s.jpg`);
-      toast.success(`Image extraite à ${formatTime(videoScrubTime)} !`);
+      toast.error(
+        "Impossible d'extraire le frame (restriction sécurité navigateur). Veuillez importer votre photo manuellement via le bouton \"Importer une photo\"."
+      );
     }
   };
 
@@ -600,7 +602,7 @@ function CommanderPage() {
       {/* Stepper Progress Bar (visible once entered the funnel) */}
       {funnelStage !== "picker" && funnelStage !== "confirmation" && (
         <div className="container-x mt-6 max-w-4xl">
-          <div className="flex items-center justify-between border-b border-border pb-4 text-xs font-medium">
+          <div className="rounded-2xl border border-border/70 bg-card/85 backdrop-blur-md px-5 py-3.5 shadow-luxury flex items-center justify-between text-xs font-medium">
             <button
               onClick={() => {
                 if (funnelStage === "video") setFunnelStage("picker");
@@ -610,20 +612,20 @@ function CommanderPage() {
                 else if (funnelStage === "delivery") setFunnelStage("cart");
                 else if (funnelStage === "payment") setFunnelStage("delivery");
               }}
-              className="inline-flex items-center gap-1 text-muted-foreground hover:text-foreground"
+              className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-charcoal transition-colors font-medium py-1"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               <span>Retour</span>
             </button>
 
-            <div className="flex items-center gap-2 sm:gap-6">
+            <div className="flex items-center gap-2 sm:gap-5">
               {[
-                { id: "video", label: "1. Vidéo", num: 1 },
-                { id: "photo", label: "2. Photo", num: 2 },
-                { id: "preview", label: "3. Aperçu", num: 3 },
-                { id: "cart", label: "4. Panier", num: 4 },
-                { id: "delivery", label: "5. Livraison", num: 5 },
-                { id: "payment", label: "6. Validation", num: 6 },
+                { id: "video", label: "Vidéo", num: 1 },
+                { id: "photo", label: "Photo", num: 2 },
+                { id: "preview", label: "Aperçu", num: 3 },
+                { id: "cart", label: "Panier", num: 4 },
+                { id: "delivery", label: "Livraison", num: 5 },
+                { id: "payment", label: "Validation", num: 6 },
               ].map((step) => {
                 const isActive = funnelStage === step.id;
                 const isPassed =
@@ -640,22 +642,22 @@ function CommanderPage() {
                       isActive
                         ? "text-deep-brown font-semibold"
                         : isPassed
-                        ? "text-charcoal"
-                        : "text-muted-foreground opacity-50"
+                        ? "text-charcoal font-medium"
+                        : "text-muted-foreground/60"
                     }`}
                   >
                     <span
-                      className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] ${
+                      className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] transition-all ${
                         isActive
-                          ? "bg-deep-brown text-ivory"
+                          ? "bg-deep-brown text-ivory ring-2 ring-champagne/40 font-bold shadow-xs"
                           : isPassed
-                          ? "bg-sand text-charcoal"
-                          : "border border-border text-muted-foreground"
+                          ? "bg-champagne/25 text-deep-brown border border-champagne/40 font-medium"
+                          : "border border-border/80 text-muted-foreground"
                       }`}
                     >
                       {step.num}
                     </span>
-                    <span className="hidden sm:inline">{step.label}</span>
+                    <span className="hidden sm:inline uppercase tracking-[0.14em] text-[11px]">{step.label}</span>
                   </div>
                 );
               })}
@@ -670,32 +672,32 @@ function CommanderPage() {
       {funnelStage === "picker" && (
         <section className="container-x mt-8 max-w-6xl">
           <div className="text-center">
-            <p className="eyebrow">La boutique MÉMORA</p>
-            <h1 className="mt-3 font-serif text-4xl sm:text-6xl">Choisissez votre support</h1>
+            <p className="eyebrow tracking-[0.25em] text-deep-brown font-semibold">La boutique MÉMORA</p>
+            <h1 className="mt-3 font-serif text-4xl sm:text-6xl text-charcoal">Choisissez votre support</h1>
             <p className="mx-auto mt-4 max-w-xl text-base text-muted-foreground">
               Chaque tirage intègre une puce NFC invisible programmée pour ouvrir instantanément votre vidéo sur smartphone.
             </p>
 
             {items.length > 0 && (
-              <div className="mx-auto mt-8 max-w-xl rounded-2xl border border-deep-brown/30 bg-cream/70 p-4 sm:p-5 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-sm animate-in fade-in">
+              <div className="mx-auto mt-8 max-w-xl rounded-2xl border border-champagne/30 bg-cream/60 backdrop-blur-sm p-5 sm:p-6 flex flex-col sm:flex-row items-center justify-between gap-4 shadow-luxury animate-in fade-in">
                 <div className="text-center sm:text-left">
                   <p className="font-serif text-lg text-charcoal font-medium">
                     Vous avez {items.length} tirage{items.length > 1 ? "s" : ""} dans votre panier
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground mt-0.5">
                     Finalisez votre commande ou choisissez un autre support pour en ajouter un.
                   </p>
                 </div>
                 <div className="flex gap-2 shrink-0">
                   <button
                     onClick={() => setFunnelStage("cart")}
-                    className="rounded-sm bg-primary px-5 py-2.5 text-xs uppercase tracking-wider font-semibold text-primary-foreground hover:bg-charcoal transition-colors shadow-xs"
+                    className="rounded-full bg-deep-brown px-5 py-2.5 text-xs uppercase tracking-wider font-semibold text-ivory hover:bg-charcoal transition-all shadow-xs"
                   >
                     Voir mon panier
                   </button>
                   <button
                     onClick={() => setFunnelStage("delivery")}
-                    className="rounded-sm border border-foreground px-4 py-2.5 text-xs uppercase tracking-wider font-semibold text-charcoal hover:bg-foreground hover:text-background transition-colors"
+                    className="rounded-full border border-charcoal/80 px-4 py-2.5 text-xs uppercase tracking-wider font-semibold text-charcoal hover:bg-charcoal hover:text-ivory transition-all"
                   >
                     Commander
                   </button>
@@ -707,7 +709,7 @@ function CommanderPage() {
           {/* Product Cards Grid - 2 Products */}
           <div className="mt-14 mx-auto max-w-4xl grid gap-8 sm:grid-cols-2">
             {/* Card 1: Simple Enveloppe & Carte */}
-            <div className="group flex flex-col justify-between rounded-2xl border border-border bg-background p-6 sm:p-8 shadow-xs hover:border-deep-brown hover:shadow-lg transition-all">
+            <div className="group flex flex-col justify-between rounded-2xl border border-border/80 bg-card p-6 sm:p-8 shadow-luxury hover:border-champagne/60 hover:shadow-luxury-lg transition-all">
               <div>
                 <div className="relative aspect-4/3 overflow-hidden rounded-xl bg-cream">
                   <img
@@ -715,37 +717,37 @@ function CommanderPage() {
                     alt="Mémora Simple (Enveloppe & Carte)"
                     className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                   />
-                  <span className="absolute left-3 top-3 rounded-full bg-deep-brown px-3 py-1 text-[11px] uppercase tracking-wider text-ivory font-medium">
+                  <span className="absolute left-3 top-3 rounded-full bg-deep-brown/95 backdrop-blur-sm px-3.5 py-1 text-[10px] uppercase tracking-[0.2em] text-ivory font-semibold shadow-xs">
                     L'Essentiel
                   </span>
                 </div>
-                <h3 className="mt-5 font-serif text-2xl sm:text-3xl">Mémora Simple (Enveloppe & Carte)</h3>
+                <h3 className="mt-5 font-serif text-2xl sm:text-3xl text-charcoal">Mémora Simple (Enveloppe & Carte)</h3>
                 <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
                   Tirage photo d'art avec puce NFC invisible, présenté dans son enveloppe d'art cachetée et accompagné d'une carte avec votre message personnalisé.
                 </p>
 
-                <div className="mt-4 rounded-xl bg-cream/50 p-3.5 text-xs text-charcoal border border-border/60">
-                  <p className="font-semibold text-deep-brown mb-1.5 uppercase tracking-wider text-[10px]">
+                <div className="mt-4 rounded-xl bg-cream/50 p-4 text-xs text-charcoal border border-border/60">
+                  <p className="font-semibold text-deep-brown mb-2 uppercase tracking-wider text-[10px]">
                     Contenu du pack :
                   </p>
-                  <ul className="space-y-1 text-muted-foreground">
-                    <li className="flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-deep-brown shrink-0" />
+                  <ul className="space-y-1.5 text-muted-foreground">
+                    <li className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-champagne shrink-0" />
                       <span>1× Tirage photo d'art 10×15 cm avec puce NFC</span>
                     </li>
-                    <li className="flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-deep-brown shrink-0" />
+                    <li className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-champagne shrink-0" />
                       <span>1× Enveloppe d'art texturée élégante</span>
                     </li>
-                    <li className="flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-deep-brown shrink-0" />
+                    <li className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-champagne shrink-0" />
                       <span>1× Carte avec votre message simple personnalisé</span>
                     </li>
                   </ul>
                 </div>
 
                 <div className="mt-5 flex items-baseline gap-2">
-                  <span className="text-3xl font-serif text-charcoal">{formatTND(49)}</span>
+                  <span className="text-3xl font-serif text-charcoal font-normal">{formatTND(getUnitPrice("10x15", 1))}</span>
                   <span className="text-xs text-muted-foreground">/ pack (dès 20 DT en volume)</span>
                 </div>
               </div>
@@ -757,7 +759,7 @@ function CommanderPage() {
                     setSelectedWithFrame(false);
                     setFunnelStage("video");
                   }}
-                  className="w-full rounded-sm bg-primary py-3.5 text-xs uppercase tracking-widest text-primary-foreground hover:bg-charcoal transition-colors shadow-xs"
+                  className="w-full rounded-full bg-deep-brown py-4 text-xs uppercase tracking-widest font-semibold text-ivory hover:bg-charcoal transition-all shadow-xs min-h-[48px]"
                 >
                   Choisir ce pack & Créer
                 </button>
@@ -766,7 +768,7 @@ function CommanderPage() {
                     setSelectedFormat("10x15");
                     setIsPriceDrawerOpen(true);
                   }}
-                  className="w-full text-center text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 py-1"
+                  className="w-full text-center text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 py-1.5 transition-colors"
                 >
                   Voir les tarifs dégressifs
                 </button>
@@ -774,7 +776,7 @@ function CommanderPage() {
             </div>
 
             {/* Card 2: Coffret Box, Carte & Lettre */}
-            <div className="group flex flex-col justify-between rounded-2xl border border-border bg-background p-6 sm:p-8 shadow-xs hover:border-deep-brown hover:shadow-lg transition-all">
+            <div className="group flex flex-col justify-between rounded-2xl border border-border/80 bg-card p-6 sm:p-8 shadow-luxury hover:border-champagne/60 hover:shadow-luxury-lg transition-all">
               <div>
                 <div className="relative aspect-4/3 overflow-hidden rounded-xl bg-cream">
                   <img
@@ -782,41 +784,41 @@ function CommanderPage() {
                     alt="Mémora Coffret (Box, Carte & Lettre)"
                     className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                   />
-                  <span className="absolute left-3 top-3 rounded-full bg-sand px-3 py-1 text-[11px] uppercase tracking-wider text-charcoal font-medium">
+                  <span className="absolute left-3 top-3 rounded-full bg-champagne/90 backdrop-blur-sm px-3.5 py-1 text-[10px] uppercase tracking-[0.2em] text-charcoal font-semibold shadow-xs">
                     Coffret Cadeau Prestige
                   </span>
                 </div>
-                <h3 className="mt-5 font-serif text-2xl sm:text-3xl">Mémora Coffret (Box, Carte & Lettre)</h3>
+                <h3 className="mt-5 font-serif text-2xl sm:text-3xl text-charcoal">Mémora Coffret (Box, Carte & Lettre)</h3>
                 <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
                   L'expérience cadeau prestige complète : une boîte coffret rigide luxueuse, votre tirage photo connecté NFC, une carte souvenir et une véritable lettre personnalisée.
                 </p>
 
-                <div className="mt-4 rounded-xl bg-cream/50 p-3.5 text-xs text-charcoal border border-border/60">
-                  <p className="font-semibold text-deep-brown mb-1.5 uppercase tracking-wider text-[10px]">
+                <div className="mt-4 rounded-xl bg-cream/50 p-4 text-xs text-charcoal border border-border/60">
+                  <p className="font-semibold text-deep-brown mb-2 uppercase tracking-wider text-[10px]">
                     Contenu du pack :
                   </p>
-                  <ul className="space-y-1 text-muted-foreground">
-                    <li className="flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-deep-brown shrink-0" />
+                  <ul className="space-y-1.5 text-muted-foreground">
+                    <li className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-champagne shrink-0" />
                       <span>1× Coffret rigide luxe de présentation (La Box)</span>
                     </li>
-                    <li className="flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-deep-brown shrink-0" />
+                    <li className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-champagne shrink-0" />
                       <span>1× Tirage photo d'art 10×15 cm avec puce NFC</span>
                     </li>
-                    <li className="flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-deep-brown shrink-0" />
+                    <li className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-champagne shrink-0" />
                       <span>1× Carte souvenir personnalisée</span>
                     </li>
-                    <li className="flex items-center gap-1.5">
-                      <span className="h-1.5 w-1.5 rounded-full bg-deep-brown shrink-0" />
+                    <li className="flex items-center gap-2">
+                      <span className="h-1.5 w-1.5 rounded-full bg-champagne shrink-0" />
                       <span>1× Véritable lettre d'émotion sur papier d'art</span>
                     </li>
                   </ul>
                 </div>
 
                 <div className="mt-5 flex items-baseline gap-2">
-                  <span className="text-3xl font-serif text-charcoal">{formatTND(89)}</span>
+                  <span className="text-3xl font-serif text-charcoal font-normal">{formatTND(getUnitPrice("box", 1))}</span>
                   <span className="text-xs text-muted-foreground">/ coffret complet (dès 49 DT en volume)</span>
                 </div>
               </div>
@@ -828,7 +830,7 @@ function CommanderPage() {
                     setSelectedWithFrame(false);
                     setFunnelStage("video");
                   }}
-                  className="w-full rounded-sm bg-primary py-3.5 text-xs uppercase tracking-widest text-primary-foreground hover:bg-charcoal transition-colors shadow-xs"
+                  className="w-full rounded-full bg-deep-brown py-4 text-xs uppercase tracking-widest font-semibold text-ivory hover:bg-charcoal transition-all shadow-xs min-h-[48px]"
                 >
                   Choisir le coffret & Créer
                 </button>
@@ -837,7 +839,7 @@ function CommanderPage() {
                     setSelectedFormat("box");
                     setIsPriceDrawerOpen(true);
                   }}
-                  className="w-full text-center text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 py-1"
+                  className="w-full text-center text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 py-1.5 transition-colors"
                 >
                   Voir les tarifs dégressifs
                 </button>
@@ -846,28 +848,28 @@ function CommanderPage() {
           </div>
 
           {/* Flip card explanation section */}
-          <div className="mt-28 rounded-3xl bg-cream/50 p-8 sm:p-14 border border-border">
+          <div className="mt-28 rounded-3xl bg-cream/40 p-8 sm:p-14 border border-border/80 shadow-luxury">
             <div className="grid gap-12 lg:grid-cols-2 items-center">
               <div>
-                <p className="eyebrow">Et si le destinataire ne sait pas comment l'utiliser ?</p>
-                <h2 className="mt-3 font-serif text-3xl sm:text-5xl">
+                <p className="eyebrow tracking-[0.25em]">Et si le destinataire ne sait pas comment l'utiliser ?</p>
+                <h2 className="mt-3 font-serif text-3xl sm:text-5xl text-charcoal">
                   Tout est imprimé au dos de chaque photo.
                 </h2>
                 <p className="mt-6 text-sm text-muted-foreground leading-relaxed">
                   Quand votre proche reçoit son Mémora, il n'a besoin d'aucune explication de votre part. Les 3 étapes ultra-simples sont imprimées avec élégance au verso.
                 </p>
 
-                <div className="mt-8 space-y-3 text-sm text-charcoal">
+                <div className="mt-8 space-y-3.5 text-sm text-charcoal">
                   <div className="flex items-center gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-deep-brown" />
+                    <CheckCircle2 className="h-5 w-5 text-champagne shrink-0" />
                     <span>Fonctionne sur iPhone et Android</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-deep-brown" />
+                    <CheckCircle2 className="h-5 w-5 text-champagne shrink-0" />
                     <span>Aucune application à télécharger</span>
                   </div>
                   <div className="flex items-center gap-3">
-                    <CheckCircle2 className="h-5 w-5 text-deep-brown" />
+                    <CheckCircle2 className="h-5 w-5 text-champagne shrink-0" />
                     <span>Pas de QR code disgracieux au recto</span>
                   </div>
                 </div>
@@ -886,14 +888,14 @@ function CommanderPage() {
          ======================================================== */}
       {funnelStage === "video" && (
         <section className="container-x mt-8 max-w-4xl">
-          <div className="rounded-2xl border border-border bg-background p-6 sm:p-10 shadow-sm animate-in fade-in">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border pb-6">
+          <div className="rounded-3xl border border-border/80 bg-card p-6 sm:p-10 shadow-luxury animate-in fade-in">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-border/80 pb-6">
               <div>
-                <div className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-deep-brown font-medium">
-                  <Video className="h-4 w-4" />
+                <div className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-deep-brown font-semibold">
+                  <Video className="h-4 w-4 text-champagne" />
                   <span>Étape 1 · Votre Vidéo</span>
                 </div>
-                <h2 className="mt-1 font-serif text-3xl sm:text-4xl">Ajoutez la vidéo de votre souvenir</h2>
+                <h2 className="mt-1 font-serif text-3xl sm:text-4xl text-charcoal">Ajoutez la vidéo de votre souvenir</h2>
                 <p className="mt-1 text-sm text-muted-foreground">
                   8 premières minutes incluses (+1,50 DT / min supplémentaire, max 30 min).
                 </p>
@@ -902,9 +904,9 @@ function CommanderPage() {
               {/* EditEasy shortcut promo */}
               <button
                 onClick={() => navigate({ to: "/editeasy" })}
-                className="inline-flex items-center gap-1.5 rounded-full border border-sand bg-sand/30 px-3.5 py-1.5 text-xs text-deep-brown hover:bg-sand/60 transition-colors shrink-0"
+                className="inline-flex items-center gap-1.5 rounded-full border border-champagne/40 bg-sand/30 px-4 py-2 text-xs font-semibold text-deep-brown hover:bg-sand/60 transition-colors shrink-0 shadow-xs"
               >
-                <Sparkles className="h-3.5 w-3.5" />
+                <Sparkles className="h-3.5 w-3.5 text-champagne" />
                 <span>Pas de montage ? Montage auto gratuit</span>
               </button>
             </div>
@@ -912,9 +914,9 @@ function CommanderPage() {
             {/* Video Input Options */}
             <div className="mt-8 grid gap-4 sm:grid-cols-2">
               {/* Option A: From Computer / Local Gallery */}
-              <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-taupe/40 bg-cream/30 p-8 text-center transition-colors hover:bg-cream/70">
+              <label className="flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-champagne/50 bg-cream/25 p-8 text-center transition-all hover:bg-cream/60 hover:border-champagne shadow-xs">
                 <Upload className="h-8 w-8 text-deep-brown/80" />
-                <p className="mt-3 font-medium text-sm">Depuis cet appareil</p>
+                <p className="mt-3 font-semibold text-sm text-charcoal">Depuis cet appareil</p>
                 <p className="mt-1 text-xs text-muted-foreground">MP4, MOV, WebM (jusqu'à 5 Go)</p>
                 <input
                   type="file"
@@ -928,10 +930,10 @@ function CommanderPage() {
               <button
                 type="button"
                 onClick={() => setIsMobileUploadOpen(true)}
-                className="flex flex-col items-center justify-center rounded-2xl border border-border bg-background p-8 text-center transition-colors hover:bg-cream/40"
+                className="flex flex-col items-center justify-center rounded-2xl border border-border/80 bg-background p-8 text-center transition-all hover:bg-cream/40 hover:border-champagne/50 shadow-xs"
               >
                 <Smartphone className="h-8 w-8 text-deep-brown/80" />
-                <p className="mt-3 font-medium text-sm">Scanner avec votre téléphone</p>
+                <p className="mt-3 font-semibold text-sm text-charcoal">Scanner avec votre téléphone</p>
                 <p className="mt-1 text-xs text-muted-foreground">
                   Flashez un QR code pour transférer depuis votre mobile
                 </p>
@@ -942,20 +944,20 @@ function CommanderPage() {
                 href="https://wa.me/21698000000?text=Bonjour,%20je%20souhaite%20commander%20un%20tirage%20M%C3%A9mora%20et%20vous%20envoyer%20ma%20vid%C3%A9o%20et%20ma%20photo."
                 target="_blank"
                 rel="noopener noreferrer"
-                className="col-span-full flex items-center justify-between rounded-xl border border-sand/80 bg-sand/20 p-4 text-xs text-charcoal hover:bg-sand/35 transition-colors"
+                className="col-span-full flex items-center justify-between rounded-2xl border border-emerald-deep/20 bg-emerald-deep/[0.04] p-4 text-xs text-charcoal hover:bg-emerald-deep/[0.08] transition-colors"
               >
                 <div className="flex items-center gap-3">
-                  <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-white">
-                    <MessageCircle className="h-4 w-4 fill-current" />
+                  <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-[#25D366] text-white shadow-xs">
+                    <MessageCircle className="h-5 w-5 fill-current" />
                   </span>
                   <div>
-                    <p className="font-semibold text-sm">Plus simple ? Commandez par WhatsApp</p>
-                    <p className="text-muted-foreground text-xs">
+                    <p className="font-semibold text-sm text-charcoal">Plus simple ? Commandez par WhatsApp</p>
+                    <p className="text-muted-foreground text-xs mt-0.5">
                       Envoyez-nous directement votre photo et votre vidéo au +216 98 000 000 et on s'occupe de tout.
                     </p>
                   </div>
                 </div>
-                <span className="hidden sm:inline font-semibold text-deep-brown underline shrink-0">
+                <span className="hidden sm:inline font-semibold text-deep-brown underline underline-offset-2 shrink-0">
                   Écrire sur WhatsApp →
                 </span>
               </a>
@@ -963,7 +965,7 @@ function CommanderPage() {
 
             {/* Video Player Preview */}
             {videoUrl && (
-              <div className="mt-8 rounded-2xl border border-border bg-charcoal/5 p-6">
+              <div className="mt-8 rounded-2xl border border-border/80 bg-charcoal/5 p-6 shadow-luxury">
                 <div className="flex items-center justify-between border-b border-border/80 pb-3">
                   <div>
                     <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -972,7 +974,7 @@ function CommanderPage() {
                     <p className="font-medium text-sm text-charcoal">{videoName}</p>
                   </div>
                   <div className="text-right">
-                    <span className="rounded-full bg-cream px-3 py-1 text-xs font-semibold text-charcoal">
+                    <span className="rounded-full bg-cream border border-border/60 px-3.5 py-1 text-xs font-semibold text-charcoal">
                       Durée : {Math.floor(videoDuration / 60)}m {videoDuration % 60}s
                     </span>
                   </div>
@@ -992,8 +994,8 @@ function CommanderPage() {
                 </div>
 
                 {/* Surcharge breakdown if > 8 min */}
-                <div className="mt-4 rounded-xl bg-cream/60 p-3.5 text-xs text-charcoal flex items-center justify-between">
-                  <span>8 premières minutes : <strong>Incluses</strong></span>
+                <div className="mt-4 rounded-xl bg-cream/70 border border-border/70 p-4 text-xs text-charcoal flex items-center justify-between">
+                  <span>8 premières minutes : <strong className="font-semibold text-charcoal">Incluses</strong></span>
                   {videoDuration > INCLUDED_VIDEO_SECONDS ? (
                     <span className="text-deep-brown font-semibold">
                       +{extraVideoMinutes} min supplémentaires = +{formatTND(videoSurchargeCurrent)}
@@ -1006,13 +1008,13 @@ function CommanderPage() {
             )}
 
             {/* Next step CTA */}
-            <div className="mt-10 flex justify-end border-t border-border pt-6">
+            <div className="mt-10 flex justify-end border-t border-border/80 pt-6">
               <button
                 onClick={() => setFunnelStage("photo")}
-                className="inline-flex items-center gap-2 rounded-sm bg-primary px-8 py-4 text-xs uppercase tracking-widest text-primary-foreground hover:bg-charcoal transition-colors shadow-md"
+                className="inline-flex items-center gap-2 rounded-full bg-deep-brown px-8 py-4 text-xs uppercase tracking-widest font-semibold text-ivory hover:bg-charcoal transition-all shadow-luxury min-h-[48px]"
               >
                 <span>Valider la vidéo & Choisir la photo</span>
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="h-4 w-4 text-champagne" />
               </button>
             </div>
           </div>
@@ -1024,13 +1026,13 @@ function CommanderPage() {
          ======================================================== */}
       {funnelStage === "photo" && (
         <section className="container-x mt-8 max-w-4xl">
-          <div className="rounded-2xl border border-border bg-background p-6 sm:p-10 shadow-sm animate-in fade-in">
-            <div className="border-b border-border pb-6">
-              <div className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-deep-brown font-medium">
-                <ImageIcon className="h-4 w-4" />
+          <div className="rounded-3xl border border-border/80 bg-card p-6 sm:p-10 shadow-luxury animate-in fade-in">
+            <div className="border-b border-border/80 pb-6">
+              <div className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-deep-brown font-semibold">
+                <ImageIcon className="h-4 w-4 text-champagne" />
                 <span>Étape 2 · La Photo Imprimée</span>
               </div>
-              <h2 className="mt-1 font-serif text-3xl sm:text-4xl">Choisissez la photo au recto</h2>
+              <h2 className="mt-1 font-serif text-3xl sm:text-4xl text-charcoal">Choisissez la photo au recto</h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Ce visuel sera imprimé en haute définition argentique sur votre tirage physique.
               </p>
@@ -1044,18 +1046,18 @@ function CommanderPage() {
                   onClick={() => setPhotoSelectionMode("extract")}
                   className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition-all ${
                     photoSelectionMode === "extract"
-                      ? "border-deep-brown bg-sand/20 shadow-xs"
-                      : "border-border bg-background hover:bg-cream/40"
+                      ? "border-deep-brown bg-sand/20 shadow-luxury"
+                      : "border-border/80 bg-background hover:bg-cream/40"
                   }`}
                 >
                   <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                    photoSelectionMode === "extract" ? "bg-deep-brown text-ivory" : "bg-cream text-charcoal"
+                    photoSelectionMode === "extract" ? "bg-deep-brown text-ivory shadow-xs" : "bg-cream text-charcoal"
                   }`}>
                     <Film className="h-5 w-5" />
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <p className="font-semibold text-sm">Extraire une image de la vidéo</p>
+                      <p className="font-semibold text-sm text-charcoal">Extraire une image de la vidéo</p>
                       <span className="rounded-full bg-sand/60 px-2 py-0.5 text-[10px] font-semibold text-deep-brown">
                         Recommandé
                       </span>
@@ -1071,17 +1073,17 @@ function CommanderPage() {
                   onClick={() => setPhotoSelectionMode("upload")}
                   className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition-all ${
                     photoSelectionMode === "upload"
-                      ? "border-deep-brown bg-sand/20 shadow-xs"
-                      : "border-border bg-background hover:bg-cream/40"
+                      ? "border-deep-brown bg-sand/20 shadow-luxury"
+                      : "border-border/80 bg-background hover:bg-cream/40"
                   }`}
                 >
                   <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                    photoSelectionMode === "upload" ? "bg-deep-brown text-ivory" : "bg-cream text-charcoal"
+                    photoSelectionMode === "upload" ? "bg-deep-brown text-ivory shadow-xs" : "bg-cream text-charcoal"
                   }`}>
                     <Upload className="h-5 w-5" />
                   </div>
                   <div>
-                    <p className="font-semibold text-sm">Importer depuis mes photos</p>
+                    <p className="font-semibold text-sm text-charcoal">Importer depuis mes photos</p>
                     <p className="text-xs text-muted-foreground mt-0.5">
                       Utilisez une photo séparée déjà enregistrée dans votre appareil (JPG, PNG, HEIC)
                     </p>
@@ -1091,7 +1093,7 @@ function CommanderPage() {
 
               {/* Mode A: Real Video Frame Extractor Studio */}
               {photoSelectionMode === "extract" && (
-                <div className="mt-6 rounded-2xl border border-sand bg-cream/30 p-5 sm:p-7 animate-in fade-in">
+                <div className="mt-6 rounded-2xl border border-champagne/40 bg-cream/25 p-5 sm:p-7 shadow-luxury animate-in fade-in">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-border/80 pb-3">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-wider text-deep-brown">
@@ -1102,7 +1104,7 @@ function CommanderPage() {
                       </p>
                     </div>
                     <div className="text-xs text-muted-foreground">
-                      Curseur : <strong className="font-mono text-charcoal">{formatTime(videoScrubTime)}</strong> / {formatTime(videoDuration)}
+                      Curseur : <strong className="font-mono text-charcoal font-semibold">{formatTime(videoScrubTime)}</strong> / {formatTime(videoDuration)}
                     </div>
                   </div>
 
@@ -1127,14 +1129,14 @@ function CommanderPage() {
                     />
 
                     {/* Timestamp overlay */}
-                    <div className="absolute top-3 left-3 rounded-full bg-black/70 backdrop-blur px-3 py-1 text-xs font-mono text-ivory flex items-center gap-1.5 shadow">
-                      <Film className="h-3.5 w-3.5 text-sand" />
+                    <div className="absolute top-3 left-3 rounded-full bg-black/75 backdrop-blur-md px-3 py-1 text-xs font-mono text-ivory flex items-center gap-1.5 shadow">
+                      <Film className="h-3.5 w-3.5 text-champagne" />
                       <span>{formatTime(videoScrubTime)} / {formatTime(videoDuration)}</span>
                     </div>
 
                     {capturedTimestamp !== null && (
-                      <div className="absolute top-3 right-3 rounded-full bg-deep-brown/90 backdrop-blur px-3 py-1 text-[11px] text-ivory flex items-center gap-1 shadow">
-                        <Check className="h-3.5 w-3.5 text-sand" />
+                      <div className="absolute top-3 right-3 rounded-full bg-deep-brown/95 backdrop-blur-md px-3.5 py-1 text-[11px] text-ivory flex items-center gap-1.5 shadow">
+                        <Check className="h-3.5 w-3.5 text-champagne" />
                         <span>Extrait à {formatTime(capturedTimestamp)}</span>
                       </div>
                     )}
@@ -1159,11 +1161,11 @@ function CommanderPage() {
 
                     {/* Precision Buttons & Capture CTA */}
                     <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pt-2">
-                      <div className="flex flex-wrap items-center gap-1">
+                      <div className="flex flex-wrap items-center gap-1.5">
                         <button
                           type="button"
                           onClick={() => stepScrubTime(-5)}
-                          className="rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-charcoal hover:bg-cream transition-colors"
+                          className="rounded-lg border border-border/80 bg-background px-2.5 py-1.5 text-xs text-charcoal hover:bg-cream/60 transition-colors"
                           title="Reculer de 5 secondes"
                         >
                           -5s
@@ -1171,7 +1173,7 @@ function CommanderPage() {
                         <button
                           type="button"
                           onClick={() => stepScrubTime(-1)}
-                          className="rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-charcoal hover:bg-cream transition-colors"
+                          className="rounded-lg border border-border/80 bg-background px-2.5 py-1.5 text-xs text-charcoal hover:bg-cream/60 transition-colors"
                           title="Reculer de 1 seconde"
                         >
                           -1s
@@ -1179,7 +1181,7 @@ function CommanderPage() {
                         <button
                           type="button"
                           onClick={() => stepScrubTime(-0.1)}
-                          className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-charcoal hover:bg-cream transition-colors"
+                          className="rounded-lg border border-border/80 bg-background px-2 py-1.5 text-xs text-charcoal hover:bg-cream/60 transition-colors"
                           title="Reculer d'une fraction de seconde"
                         >
                           -0.1s
@@ -1187,14 +1189,14 @@ function CommanderPage() {
                         <button
                           type="button"
                           onClick={toggleScrubPlay}
-                          className="rounded-md border border-deep-brown/30 bg-sand/30 px-3.5 py-1.5 text-xs font-semibold text-deep-brown hover:bg-sand/60 transition-colors"
+                          className="rounded-lg border border-deep-brown/30 bg-sand/30 px-3.5 py-1.5 text-xs font-semibold text-deep-brown hover:bg-sand/60 transition-colors"
                         >
                           {isScrubPlaying ? "Pause" : "Lecture"}
                         </button>
                         <button
                           type="button"
                           onClick={() => stepScrubTime(0.1)}
-                          className="rounded-md border border-border bg-background px-2 py-1.5 text-xs text-charcoal hover:bg-cream transition-colors"
+                          className="rounded-lg border border-border/80 bg-background px-2 py-1.5 text-xs text-charcoal hover:bg-cream/60 transition-colors"
                           title="Avancer d'une fraction de seconde"
                         >
                           +0.1s
@@ -1202,7 +1204,7 @@ function CommanderPage() {
                         <button
                           type="button"
                           onClick={() => stepScrubTime(1)}
-                          className="rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-charcoal hover:bg-cream transition-colors"
+                          className="rounded-lg border border-border/80 bg-background px-2.5 py-1.5 text-xs text-charcoal hover:bg-cream/60 transition-colors"
                           title="Avancer de 1 seconde"
                         >
                           +1s
@@ -1210,7 +1212,7 @@ function CommanderPage() {
                         <button
                           type="button"
                           onClick={() => stepScrubTime(5)}
-                          className="rounded-md border border-border bg-background px-2.5 py-1.5 text-xs text-charcoal hover:bg-cream transition-colors"
+                          className="rounded-lg border border-border/80 bg-background px-2.5 py-1.5 text-xs text-charcoal hover:bg-cream/60 transition-colors"
                           title="Avancer de 5 secondes"
                         >
                           +5s
@@ -1220,15 +1222,15 @@ function CommanderPage() {
                       <button
                         type="button"
                         onClick={handleCaptureFrame}
-                        className="inline-flex items-center justify-center gap-2 rounded-lg bg-deep-brown px-5 py-2.5 text-xs uppercase tracking-wider font-semibold text-ivory hover:bg-charcoal transition-all shadow-sm shrink-0"
+                        className="inline-flex items-center justify-center gap-2 rounded-full bg-deep-brown px-6 py-2.5 text-xs uppercase tracking-wider font-semibold text-ivory hover:bg-charcoal transition-all shadow-sm shrink-0 min-h-[40px]"
                       >
-                        <Camera className="h-4 w-4" />
+                        <Camera className="h-4 w-4 text-champagne" />
                         <span>Extraire cette image ({formatTime(videoScrubTime)})</span>
                       </button>
                     </div>
 
                     {photoSource === "frame" && capturedTimestamp !== null && (
-                      <div className="mt-3 flex items-center gap-2 rounded-xl bg-sand/40 border border-sand p-3 text-xs text-deep-brown font-medium">
+                      <div className="mt-3 flex items-center gap-2 rounded-xl bg-sand/40 border border-sand/70 p-3 text-xs text-deep-brown font-medium">
                         <CheckCircle2 className="h-4 w-4 shrink-0 text-deep-brown" />
                         <span>Image extraite avec succès à <strong>{formatTime(capturedTimestamp)}</strong> depuis votre vidéo originale. Ce moment précis est configuré pour votre tirage ci-dessous.</span>
                       </div>
@@ -1239,9 +1241,9 @@ function CommanderPage() {
 
               {/* Mode B: Direct Image Upload */}
               {photoSelectionMode === "upload" && (
-                <label className="mt-6 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-taupe/40 bg-cream/30 p-10 text-center transition-colors hover:bg-cream/70 animate-in fade-in">
+                <label className="mt-6 flex cursor-pointer flex-col items-center justify-center rounded-2xl border-2 border-dashed border-champagne/50 bg-cream/25 p-10 text-center transition-all hover:bg-cream/60 hover:border-champagne animate-in fade-in shadow-xs">
                   <Upload className="h-9 w-9 text-deep-brown/80" />
-                  <p className="mt-3 text-sm font-semibold">Cliquez pour importer votre photo</p>
+                  <p className="mt-3 text-sm font-semibold text-charcoal">Cliquez pour importer votre photo</p>
                   <p className="mt-1 text-xs text-muted-foreground">Format JPG, PNG, WEBP jusqu'à 25 Mo</p>
                   <input
                     type="file"
@@ -1269,17 +1271,17 @@ function CommanderPage() {
             </div>
 
             {/* Step 2.5: Message on Card & Letter Customization */}
-            <div className="mt-10 rounded-2xl border border-sand bg-cream/30 p-6 sm:p-8 space-y-6">
+            <div className="mt-10 rounded-2xl border border-border/80 bg-cream/30 p-6 sm:p-8 space-y-6 shadow-luxury">
               <div className="border-b border-border/80 pb-4">
-                <div className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-deep-brown font-medium">
-                  <Gift className="h-4 w-4" />
+                <div className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-deep-brown font-semibold">
+                  <Gift className="h-4 w-4 text-champagne" />
                   <span>
                     {selectedFormat === "box"
                       ? "Personnalisation · Carte & Lettre d'émotion"
                       : "Personnalisation · Carte avec message"}
                   </span>
                 </div>
-                <h3 className="mt-1 font-serif text-2xl">Vos mots précieux</h3>
+                <h3 className="mt-1 font-serif text-2xl text-charcoal">Vos mots précieux</h3>
                 <p className="mt-1 text-xs text-muted-foreground">
                   {selectedFormat === "box"
                     ? "Rédigez le mot court pour la carte, ainsi que votre lettre qui sera imprimée sur papier d'art et glissée dans le coffret."
@@ -1299,7 +1301,7 @@ function CommanderPage() {
                   value={cardMessage}
                   onChange={(e) => setCardMessage(e.target.value)}
                   placeholder="Ex: Pour toujours avec toi. Je t'aime..."
-                  className="mt-1.5 w-full rounded-lg border border-border bg-background px-4 py-2.5 text-sm outline-hidden focus:border-deep-brown"
+                  className="mt-1.5 w-full rounded-xl border border-border/80 bg-background px-4 py-3 text-sm outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-xs"
                 />
               </div>
 
@@ -1315,7 +1317,7 @@ function CommanderPage() {
                     value={letterContent}
                     onChange={(e) => setLetterContent(e.target.value)}
                     placeholder="Chère maman, mon amour, cher ami... Rédigez ici vos plus beaux souvenirs et sentiments. Notre atelier imprimera votre lettre avec raffinement pour l'insérer dans votre coffret cadeau."
-                    className="mt-1.5 w-full rounded-lg border border-border bg-background p-4 text-sm font-serif leading-relaxed outline-hidden focus:border-deep-brown shadow-inner"
+                    className="mt-1.5 w-full rounded-xl border border-border/80 bg-background p-4 text-sm font-serif leading-relaxed outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-inner"
                   />
                   <p className="mt-1 text-[11px] text-muted-foreground">
                     Cette lettre sera délicatement pliée et cachetée aux côtés de votre photo NFC dans la boîte coffret.
@@ -1325,19 +1327,19 @@ function CommanderPage() {
             </div>
 
             {/* Next step CTA */}
-            <div className="mt-12 flex items-center justify-between border-t border-border pt-6">
+            <div className="mt-12 flex items-center justify-between border-t border-border/80 pt-6">
               <button
                 onClick={() => setFunnelStage("video")}
-                className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground"
+                className="text-xs uppercase tracking-widest text-muted-foreground hover:text-charcoal transition-colors py-2"
               >
                 Retour à la vidéo
               </button>
               <button
                 onClick={() => setFunnelStage("preview")}
-                className="inline-flex items-center gap-2 rounded-sm bg-primary px-8 py-4 text-xs uppercase tracking-widest text-primary-foreground hover:bg-charcoal transition-colors shadow-md"
+                className="inline-flex items-center gap-2 rounded-full bg-deep-brown px-8 py-4 text-xs uppercase tracking-widest font-semibold text-ivory hover:bg-charcoal transition-all shadow-luxury min-h-[48px]"
               >
                 <span>Continuer vers l'Aperçu de mon MÉMORA</span>
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="h-4 w-4 text-champagne" />
               </button>
             </div>
           </div>
@@ -1349,13 +1351,13 @@ function CommanderPage() {
          ======================================================== */}
       {funnelStage === "preview" && (
         <section className="container-x mt-8 max-w-5xl">
-          <div className="rounded-2xl border border-border bg-background p-6 sm:p-10 shadow-sm animate-in fade-in">
-            <div className="border-b border-border pb-6">
-              <div className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-deep-brown font-medium">
-                <Sparkles className="h-4 w-4" />
+          <div className="rounded-3xl border border-border/80 bg-card p-6 sm:p-10 shadow-luxury animate-in fade-in">
+            <div className="border-b border-border/80 pb-6">
+              <div className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-deep-brown font-semibold">
+                <Sparkles className="h-4 w-4 text-champagne" />
                 <span>Étape 3 · Aperçu interactif de votre MÉMORA</span>
               </div>
-              <h2 className="mt-1 font-serif text-3xl sm:text-4xl">Aperçu de votre MÉMORA</h2>
+              <h2 className="mt-1 font-serif text-3xl sm:text-4xl text-charcoal">Aperçu de votre MÉMORA</h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Voilà ce que vos proches verront : un simple contact du téléphone sur la photo, et votre vidéo s'ouvre.
               </p>
@@ -1368,9 +1370,9 @@ function CommanderPage() {
               </div>
 
               {/* Summary card */}
-              <div className="space-y-6 rounded-2xl border border-border bg-cream/30 p-6 sm:p-8">
+              <div className="space-y-6 rounded-2xl border border-border/80 bg-cream/35 p-6 sm:p-8 shadow-luxury">
                 <div>
-                  <p className="eyebrow text-deep-brown">Votre Création Personnalisée</p>
+                  <p className="eyebrow tracking-[0.25em] text-deep-brown font-semibold">Votre Création Personnalisée</p>
                   <h3 className="font-serif text-2xl text-charcoal mt-1">
                     {selectedFormat === "box"
                       ? "Mémora Coffret (Box, Carte & Lettre)"
@@ -1384,7 +1386,7 @@ function CommanderPage() {
                 </div>
 
                 {/* Photo chosen */}
-                <div className="flex items-center gap-4 rounded-xl border border-border/80 bg-background p-3.5">
+                <div className="flex items-center gap-4 rounded-xl border border-border/70 bg-card p-3.5 shadow-xs">
                   <img
                     src={composedPhotoUrl || photoUrl}
                     alt="Photo sélectionnée"
@@ -1404,8 +1406,8 @@ function CommanderPage() {
                 </div>
 
                 {/* Video linked */}
-                <div className="flex items-center gap-4 rounded-xl border border-border/80 bg-background p-3.5">
-                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-deep-brown text-ivory">
+                <div className="flex items-center gap-4 rounded-xl border border-border/70 bg-card p-3.5 shadow-xs">
+                  <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-lg bg-deep-brown text-ivory shadow-xs">
                     <Video className="h-5 w-5" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -1418,7 +1420,7 @@ function CommanderPage() {
                 </div>
 
                 {/* Card message */}
-                <div className="rounded-xl border border-sand/70 bg-[#FAF8F5] p-4">
+                <div className="rounded-xl border border-sand/70 bg-[#FAF8F5] p-4 shadow-xs">
                   <p className="text-[10px] uppercase tracking-wider text-muted-foreground font-semibold">
                     Message sur la carte
                   </p>
@@ -1429,7 +1431,7 @@ function CommanderPage() {
 
                 {/* Letter if box */}
                 {selectedFormat === "box" && letterContent && (
-                  <div className="rounded-xl border border-sand/70 bg-[#FAF8F5] p-4">
+                  <div className="rounded-xl border border-sand/70 bg-[#FAF8F5] p-4 shadow-xs">
                     <div className="flex items-center justify-between">
                       <p className="text-[10px] uppercase tracking-wider text-deep-brown font-semibold">
                         Lettre d'émotion pour le coffret
@@ -1443,17 +1445,17 @@ function CommanderPage() {
                 )}
 
                 {/* Reassurance points */}
-                <div className="space-y-2 border-t border-border pt-4 text-xs text-muted-foreground">
+                <div className="space-y-2 border-t border-border/80 pt-4 text-xs text-muted-foreground">
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-deep-brown shrink-0" />
+                    <CheckCircle2 className="h-4 w-4 text-champagne shrink-0" />
                     <span>Puce NFC invisible NTAG213 garantie à vie</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-deep-brown shrink-0" />
+                    <CheckCircle2 className="h-4 w-4 text-champagne shrink-0" />
                     <span>Fonctionne sur iPhone et Android sans aucune application</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <CheckCircle2 className="h-4 w-4 text-deep-brown shrink-0" />
+                    <CheckCircle2 className="h-4 w-4 text-champagne shrink-0" />
                     <span>Notice explicative imprimée avec élégance au verso</span>
                   </div>
                 </div>
@@ -1461,19 +1463,19 @@ function CommanderPage() {
             </div>
 
             {/* Next step CTA */}
-            <div className="mt-12 flex items-center justify-between border-t border-border pt-6">
+            <div className="mt-12 flex items-center justify-between border-t border-border/80 pt-6">
               <button
                 onClick={() => setFunnelStage("photo")}
-                className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground"
+                className="text-xs uppercase tracking-widest text-muted-foreground hover:text-charcoal transition-colors py-2"
               >
                 ← Modifier la photo ou le message
               </button>
               <button
                 onClick={handleValidatePhotoAndAddToCart}
-                className="inline-flex items-center gap-2 rounded-sm bg-primary px-8 py-4 text-xs uppercase tracking-widest text-primary-foreground hover:bg-charcoal transition-colors shadow-md"
+                className="inline-flex items-center gap-2 rounded-full bg-deep-brown px-8 py-4 text-xs uppercase tracking-widest font-semibold text-ivory hover:bg-charcoal transition-all shadow-luxury min-h-[48px]"
               >
                 <span>Valider & Ajouter au Panier</span>
-                <ArrowRight className="h-4 w-4" />
+                <ArrowRight className="h-4 w-4 text-champagne" />
               </button>
             </div>
           </div>
@@ -1485,17 +1487,17 @@ function CommanderPage() {
          ======================================================== */}
       {funnelStage === "cart" && (
         <section className="container-x mt-8 max-w-5xl">
-          <div className="border-b border-border pb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
+          <div className="border-b border-border/80 pb-6 flex flex-col sm:flex-row sm:items-end justify-between gap-4">
             <div>
-              <p className="eyebrow">Votre Commande MÉMORA</p>
-              <h1 className="font-serif text-4xl sm:text-5xl">Mon Panier</h1>
+              <p className="eyebrow tracking-[0.25em] text-deep-brown font-semibold">Votre Commande MÉMORA</p>
+              <h1 className="font-serif text-4xl sm:text-5xl text-charcoal">Mon Panier</h1>
             </div>
             <button
               onClick={() => {
                 setSelectedFormat("10x15");
                 setFunnelStage("video");
               }}
-              className="inline-flex items-center gap-2 rounded-full border border-border bg-cream px-4 py-2 text-xs uppercase tracking-wider text-charcoal hover:bg-sand transition-colors shrink-0"
+              className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-cream px-4 py-2 text-xs uppercase tracking-wider font-semibold text-charcoal hover:bg-sand transition-all shrink-0 shadow-xs"
             >
               <Plus className="h-4 w-4 text-deep-brown" />
               <span>Créer une autre photo Mémora</span>
@@ -1503,11 +1505,12 @@ function CommanderPage() {
           </div>
 
           {items.length === 0 ? (
-            <div className="py-20 text-center">
-              <p className="text-lg text-muted-foreground">Votre panier est encore vide.</p>
+            <div className="py-20 text-center rounded-3xl border border-border/80 bg-card p-10 shadow-luxury mt-8">
+              <p className="font-serif text-2xl text-charcoal">Votre panier est encore vide.</p>
+              <p className="text-sm text-muted-foreground mt-2">Choisissez votre support pour débuter votre premier souvenir.</p>
               <button
                 onClick={() => setFunnelStage("picker")}
-                className="mt-6 inline-block rounded-sm bg-primary px-8 py-3 text-xs uppercase tracking-widest text-primary-foreground"
+                className="mt-6 inline-block rounded-full bg-deep-brown px-8 py-3.5 text-xs uppercase tracking-widest font-semibold text-ivory hover:bg-charcoal transition-all shadow-md"
               >
                 Choisir un format
               </button>
@@ -1523,23 +1526,23 @@ function CommanderPage() {
                   return (
                     <div
                       key={item.key}
-                      className="rounded-2xl border border-border bg-background p-6 shadow-xs transition-all hover:border-deep-brown/40"
+                      className="rounded-2xl border border-border/80 bg-card p-6 shadow-luxury transition-all hover:border-champagne/60"
                     >
                       <div className="flex gap-5">
                         <img
                           src={item.photoPreviewUrl || hero}
                           alt="Aperçu tirage"
-                          className="h-28 w-24 rounded-lg object-cover border border-border shrink-0"
+                          className="h-28 w-24 rounded-lg object-cover border border-border/80 shrink-0 shadow-xs"
                         />
                         <div className="flex-1">
                           <div className="flex items-start justify-between">
                             <div>
-                              <h3 className="font-serif text-2xl">
+                              <h3 className="font-serif text-2xl text-charcoal">
                                 {item.format === "box" || item.productId === "p2"
                                   ? "Mémora Coffret (Box, Carte & Lettre)"
                                   : "Mémora Simple (Enveloppe & Carte)"}
                               </h3>
-                              <p className="text-xs text-muted-foreground">
+                              <p className="text-xs text-muted-foreground mt-0.5">
                                 Vidéo liée : {item.videoName || "video_souvenir.mp4"} ({Math.floor(item.videoDurationSec / 60)}m)
                               </p>
                               {item.cardMessage && (
@@ -1554,7 +1557,7 @@ function CommanderPage() {
                               )}
                             </div>
                             <div className="text-right">
-                              <p className="font-serif text-xl">{formatTND(unitPrice * item.qty)}</p>
+                              <p className="font-serif text-xl font-normal text-charcoal">{formatTND(unitPrice * item.qty)}</p>
                               <p className="text-[11px] text-muted-foreground">
                                 {formatTND(unitPrice)} /u
                               </p>
@@ -1562,20 +1565,22 @@ function CommanderPage() {
                           </div>
 
                           {/* Quantity and Actions */}
-                          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border pt-4 text-xs">
+                          <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-border/80 pt-4 text-xs">
                             <div className="flex items-center gap-3">
                               <span className="text-muted-foreground">Quantité :</span>
-                              <div className="flex items-center rounded-md border border-border">
+                              <div className="flex items-center rounded-full border border-border/80 bg-cream/40 px-1 py-0.5 shadow-xs">
                                 <button
                                   onClick={() => cart.setQty(item.key, item.qty - 1)}
-                                  className="p-1.5 hover:bg-cream"
+                                  className="p-1.5 rounded-full hover:bg-cream transition-colors text-charcoal"
+                                  aria-label="Diminuer quantité"
                                 >
                                   <Minus className="h-3 w-3" />
                                 </button>
-                                <span className="px-3 font-semibold">{item.qty}</span>
+                                <span className="px-3 font-semibold text-charcoal">{item.qty}</span>
                                 <button
                                   onClick={() => cart.setQty(item.key, item.qty + 1)}
-                                  className="p-1.5 hover:bg-cream"
+                                  className="p-1.5 rounded-full hover:bg-cream transition-colors text-charcoal"
+                                  aria-label="Augmenter quantité"
                                 >
                                   <Plus className="h-3 w-3" />
                                 </button>
@@ -1586,14 +1591,14 @@ function CommanderPage() {
                             <div className="flex items-center gap-4">
                               <button
                                 onClick={() => handleDuplicate(item.key, "same_photo_new_video")}
-                                className="inline-flex items-center gap-1 text-muted-foreground hover:text-deep-brown"
+                                className="inline-flex items-center gap-1 text-muted-foreground hover:text-deep-brown transition-colors"
                               >
                                 <Copy className="h-3.5 w-3.5" />
                                 <span>Même photo, autre vidéo</span>
                               </button>
                               <button
                                 onClick={() => cart.remove(item.key)}
-                                className="text-muted-foreground hover:text-destructive underline"
+                                className="text-muted-foreground hover:text-destructive underline transition-colors"
                               >
                                 Supprimer
                               </button>
@@ -1606,14 +1611,14 @@ function CommanderPage() {
                 })}
 
                 {/* Promo Code & Gift Card Inputs */}
-                <div className="rounded-2xl border border-border bg-cream/30 p-6 space-y-4">
+                <div className="rounded-2xl border border-border/80 bg-cream/30 p-6 space-y-4 shadow-xs">
                   <div className="flex gap-3">
                     <input
                       type="text"
                       placeholder="Code promo (ex: MEMORA10)"
                       value={promoInput}
                       onChange={(e) => setPromoInput(e.target.value)}
-                      className="flex-1 rounded-md border border-border bg-background px-3 py-2 text-xs uppercase outline-hidden"
+                      className="flex-1 rounded-xl border border-border/80 bg-background px-4 py-2.5 text-xs uppercase outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30"
                     />
                     <button
                       onClick={() => {
@@ -1621,7 +1626,7 @@ function CommanderPage() {
                         if (res.success) toast.success(res.message);
                         else toast.error(res.message);
                       }}
-                      className="rounded-md bg-foreground px-4 py-2 text-xs text-background font-medium"
+                      className="rounded-xl bg-charcoal px-5 py-2.5 text-xs text-ivory font-medium hover:bg-deep-brown transition-colors"
                     >
                       Appliquer
                     </button>
@@ -1630,26 +1635,26 @@ function CommanderPage() {
               </div>
 
               {/* Order Summary Sidebar */}
-              <div className="h-fit rounded-2xl border border-border bg-cream/40 p-6 sm:p-8 shadow-xs">
-                <h3 className="font-serif text-2xl border-b border-border pb-4">Récapitulatif</h3>
+              <div className="h-fit rounded-2xl border border-border/80 bg-cream/40 p-6 sm:p-8 shadow-luxury sticky top-28">
+                <h3 className="font-serif text-2xl text-charcoal border-b border-border/80 pb-4">Récapitulatif</h3>
 
                 <div className="mt-5 space-y-3 text-sm">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Tirages photos ({quote.totalQuantity} ex.)</span>
-                    <span>{formatTND(quote.itemsSubtotal)}</span>
+                    <span className="font-medium text-charcoal">{formatTND(quote.itemsSubtotal)}</span>
                   </div>
 
                   {quote.framesSubtotal > 0 && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Options cadres bois</span>
-                      <span>+{formatTND(quote.framesSubtotal)}</span>
+                      <span className="font-medium text-charcoal">+{formatTND(quote.framesSubtotal)}</span>
                     </div>
                   )}
 
                   {quote.videoSurcharges > 0 && (
                     <div className="flex justify-between">
                       <span className="text-muted-foreground">Supplément vidéo (&gt;8 min)</span>
-                      <span>+{formatTND(quote.videoSurcharges)}</span>
+                      <span className="font-medium text-charcoal">+{formatTND(quote.videoSurcharges)}</span>
                     </div>
                   )}
 
@@ -1660,33 +1665,33 @@ function CommanderPage() {
                     </div>
                   )}
 
-                  <div className="flex justify-between border-t border-border pt-3">
+                  <div className="flex justify-between border-t border-border/80 pt-3">
                     <span className="text-muted-foreground">Livraison estimée</span>
                     <span>
                       {quote.isFreeShipping ? (
-                        <strong className="text-deep-brown">Offerte</strong>
+                        <strong className="text-deep-brown font-semibold">Offerte</strong>
                       ) : (
-                        formatTND(quote.shippingCost)
+                        <span className="font-medium text-charcoal">{formatTND(quote.shippingCost)}</span>
                       )}
                     </span>
                   </div>
 
-                  <div className="flex justify-between border-t border-border pt-4 text-xl font-serif font-bold text-charcoal">
+                  <div className="flex justify-between border-t border-border/80 pt-4 text-xl font-serif font-normal text-charcoal">
                     <span>Total TTC</span>
-                    <span>{formatTND(quote.total)}</span>
+                    <span className="font-semibold">{formatTND(quote.total)}</span>
                   </div>
                 </div>
 
                 {/* Free shipping threshold progress */}
                 {!quote.isFreeShipping && (
-                  <div className="mt-5 rounded-xl bg-sand/30 p-3 text-xs text-charcoal">
+                  <div className="mt-5 rounded-xl bg-champagne/15 border border-champagne/30 p-3.5 text-xs text-charcoal">
                     Plus que {formatTND(FREE_SHIPPING_THRESHOLD_TND - quote.total)} pour profiter de la <strong>livraison offerte</strong> !
                   </div>
                 )}
 
                 <button
                   onClick={() => setFunnelStage("delivery")}
-                  className="mt-8 w-full rounded-sm bg-primary py-4 text-xs uppercase tracking-widest text-primary-foreground hover:bg-charcoal transition-colors shadow-md"
+                  className="mt-8 w-full rounded-full bg-deep-brown py-4 text-xs uppercase tracking-widest font-semibold text-ivory hover:bg-charcoal transition-all shadow-luxury min-h-[48px]"
                 >
                   Passer à la livraison
                 </button>
@@ -1701,13 +1706,13 @@ function CommanderPage() {
          ======================================================== */}
       {funnelStage === "delivery" && (
         <section className="container-x mt-8 max-w-3xl">
-          <div className="rounded-2xl border border-border bg-background p-6 sm:p-10 shadow-sm animate-in fade-in">
-            <div className="border-b border-border pb-6">
-              <div className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-deep-brown font-medium">
-                <Truck className="h-4 w-4" />
+          <div className="rounded-3xl border border-border/80 bg-card p-6 sm:p-10 shadow-luxury animate-in fade-in">
+            <div className="border-b border-border/80 pb-6">
+              <div className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-deep-brown font-semibold">
+                <Truck className="h-4 w-4 text-champagne" />
                 <span>Étape 5 · Coordonnées & Livraison</span>
               </div>
-              <h2 className="mt-1 font-serif text-3xl sm:text-4xl">Où devons-nous expédier vos Mémora ?</h2>
+              <h2 className="mt-1 font-serif text-3xl sm:text-4xl text-charcoal">Où devons-nous expédier vos Mémora ?</h2>
             </div>
 
             <form
@@ -1720,7 +1725,7 @@ function CommanderPage() {
               {/* Customer Names */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-charcoal">
                     Prénom *
                   </label>
                   <input
@@ -1728,11 +1733,11 @@ function CommanderPage() {
                     type="text"
                     value={customer.firstName}
                     onChange={(e) => setCustomer({ ...customer, firstName: e.target.value })}
-                    className="mt-1.5 w-full rounded-md border border-border bg-transparent px-4 py-2.5 text-sm outline-hidden focus:border-foreground"
+                    className="mt-1.5 w-full rounded-xl border border-border/80 bg-background px-4 py-3 text-sm outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-xs"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-charcoal">
                     Nom *
                   </label>
                   <input
@@ -1740,7 +1745,7 @@ function CommanderPage() {
                     type="text"
                     value={customer.lastName}
                     onChange={(e) => setCustomer({ ...customer, lastName: e.target.value })}
-                    className="mt-1.5 w-full rounded-md border border-border bg-transparent px-4 py-2.5 text-sm outline-hidden focus:border-foreground"
+                    className="mt-1.5 w-full rounded-xl border border-border/80 bg-background px-4 py-3 text-sm outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-xs"
                   />
                 </div>
               </div>
@@ -1748,7 +1753,7 @@ function CommanderPage() {
               {/* Email & Phone */}
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-charcoal">
                     Email pour le suivi *
                   </label>
                   <input
@@ -1756,11 +1761,11 @@ function CommanderPage() {
                     type="email"
                     value={customer.email}
                     onChange={(e) => setCustomer({ ...customer, email: e.target.value })}
-                    className="mt-1.5 w-full rounded-md border border-border bg-transparent px-4 py-2.5 text-sm outline-hidden focus:border-foreground"
+                    className="mt-1.5 w-full rounded-xl border border-border/80 bg-background px-4 py-3 text-sm outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-xs"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-charcoal">
                     Téléphone (pour le livreur) *
                   </label>
                   <input
@@ -1769,14 +1774,14 @@ function CommanderPage() {
                     placeholder="Ex: 20 123 456 ou 98 123 456"
                     value={customer.phone}
                     onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
-                    className="mt-1.5 w-full rounded-md border border-border bg-transparent px-4 py-2.5 text-sm outline-hidden focus:border-foreground"
+                    className="mt-1.5 w-full rounded-xl border border-border/80 bg-background px-4 py-3 text-sm outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-xs"
                   />
                 </div>
               </div>
 
               {/* Street Address */}
               <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <label className="text-xs font-semibold uppercase tracking-wider text-charcoal">
                   Adresse de livraison *
                 </label>
                 <input
@@ -1785,14 +1790,14 @@ function CommanderPage() {
                   value={shipping.address}
                   onChange={(e) => setShipping({ ...shipping, address: e.target.value })}
                   placeholder="Rue, quartier, résidence, n° d'appartement..."
-                  className="mt-1.5 w-full rounded-md border border-border bg-transparent px-4 py-2.5 text-sm outline-hidden focus:border-foreground"
+                  className="mt-1.5 w-full rounded-xl border border-border/80 bg-background px-4 py-3 text-sm outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-xs"
                 />
               </div>
 
               {/* City, Postal, Country */}
               <div className="grid gap-4 sm:grid-cols-3">
                 <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-charcoal">
                     Code postal
                   </label>
                   <input
@@ -1800,11 +1805,11 @@ function CommanderPage() {
                     placeholder="Ex: 1001, 4000..."
                     value={shipping.postalCode}
                     onChange={(e) => setShipping({ ...shipping, postalCode: e.target.value })}
-                    className="mt-1.5 w-full rounded-md border border-border bg-transparent px-4 py-2.5 text-sm outline-hidden focus:border-foreground"
+                    className="mt-1.5 w-full rounded-xl border border-border/80 bg-background px-4 py-3 text-sm outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-xs"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-charcoal">
                     Gouvernorat / Ville *
                   </label>
                   <input
@@ -1814,7 +1819,7 @@ function CommanderPage() {
                     placeholder="Choisir ou saisir la ville..."
                     value={shipping.city}
                     onChange={(e) => setShipping({ ...shipping, city: e.target.value })}
-                    className="mt-1.5 w-full rounded-md border border-border bg-transparent px-4 py-2.5 text-sm outline-hidden focus:border-foreground"
+                    className="mt-1.5 w-full rounded-xl border border-border/80 bg-background px-4 py-3 text-sm outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-xs"
                   />
                   <datalist id="tunisian-cities">
                     {TUNISIAN_GOVERNORATES.map((g) => (
@@ -1823,13 +1828,13 @@ function CommanderPage() {
                   </datalist>
                 </div>
                 <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                  <label className="text-xs font-semibold uppercase tracking-wider text-charcoal">
                     Pays *
                   </label>
                   <select
                     value={shipping.country}
                     onChange={(e) => setShipping({ ...shipping, country: e.target.value })}
-                    className="mt-1.5 w-full rounded-md border border-border bg-background px-4 py-2.5 text-sm outline-hidden focus:border-foreground"
+                    className="mt-1.5 w-full rounded-xl border border-border/80 bg-background px-4 py-3 text-sm outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-xs"
                   >
                     <option value="TN">Tunisie</option>
                   </select>
@@ -1837,8 +1842,8 @@ function CommanderPage() {
               </div>
 
               {/* Carrier Selection */}
-              <div className="pt-4 border-t border-border">
-                <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+              <div className="pt-4 border-t border-border/80">
+                <p className="text-xs font-semibold uppercase tracking-wider text-charcoal mb-3">
                   Mode de livraison
                 </p>
                 <div className="space-y-3">
@@ -1847,8 +1852,8 @@ function CommanderPage() {
                       key={opt.id}
                       className={`flex cursor-pointer items-center justify-between rounded-xl border p-4 transition-all ${
                         shipping.carrier === opt.id
-                          ? "border-deep-brown bg-sand/15"
-                          : "border-border hover:bg-cream/40"
+                          ? "border-deep-brown bg-sand/20 shadow-xs ring-1 ring-deep-brown/10"
+                          : "border-border/80 hover:bg-cream/40"
                       }`}
                     >
                       <div className="flex items-center gap-3">
@@ -1864,7 +1869,7 @@ function CommanderPage() {
                           <p className="text-xs text-muted-foreground">{opt.description} · Délai {opt.etaDays}</p>
                         </div>
                       </div>
-                      <span className="font-serif text-base font-bold">
+                      <span className="font-serif text-base font-bold text-charcoal">
                         {opt.priceTND === 0 ? "Gratuit" : formatTND(opt.priceTND)}
                       </span>
                     </label>
@@ -1873,20 +1878,20 @@ function CommanderPage() {
               </div>
 
               {/* Submit to Payment */}
-              <div className="mt-8 flex items-center justify-between border-t border-border pt-6">
+              <div className="mt-8 flex items-center justify-between border-t border-border/80 pt-6">
                 <button
                   type="button"
                   onClick={() => setFunnelStage("cart")}
-                  className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground"
+                  className="text-xs uppercase tracking-widest text-muted-foreground hover:text-charcoal transition-colors py-2"
                 >
                   Retour au panier
                 </button>
                 <button
                   type="submit"
-                  className="inline-flex items-center gap-2 rounded-sm bg-primary px-8 py-4 text-xs uppercase tracking-widest text-primary-foreground hover:bg-charcoal transition-colors shadow-md"
+                  className="inline-flex items-center gap-2 rounded-full bg-deep-brown px-8 py-4 text-xs uppercase tracking-widest font-semibold text-ivory hover:bg-charcoal transition-all shadow-luxury min-h-[48px]"
                 >
                   <span>Valider la commande ({formatTND(quote.total)})</span>
-                  <ArrowRight className="h-4 w-4" />
+                  <ArrowRight className="h-4 w-4 text-champagne" />
                 </button>
               </div>
             </form>
@@ -1899,22 +1904,22 @@ function CommanderPage() {
          ======================================================== */}
       {funnelStage === "payment" && (
         <section className="container-x mt-8 max-w-3xl">
-          <div className="rounded-2xl border border-border bg-background p-6 sm:p-10 shadow-sm animate-in fade-in">
-            <div className="border-b border-border pb-6">
-              <div className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-deep-brown font-medium">
-                <Banknote className="h-4 w-4" />
+          <div className="rounded-3xl border border-border/80 bg-card p-6 sm:p-10 shadow-luxury animate-in fade-in">
+            <div className="border-b border-border/80 pb-6">
+              <div className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-deep-brown font-semibold">
+                <Banknote className="h-4 w-4 text-champagne" />
                 <span>Étape 6 · Validation de votre commande</span>
               </div>
-              <h2 className="mt-1 font-serif text-3xl sm:text-4xl">Paiement à la livraison</h2>
+              <h2 className="mt-1 font-serif text-3xl sm:text-4xl text-charcoal">Paiement à la livraison</h2>
               <p className="mt-1 text-sm text-muted-foreground">
                 Réglez en toute sérénité en espèces auprès du livreur à la réception de votre colis.
               </p>
             </div>
 
             {/* Exclusive Payment Method: Cash On Delivery */}
-            <div className="mt-8 rounded-2xl border-2 border-deep-brown bg-sand/15 p-6 shadow-xs">
+            <div className="mt-8 rounded-2xl border-2 border-deep-brown bg-sand/15 p-6 sm:p-8 shadow-luxury">
               <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-deep-brown text-ivory shadow-sm">
+                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-deep-brown text-ivory shadow-xs">
                   <Banknote className="h-6 w-6" />
                 </div>
                 <div className="flex-1">
@@ -1930,15 +1935,15 @@ function CommanderPage() {
 
                   <div className="mt-5 grid gap-3 sm:grid-cols-3 border-t border-deep-brown/15 pt-4 text-xs text-charcoal">
                     <div className="flex items-center gap-2">
-                      <ShieldCheck className="h-4 w-4 text-deep-brown shrink-0" />
+                      <ShieldCheck className="h-4 w-4 text-champagne shrink-0" />
                       <span>Aucune carte bancaire requise</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <Truck className="h-4 w-4 text-deep-brown shrink-0" />
+                      <Truck className="h-4 w-4 text-champagne shrink-0" />
                       <span>Livraison suivie par transporteur</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-deep-brown shrink-0" />
+                      <CheckCircle2 className="h-4 w-4 text-champagne shrink-0" />
                       <span>Paiement après réception</span>
                     </div>
                   </div>
@@ -1947,15 +1952,15 @@ function CommanderPage() {
             </div>
 
             {/* Delivery Recap Card */}
-            <div className="mt-6 rounded-xl border border-border bg-cream/40 p-4 text-xs text-charcoal flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+            <div className="mt-6 rounded-xl border border-border/80 bg-cream/40 p-4 text-xs text-charcoal flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
               <div>
                 <p className="font-semibold text-deep-brown uppercase tracking-wider text-[10px]">
                   Adresse de livraison enregistrée :
                 </p>
-                <p className="mt-0.5 text-xs text-charcoal">
+                <p className="mt-0.5 text-xs text-charcoal font-medium">
                   {customer.firstName} {customer.lastName} · {shipping.address}, {shipping.postalCode} {shipping.city}
                 </p>
-                <p className="text-[11px] text-muted-foreground">Tél : {customer.phone || "Non renseigné"}</p>
+                <p className="text-[11px] text-muted-foreground mt-0.5">Tél : {customer.phone || "Non renseigné"}</p>
               </div>
               <button
                 type="button"
@@ -1967,13 +1972,13 @@ function CommanderPage() {
             </div>
 
             {/* Legal consent check */}
-            <div className="mt-8 border-t border-border pt-6">
+            <div className="mt-8 border-t border-border/80 pt-6">
               <label className="flex items-start gap-3 text-xs text-charcoal cursor-pointer">
                 <input
                   type="checkbox"
                   checked={legalConsent}
                   onChange={(e) => setLegalConsent(e.target.checked)}
-                  className="mt-0.5 accent-deep-brown"
+                  className="mt-0.5 accent-deep-brown h-4 w-4"
                 />
                 <span>
                   J'accepte expressément les <strong>Conditions Générales de Vente</strong> et m'engage à régler la somme de <strong>{formatTND(quote.total)}</strong> en espèces au livreur à la réception de mon colis.
@@ -1983,7 +1988,7 @@ function CommanderPage() {
 
             {/* Status Feedback and Progress Indicator */}
             {isSubmitting && (
-              <div className="mt-6 rounded-2xl border border-sand bg-cream/50 p-5 animate-in fade-in">
+              <div className="mt-6 rounded-2xl border border-champagne/40 bg-cream/60 p-5 shadow-luxury animate-in fade-in">
                 <div className="flex items-center gap-3">
                   <RotateCw className="h-5 w-5 text-deep-brown animate-spin shrink-0" />
                   <div className="flex-1">
@@ -2002,7 +2007,7 @@ function CommanderPage() {
 
             {/* Error & Retry Banner */}
             {checkoutStep === "error" && checkoutError && !isSubmitting && (
-              <div className="mt-6 rounded-2xl border border-destructive/30 bg-destructive/10 p-5 animate-in fade-in">
+              <div className="mt-6 rounded-2xl border border-destructive/30 bg-destructive/10 p-5 shadow-xs animate-in fade-in">
                 <div className="flex items-start gap-3">
                   <div className="rounded-full bg-destructive/20 p-1 text-destructive shrink-0 mt-0.5">
                     <RotateCw className="h-4 w-4" />
@@ -2015,7 +2020,7 @@ function CommanderPage() {
                     <button
                       type="button"
                       onClick={handleConfirmOrder}
-                      className="mt-3 inline-flex items-center gap-1.5 rounded-sm bg-destructive px-4 py-2 text-xs font-semibold uppercase tracking-wider text-destructive-foreground hover:bg-destructive/90 transition-colors shadow-xs"
+                      className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-destructive px-5 py-2 text-xs font-semibold uppercase tracking-wider text-destructive-foreground hover:bg-destructive/90 transition-colors shadow-xs"
                     >
                       <RotateCw className="h-3.5 w-3.5" />
                       <span>Réessayer l'envoi et la commande</span>
@@ -2026,23 +2031,23 @@ function CommanderPage() {
             )}
 
             {/* Confirm Order CTA */}
-            <div className="mt-8 flex items-center justify-between border-t border-border pt-6">
+            <div className="mt-8 flex items-center justify-between border-t border-border/80 pt-6">
               <button
                 type="button"
                 onClick={() => setFunnelStage("delivery")}
-                className="text-xs uppercase tracking-widest text-muted-foreground hover:text-foreground"
+                className="text-xs uppercase tracking-widest text-muted-foreground hover:text-charcoal transition-colors py-2"
               >
                 Retour
               </button>
               <button
                 onClick={handleConfirmOrder}
                 disabled={isSubmitting}
-                className="inline-flex items-center gap-2 rounded-sm bg-primary px-8 sm:px-10 py-4 text-xs uppercase tracking-widest text-primary-foreground hover:bg-charcoal transition-colors shadow-md disabled:opacity-60 disabled:cursor-wait"
+                className="inline-flex items-center gap-2 rounded-full bg-deep-brown px-8 sm:px-10 py-4 text-xs uppercase tracking-widest font-semibold text-ivory hover:bg-charcoal transition-all shadow-luxury disabled:opacity-60 disabled:cursor-wait min-h-[48px]"
               >
                 {isSubmitting ? (
-                  <RotateCw className="h-4 w-4 text-sand animate-spin" />
+                  <RotateCw className="h-4 w-4 text-champagne animate-spin" />
                 ) : (
-                  <ShieldCheck className="h-4 w-4 text-sand" />
+                  <ShieldCheck className="h-4 w-4 text-champagne" />
                 )}
                 <span>
                   {isSubmitting
@@ -2062,14 +2067,14 @@ function CommanderPage() {
          ======================================================== */}
       {funnelStage === "confirmation" && (
         <section className="container-x mt-10 max-w-2xl text-center">
-          <div className="rounded-3xl border border-border bg-background p-8 sm:p-14 shadow-lg animate-in zoom-in-95">
-            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-sand/30 text-deep-brown">
-              <CheckCircle2 className="h-8 w-8" />
+          <div className="rounded-3xl border border-border/80 bg-card p-8 sm:p-14 shadow-luxury-lg animate-in zoom-in-95">
+            <div className="mx-auto flex h-16 w-16 items-center justify-center rounded-full bg-champagne/20 text-deep-brown shadow-xs">
+              <CheckCircle2 className="h-8 w-8 text-deep-brown" />
             </div>
 
-            <p className="eyebrow mt-6">Commande validée</p>
-            <h1 className="mt-2 font-serif text-4xl sm:text-5xl">Merci pour votre confiance !</h1>
-            <p className="mt-2 text-sm font-semibold text-deep-brown">
+            <p className="eyebrow mt-6 tracking-[0.25em] text-deep-brown font-semibold">Commande validée</p>
+            <h1 className="mt-2 font-serif text-4xl sm:text-5xl text-charcoal">Merci pour votre confiance !</h1>
+            <p className="mt-3 text-sm font-semibold text-deep-brown font-mono bg-cream inline-block px-4 py-1.5 rounded-full border border-border/80 shadow-xs">
               Numéro de commande : {orderNumber}
             </p>
             <p className="mt-4 text-sm text-muted-foreground">
@@ -2077,7 +2082,7 @@ function CommanderPage() {
             </p>
 
             {/* COD Reminder Badge */}
-            <div className="mt-6 rounded-2xl border border-sand bg-sand/20 p-4 text-xs text-charcoal">
+            <div className="mt-6 rounded-2xl border border-sand/80 bg-sand/20 p-5 text-xs text-charcoal shadow-xs">
               <p className="font-semibold text-deep-brown flex items-center justify-center gap-1.5 text-sm">
                 <Banknote className="h-4.5 w-4.5 text-deep-brown" />
                 <span>Règlement : En espèces à la livraison</span>
@@ -2088,44 +2093,44 @@ function CommanderPage() {
             </div>
 
             {/* Fulfilment Timeline Stepper as specified in section 11 of plan.md */}
-            <div className="mt-10 rounded-2xl border border-border bg-cream/40 p-6 text-left">
+            <div className="mt-10 rounded-2xl border border-border/80 bg-cream/40 p-6 text-left shadow-xs">
               <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
                 Cycle de fabrication & livraison
               </p>
               <div className="space-y-3.5 text-xs text-charcoal">
                 <div className="flex items-center gap-3">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-deep-brown text-[10px] text-ivory font-bold">1</span>
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-deep-brown text-[10px] text-ivory font-bold shadow-xs">1</span>
                   <span><strong>Tirage d'art en cours :</strong> Impression argentique haute résolution.</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-deep-brown text-[10px] text-ivory font-bold">2</span>
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-deep-brown text-[10px] text-ivory font-bold shadow-xs">2</span>
                   <span><strong>Programmation NFC :</strong> Intégration et verrouillage de votre puce unique.</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-deep-brown text-[10px] text-ivory font-bold">3</span>
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-deep-brown text-[10px] text-ivory font-bold shadow-xs">3</span>
                   <span><strong>Contrôle qualité :</strong> Test de scan avant emballage soigné.</span>
                 </div>
                 <div className="flex items-center gap-3">
-                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-sand text-[10px] text-charcoal font-bold">4</span>
+                  <span className="flex h-5 w-5 items-center justify-center rounded-full bg-champagne text-[10px] text-charcoal font-bold shadow-xs">4</span>
                   <span><strong>Expédition suivie :</strong> Réception sous 3 à 5 jours ouvrés.</span>
                 </div>
               </div>
             </div>
 
             {/* Post-purchase feedback widget */}
-            <div className="mt-8 rounded-xl border border-border p-5 text-left bg-background">
+            <div className="mt-8 rounded-2xl border border-border/80 p-5 text-left bg-background shadow-xs">
               <p className="text-xs font-medium text-charcoal">
                 Votre avis nous est précieux : qu'est-ce qui a failli vous empêcher de commander aujourd'hui ?
               </p>
               <input
                 type="text"
                 placeholder="Un détail sur les prix, la livraison, le fonctionnement..."
-                className="mt-2 w-full rounded-md border border-border bg-transparent p-2.5 text-xs outline-hidden"
+                className="mt-2 w-full rounded-xl border border-border/80 bg-transparent p-3 text-xs outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30"
               />
               <button
                 type="button"
                 onClick={() => toast.success("Merci pour votre retour !")}
-                className="mt-3 rounded-sm bg-cream px-3 py-1.5 text-[11px] font-semibold text-charcoal hover:bg-sand"
+                className="mt-3 rounded-full bg-cream px-4 py-1.5 text-[11px] font-semibold text-charcoal hover:bg-sand transition-colors"
               >
                 Envoyer mon avis
               </button>
@@ -2137,7 +2142,7 @@ function CommanderPage() {
                   cart.clear();
                   navigate({ to: "/" });
                 }}
-                className="rounded-sm bg-primary px-8 py-3.5 text-xs uppercase tracking-widest text-primary-foreground hover:bg-charcoal transition-colors"
+                className="rounded-full bg-deep-brown px-8 py-4 text-xs uppercase tracking-widest font-semibold text-ivory hover:bg-charcoal transition-all shadow-luxury min-h-[48px]"
               >
                 Retour à l'accueil
               </button>

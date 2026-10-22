@@ -21,43 +21,43 @@ export function PriceDrawer({
         aria-modal="true"
       >
         {/* Header */}
-        <div className="flex items-center justify-between border-b border-border pb-5">
+        <div className="flex items-center justify-between border-b border-sand/20 pb-5">
           <div>
-            <p className="eyebrow">Tarifs & Remises Dégressives</p>
-            <h2 className="font-serif text-3xl">Grille tarifaire MÉMORA</h2>
+            <p className="eyebrow text-deep-brown font-semibold tracking-[0.2em]">Tarifs &amp; Remises Dégressives</p>
+            <h2 className="font-serif text-3xl text-charcoal mt-1">Grille tarifaire MÉMORA</h2>
           </div>
           <button
             onClick={onClose}
             aria-label="Fermer"
-            className="rounded-full p-2 text-muted-foreground hover:bg-cream hover:text-foreground transition-colors"
+            className="rounded-full p-2 text-muted-foreground hover:bg-sand/20 hover:text-charcoal transition-colors cursor-pointer"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Reassurance Banner */}
-        <div className="my-6 rounded-xl bg-sand/20 p-4 text-sm text-charcoal">
+        <div className="my-6 rounded-2xl border border-sand/30 bg-sand/15 p-4 text-sm text-charcoal shadow-2xs">
           <p className="flex items-center gap-2 font-medium">
             <Sparkles className="h-4 w-4 text-deep-brown" />
             Remises de volume automatiques
           </p>
-          <p className="mt-1 text-xs text-muted-foreground">
+          <p className="mt-1 text-xs text-muted-foreground leading-relaxed">
             Plus vous commandez d'exemplaires (même souvenir ou souvenirs différents), plus le prix unitaire diminue !
           </p>
         </div>
 
         {/* Comparison Table */}
-        <div className="overflow-hidden rounded-xl border border-border">
+        <div className="overflow-hidden rounded-2xl border border-sand/25 shadow-2xs">
           <table className="w-full text-left text-sm">
-            <thead className="bg-cream/60 border-b border-border font-serif text-base">
+            <thead className="bg-cream/80 border-b border-sand/20 font-serif text-base text-charcoal">
               <tr>
                 <th className="p-3.5">Quantité</th>
                 <th className="p-3.5">Simple (Enveloppe)</th>
-                <th className="p-3.5">Coffret (Box & Lettre)</th>
+                <th className="p-3.5">Coffret (Box &amp; Lettre)</th>
                 <th className="p-3.5 text-right">Remise</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-sand/15">
               {TIERS_10X15.map((tier, idx) => {
                 const boxPrice = TIERS_BOX[idx]?.unitPriceTND ?? 49;
                 const label =
@@ -72,7 +72,7 @@ export function PriceDrawer({
                     : "100+";
 
                 return (
-                  <tr key={tier.minQty} className="hover:bg-cream/30 transition-colors">
+                  <tr key={tier.minQty} className="hover:bg-cream/40 transition-colors">
                     <td className="p-3.5 font-medium">{label}</td>
                     <td className="p-3.5">
                       <span className="font-semibold text-charcoal">{formatTND(tier.unitPriceTND)}</span>
@@ -101,7 +101,7 @@ export function PriceDrawer({
         </div>
 
         {/* What is included */}
-        <div className="mt-8 space-y-3.5 border-t border-border pt-6">
+        <div className="mt-8 space-y-3.5 border-t border-sand/20 pt-6">
           <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Tout est inclus</p>
           <div className="flex items-start gap-2.5 text-xs text-charcoal">
             <Check className="h-4 w-4 shrink-0 text-deep-brown mt-0.5" />
@@ -138,12 +138,12 @@ export function PriceDrawer({
         </div>
 
         {/* CTA */}
-        <div className="mt-auto border-t border-border pt-6">
+        <div className="mt-8 border-t border-sand/20 pt-6">
           <Link
             to="/commander"
             search={{ format: initialFormat === "box" ? "box" : "10x15", stage: "video" }}
             onClick={onClose}
-            className="flex w-full items-center justify-center rounded-sm bg-primary py-4 text-xs uppercase tracking-[0.2em] text-primary-foreground hover:bg-charcoal transition-colors shadow-md"
+            className="flex w-full items-center justify-center rounded-full bg-primary py-4 text-xs uppercase tracking-[0.2em] text-primary-foreground hover:bg-charcoal transition-all shadow-luxury hover:shadow-luxury-lg font-semibold cursor-pointer"
           >
             Commencer ma création
           </Link>

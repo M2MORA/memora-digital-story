@@ -30,6 +30,7 @@ export type Order = {
   total: number;
   currency: string;
   status: OrderStatus;
+  draft_id?: string | null;
   created_at: string;
 };
 
@@ -41,6 +42,7 @@ export type Memory = {
   photo_url: string | null;
   view_count: number;
   status: "active" | "draft" | "archived";
+  order_id?: string | null;
   created_at: string;
 };
 

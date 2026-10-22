@@ -54,25 +54,29 @@ function Story() {
         title="Parce que certains instants sont éternels."
         intro="Vos plus belles photos méritent mieux qu'un écran. MÉMORA transforme vos moments les plus précieux en souvenirs physiques et émotionnels que l'on garde près du cœur."
       />
-      <img src={hero} alt="Souvenirs MÉMORA" loading="lazy" className="h-[60vh] w-full object-cover" />
-      <section className="container-x py-24">
+      <div className="container-x pb-8">
+        <div className="overflow-hidden rounded-3xl border border-sand/20 shadow-luxury-lg">
+          <img src={hero} alt="Souvenirs MÉMORA" loading="lazy" className="h-[50vh] sm:h-[60vh] w-full object-cover" />
+        </div>
+      </div>
+      <section className="container-x py-20 sm:py-24">
         {CHAPTERS.map(([t, d], i) => (
-          <div key={t} className="grid gap-6 border-t border-border py-12 md:grid-cols-[6rem_1fr_1.4fr]">
-            <span className="font-serif text-2xl text-taupe">0{i + 1}</span>
-            <h2 className="text-3xl font-serif text-charcoal">{t}</h2>
+          <div key={t} className="grid gap-6 border-t border-sand/20 py-12 md:grid-cols-[6rem_1fr_1.4fr] items-baseline">
+            <span className="font-serif text-3xl text-sand font-bold">0{i + 1}</span>
+            <h2 className="text-2xl sm:text-3xl font-serif text-charcoal">{t}</h2>
             <p className="text-base leading-relaxed text-muted-foreground">{d}</p>
           </div>
         ))}
       </section>
-      <section className="grid md:grid-cols-2 border-t border-border">
-        <div className="flex flex-col justify-center bg-rose-poudre/25 p-12 md:p-20">
+      <section className="grid md:grid-cols-2 border-t border-sand/20">
+        <div className="flex flex-col justify-center bg-cream/70 p-12 md:p-20">
           <p className="font-serif text-3xl sm:text-4xl italic leading-snug text-charcoal">
             « Les instants passent. Les souvenirs restent. »
           </p>
           <p className="mt-3 text-sm font-serif italic text-deep-brown">
             Un instant capturé. Une émotion préservée.
           </p>
-          <p className="mt-4 text-xs uppercase tracking-widest text-deep-brown font-semibold">
+          <p className="mt-4 text-xs uppercase tracking-[0.2em] text-deep-brown font-semibold">
             MÉMORA · Make Memories Last
           </p>
         </div>
