@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Smartphone, Sparkles, ShieldCheck, CheckCircle2, ArrowRight } from "lucide-react";
-import scan from "@/assets/scan.jpg";
+import scan from "@/assets/scan-v2.jpg";
 import { FlipCardDemo } from "@/components/site/FlipCardDemo";
 import { PageHero } from "@/components/site/ProductCard";
 

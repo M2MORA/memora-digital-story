@@ -45,8 +45,7 @@ const Q = [
     key: "budget",
     q: "Quel est votre budget indicatif ?",
     opts: [
-      ["50", "49 DT (Formule Simple : Enveloppe & Carte)"],
-      ["90", "89 DT (Formule Prestige : Coffret Box & Lettre)"],
+      ["50", "49 DT · Mémora Simple (Enveloppe & Carte)"],
       ["999", "Plusieurs exemplaires (Tarif dégressif)"],
     ],
   },
@@ -55,7 +54,7 @@ const Q = [
     q: "Quel style visuel préférez-vous ?",
     opts: [
       ["classic", "Classique & Authentique (Enveloppe d'art)"],
-      ["romantic", "Romantique & Précieux (Coffret & Lettre)"],
+      ["romantic", "Romantique & Précieux"],
       ["minimal", "Minimaliste & Sobre"],
       ["modern", "Moderne"],
     ],

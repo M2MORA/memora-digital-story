@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Film, Smartphone, Sparkles, ShieldCheck, Lock, Play, ArrowRight } from "lucide-react";
-import moments from "@/assets/product-moments.jpg";
+import moments from "@/assets/product-moments-v2.jpg";
 import { PageHero } from "@/components/site/ProductCard";
 
 export const Route = createFileRoute("/digital-memories")({

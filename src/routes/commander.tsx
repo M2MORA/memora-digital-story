@@ -70,23 +70,21 @@ import {
   Format,
   getUnitPrice,
   getVideoSurcharge,
+  FRAME_PRICES,
   getShippingOptions,
   formatTND,
   FREE_SHIPPING_THRESHOLD_TND,
   INCLUDED_VIDEO_SECONDS,
   MAX_VIDEO_SECONDS,
 } from "@/lib/pricing";
-import { PRODUCTS, Product } from "@/lib/products";
 import { PriceDrawer } from "@/components/site/PriceDrawer";
 import { MobileUploadModal } from "@/components/site/MobileUploadModal";
 import { FlipCardDemo } from "@/components/site/FlipCardDemo";
 import { TapDemo } from "@/components/site/TapDemo";
-import envelopeImg from "@/assets/product-envelope.jpg";
-import boxLetterImg from "@/assets/product-box-letter.jpg";
-import hero from "@/assets/hero.jpg";
-import moments from "@/assets/product-moments.jpg";
-import scan from "@/assets/scan.jpg";
-import box from "@/assets/product-box.jpg";
+import envelopeImg from "@/assets/product-envelope-v2.jpg";
+import hero from "@/assets/hero-v2.jpg";
+import moments from "@/assets/product-moments-v2.jpg";
+import scan from "@/assets/scan-v2.jpg";
 
 type CommanderSearch = {
   stage?: "picker" | "video" | "photo" | "preview" | "cart" | "delivery" | "payment" | "confirmation" | undefined;
@@ -157,7 +155,7 @@ function CommanderPage() {
   );
 
   // Selected format for the current creation
-  const [selectedFormat, setSelectedFormat] = useState<Format>(search.format ?? "10x15");
+  const [selectedFormat, setSelectedFormat] = useState<Format>("10x15");
   const [selectedWithFrame, setSelectedWithFrame] = useState(search.withFrame ?? false);
 
   // Modals
@@ -166,11 +164,12 @@ function CommanderPage() {
 
   // Step 1: Video state
   const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string>(
-    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-  );
-  const [videoName, setVideoName] = useState<string>("video_souvenir.mp4");
-  const [videoDuration, setVideoDuration] = useState<number>(120); // 2 min default
+  const [videoUrl, setVideoUrl] = useState<string>("");
+  const [videoName, setVideoName] = useState<string>("");
+  const [videoDuration, setVideoDuration] = useState<number>(0);
+  const [videoStatus, setVideoStatus] = useState<"empty" | "loading" | "ready" | "error">("empty");
+  const [videoErrorMessage, setVideoErrorMessage] = useState<string | null>(null);
+  const [isDemoVideo, setIsDemoVideo] = useState(false);
   const [isPlayingVideo, setIsPlayingVideo] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
@@ -191,7 +190,6 @@ function CommanderPage() {
   const [photoCropSettings, setPhotoCropSettings] = useState<CropSettings | null>(null);
   const [previewSide, setPreviewSide] = useState<"recto" | "verso">("recto");
   const [cardMessage, setCardMessage] = useState<string>("Pour toujours, je t'aime.");
-  const [letterContent, setLetterContent] = useState<string>("");
 
   // Step 4: Delivery state
   const [customer, setCustomer] = useState({
@@ -239,49 +237,84 @@ function CommanderPage() {
       ? Math.ceil((videoDuration - INCLUDED_VIDEO_SECONDS) / 60)
       : 0;
   const videoSurchargeCurrent = getVideoSurcharge(videoDuration, 1);
+  const currentOrderQuantity = items.reduce((quantity, item) => quantity + item.qty, 0);
+  const selectedItemBasePrice =
+    getUnitPrice(selectedFormat, currentOrderQuantity + 1) +
+    (selectedWithFrame ? FRAME_PRICES[selectedFormat] : 0);
+  const selectedItemEstimate =
+    selectedItemBasePrice + (videoStatus === "ready" && !isDemoVideo ? videoSurchargeCurrent : 0);
+  const canContinueWithVideo = videoStatus === "ready" && !isDemoVideo;
+
+  const funnelSteps = [
+    { id: "video", label: "Vidéo", num: 1 },
+    { id: "photo", label: "Photo", num: 2 },
+    { id: "preview", label: "Aperçu", num: 3 },
+    { id: "cart", label: "Panier", num: 4 },
+    { id: "delivery", label: "Livraison", num: 5 },
+    { id: "payment", label: "Validation", num: 6 },
+  ] as const;
+  const activeStepIndex = funnelSteps.findIndex((step) => step.id === funnelStage);
+  const activeStep = funnelSteps[activeStepIndex];
 
   // Overall quote calculation
   const quote = cart.getQuote(shipping.country, shipping.carrier);
 
   // Handle Video file upload
   const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
+    const input = e.currentTarget;
+    const file = input.files?.[0];
     if (!file) return;
+    input.value = "";
+
+    const rejectFile = (message: string) => {
+      setVideoErrorMessage(
+        videoStatus === "ready"
+          ? `${message} Votre vidéo précédente reste sélectionnée.`
+          : message,
+      );
+      toast.error(message);
+    };
 
     const ext = file.name.split(".").pop()?.toLowerCase() || "";
     if (!["mp4", "mov", "webm"].includes(ext)) {
-      toast.error("Format vidéo non supporté (MP4, MOV, WEBM requis)");
+      rejectFile("Format vidéo non supporté (MP4, MOV ou WebM requis).");
       return;
     }
-    if (!file.type.startsWith("video/") && file.type !== "application/octet-stream") {
-      toast.error("Type MIME vidéo invalide");
+    const mimeType = file.type.trim().toLowerCase();
+    if (mimeType && !mimeType.startsWith("video/") && mimeType !== "application/octet-stream") {
+      rejectFile("Ce fichier n’est pas reconnu comme une vidéo.");
       return;
     }
     if (file.size > 5 * 1024 * 1024 * 1024) {
-      toast.error("Le fichier dépasse la taille maximale autorisée (5 Go)");
+      rejectFile("La vidéo dépasse la taille maximale de 5 Go.");
       return;
     }
     if (file.size <= 0) {
-      toast.error("Fichier vidéo vide");
+      rejectFile("Ce fichier vidéo est vide.");
       return;
     }
+
+    if (videoUrl.startsWith("blob:")) {
+      URL.revokeObjectURL(videoUrl);
+    }
+    const url = URL.createObjectURL(file);
+    setVideoFile(file);
+    setVideoUrl(url);
+    setVideoName(file.name);
+    setVideoDuration(0);
+    setIsDemoVideo(false);
+    setVideoStatus("loading");
+    setVideoErrorMessage(null);
+    setVideoScrubTime(0);
+    setCapturedTimestamp(null);
 
     try {
       const cacheKey = getMediaCacheKey(draftId, currentItemKey, "video");
       await putCachedMedia(cacheKey, file);
-
-      if (videoUrl && videoUrl.startsWith("blob:")) {
-        URL.revokeObjectURL(videoUrl);
-      }
-      const url = URL.createObjectURL(file);
-      setVideoFile(file);
-      setVideoUrl(url);
-      setVideoName(file.name);
-      setVideoScrubTime(0);
-      setCapturedTimestamp(null);
-      toast.success("Vidéo chargée et mise en cache avec succès !");
+      toast.success("Vidéo chargée et prête à être vérifiée.");
     } catch {
-      toast.error("Erreur d'enregistrement local de la vidéo");
+      setVideoErrorMessage("La vidéo est chargée, mais sa sauvegarde locale a échoué. Gardez cette page ouverte jusqu’à la suite de la commande.");
+      toast.error("La vidéo n’a pas pu être sauvegardée pour reprendre ce brouillon plus tard.");
     }
   };
 
@@ -404,9 +437,9 @@ function CommanderPage() {
   // Add created item to cart
   const handleValidatePhotoAndAddToCart = () => {
     const finalPhoto = composedPhotoUrl || photoUrl;
-    cart.add(selectedFormat === "box" ? "p2" : "p1", {
+    cart.add("p1", {
       key: currentItemKey,
-      format: selectedFormat === "box" ? "box" : "10x15",
+      format: "10x15",
       withFrame: selectedWithFrame,
       videoDurationSec: videoDuration,
       photoPreviewUrl: finalPhoto.startsWith("blob:") ? undefined : finalPhoto,
@@ -414,7 +447,6 @@ function CommanderPage() {
       videoName: videoName,
       photoName: photoName,
       cardMessage,
-      letterContent,
       qty: 1,
       cropSettings: photoCropSettings ?? {
         zoom: photoZoom,
@@ -549,7 +581,6 @@ function CommanderPage() {
         withFrame: it.withFrame ?? false,
         videoDurationSec: it.videoDurationSec,
         cardMessage: it.cardMessage,
-        letterContent: it.letterContent,
         personalization: it.personalization,
         qty: it.qty,
       }));
@@ -602,7 +633,7 @@ function CommanderPage() {
       {/* Stepper Progress Bar (visible once entered the funnel) */}
       {funnelStage !== "picker" && funnelStage !== "confirmation" && (
         <div className="container-x mt-6 max-w-4xl">
-          <div className="rounded-2xl border border-border/70 bg-card/85 backdrop-blur-md px-5 py-3.5 shadow-luxury flex items-center justify-between text-xs font-medium">
+          <div className="rounded-2xl border border-border/70 bg-card/85 backdrop-blur-md px-4 sm:px-5 py-3.5 shadow-luxury flex items-center gap-4 text-xs font-medium min-w-0">
             <button
               onClick={() => {
                 if (funnelStage === "video") setFunnelStage("picker");
@@ -612,21 +643,36 @@ function CommanderPage() {
                 else if (funnelStage === "delivery") setFunnelStage("cart");
                 else if (funnelStage === "payment") setFunnelStage("delivery");
               }}
-              className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-charcoal transition-colors font-medium py-1"
+              className="inline-flex shrink-0 items-center gap-1.5 text-muted-foreground hover:text-charcoal transition-colors font-medium py-1"
             >
               <ArrowLeft className="h-3.5 w-3.5" />
               <span>Retour</span>
             </button>
 
-            <div className="flex items-center gap-2 sm:gap-5">
-              {[
-                { id: "video", label: "Vidéo", num: 1 },
-                { id: "photo", label: "Photo", num: 2 },
-                { id: "preview", label: "Aperçu", num: 3 },
-                { id: "cart", label: "Panier", num: 4 },
-                { id: "delivery", label: "Livraison", num: 5 },
-                { id: "payment", label: "Validation", num: 6 },
-              ].map((step) => {
+            <div className="flex min-w-0 flex-1 flex-col gap-1.5 lg:hidden">
+              <div className="flex min-w-0 items-center justify-between gap-2 text-[11px]">
+                <span className="shrink-0 font-semibold uppercase tracking-wider text-deep-brown">
+                  Étape {activeStepIndex + 1} sur {funnelSteps.length}
+                </span>
+                <span className="truncate text-right text-muted-foreground">{activeStep?.label}</span>
+              </div>
+              <div
+                role="progressbar"
+                aria-label={`Progression : étape ${activeStepIndex + 1} sur ${funnelSteps.length}`}
+                aria-valuemin={1}
+                aria-valuemax={funnelSteps.length}
+                aria-valuenow={activeStepIndex + 1}
+                className="h-1.5 overflow-hidden rounded-full bg-cream"
+              >
+                <div
+                  className="h-full rounded-full bg-deep-brown transition-[width] duration-300"
+                  style={{ width: `${((activeStepIndex + 1) / funnelSteps.length) * 100}%` }}
+                />
+              </div>
+            </div>
+
+            <div className="hidden min-w-0 flex-1 items-center justify-end gap-3 lg:flex xl:gap-5">
+              {funnelSteps.map((step) => {
                 const isActive = funnelStage === step.id;
                 const isPassed =
                   (step.id === "video" && funnelStage !== "video") ||
@@ -638,22 +684,20 @@ function CommanderPage() {
                 return (
                   <div
                     key={step.id}
-                    className={`flex items-center gap-1.5 ${
-                      isActive
+                    className={`flex items-center gap-1.5 ${isActive
                         ? "text-deep-brown font-semibold"
                         : isPassed
-                        ? "text-charcoal font-medium"
-                        : "text-muted-foreground/60"
-                    }`}
+                          ? "text-charcoal font-medium"
+                          : "text-muted-foreground/60"
+                      }`}
                   >
                     <span
-                      className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] transition-all ${
-                        isActive
+                      className={`flex h-5 w-5 items-center justify-center rounded-full text-[10px] transition-all ${isActive
                           ? "bg-deep-brown text-ivory ring-2 ring-champagne/40 font-bold shadow-xs"
                           : isPassed
-                          ? "bg-champagne/25 text-deep-brown border border-champagne/40 font-medium"
-                          : "border border-border/80 text-muted-foreground"
-                      }`}
+                            ? "bg-champagne/25 text-deep-brown border border-champagne/40 font-medium"
+                            : "border border-border/80 text-muted-foreground"
+                        }`}
                     >
                       {step.num}
                     </span>
@@ -706,8 +750,8 @@ function CommanderPage() {
             )}
           </div>
 
-          {/* Product Cards Grid - 2 Products */}
-          <div className="mt-14 mx-auto max-w-4xl grid gap-8 sm:grid-cols-2">
+          {/* Single product card */}
+          <div className="mt-14 mx-auto max-w-2xl grid grid-cols-1 gap-8">
             {/* Card 1: Simple Enveloppe & Carte */}
             <div className="group flex flex-col justify-between rounded-2xl border border-border/80 bg-card p-6 sm:p-8 shadow-luxury hover:border-champagne/60 hover:shadow-luxury-lg transition-all">
               <div>
@@ -774,79 +818,7 @@ function CommanderPage() {
                 </button>
               </div>
             </div>
-
-            {/* Card 2: Coffret Box, Carte & Lettre */}
-            <div className="group flex flex-col justify-between rounded-2xl border border-border/80 bg-card p-6 sm:p-8 shadow-luxury hover:border-champagne/60 hover:shadow-luxury-lg transition-all">
-              <div>
-                <div className="relative aspect-4/3 overflow-hidden rounded-xl bg-cream">
-                  <img
-                    src={boxLetterImg}
-                    alt="Mémora Coffret (Box, Carte & Lettre)"
-                    className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
-                  />
-                  <span className="absolute left-3 top-3 rounded-full bg-champagne/90 backdrop-blur-sm px-3.5 py-1 text-[10px] uppercase tracking-[0.2em] text-charcoal font-semibold shadow-xs">
-                    Coffret Cadeau Prestige
-                  </span>
-                </div>
-                <h3 className="mt-5 font-serif text-2xl sm:text-3xl text-charcoal">Mémora Coffret (Box, Carte & Lettre)</h3>
-                <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-                  L'expérience cadeau prestige complète : une boîte coffret rigide luxueuse, votre tirage photo connecté NFC, une carte souvenir et une véritable lettre personnalisée.
-                </p>
-
-                <div className="mt-4 rounded-xl bg-cream/50 p-4 text-xs text-charcoal border border-border/60">
-                  <p className="font-semibold text-deep-brown mb-2 uppercase tracking-wider text-[10px]">
-                    Contenu du pack :
-                  </p>
-                  <ul className="space-y-1.5 text-muted-foreground">
-                    <li className="flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-champagne shrink-0" />
-                      <span>1× Coffret rigide luxe de présentation (La Box)</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-champagne shrink-0" />
-                      <span>1× Tirage photo d'art 10×15 cm avec puce NFC</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-champagne shrink-0" />
-                      <span>1× Carte souvenir personnalisée</span>
-                    </li>
-                    <li className="flex items-center gap-2">
-                      <span className="h-1.5 w-1.5 rounded-full bg-champagne shrink-0" />
-                      <span>1× Véritable lettre d'émotion sur papier d'art</span>
-                    </li>
-                  </ul>
-                </div>
-
-                <div className="mt-5 flex items-baseline gap-2">
-                  <span className="text-3xl font-serif text-charcoal font-normal">{formatTND(getUnitPrice("box", 1))}</span>
-                  <span className="text-xs text-muted-foreground">/ coffret complet (dès 49 DT en volume)</span>
-                </div>
-              </div>
-
-              <div className="mt-6 space-y-2">
-                <button
-                  onClick={() => {
-                    setSelectedFormat("box");
-                    setSelectedWithFrame(false);
-                    setFunnelStage("video");
-                  }}
-                  className="w-full rounded-full bg-deep-brown py-4 text-xs uppercase tracking-widest font-semibold text-ivory hover:bg-charcoal transition-all shadow-xs min-h-[48px]"
-                >
-                  Choisir le coffret & Créer
-                </button>
-                <button
-                  onClick={() => {
-                    setSelectedFormat("box");
-                    setIsPriceDrawerOpen(true);
-                  }}
-                  className="w-full text-center text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 py-1.5 transition-colors"
-                >
-                  Voir les tarifs dégressifs
-                </button>
-              </div>
-            </div>
           </div>
-
           {/* Flip card explanation section */}
           <div className="mt-28 rounded-3xl bg-cream/40 p-8 sm:p-14 border border-border/80 shadow-luxury">
             <div className="grid gap-12 lg:grid-cols-2 items-center">
@@ -911,6 +883,26 @@ function CommanderPage() {
               </button>
             </div>
 
+            <div className="mt-5 flex flex-col gap-3 rounded-2xl border border-border/70 bg-cream/45 p-4 sm:flex-row sm:items-center sm:justify-between sm:px-5">
+              <div className="min-w-0">
+                <p className="text-[10px] font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                  Votre tirage
+                </p>
+                <p className="mt-1 font-medium text-sm text-charcoal">
+                  Mémora Simple · 10 × 15 cm · {selectedWithFrame ? "Avec cadre" : "Sans cadre"}
+                </p>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                  Les 8 premières minutes de vidéo sont incluses.
+                </p>
+              </div>
+              <div className="flex shrink-0 items-baseline justify-between gap-3 border-t border-border/60 pt-3 sm:flex-col sm:items-end sm:border-0 sm:pt-0">
+                <span className="text-xs text-muted-foreground">Estimation · hors livraison</span>
+                <strong className="font-serif text-2xl font-normal text-charcoal">
+                  {formatTND(selectedItemEstimate)}
+                </strong>
+              </div>
+            </div>
+
             {/* Video Input Options */}
             <div className="mt-8 grid gap-4 sm:grid-cols-2">
               {/* Option A: From Computer / Local Gallery */}
@@ -920,7 +912,7 @@ function CommanderPage() {
                 <p className="mt-1 text-xs text-muted-foreground">MP4, MOV, WebM (jusqu'à 5 Go)</p>
                 <input
                   type="file"
-                  accept="video/*"
+                  accept=".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm"
                   className="hidden"
                   onChange={handleVideoUpload}
                 />
@@ -963,19 +955,36 @@ function CommanderPage() {
               </a>
             </div>
 
+            <p className="mt-3 text-center text-[11px] leading-relaxed text-muted-foreground">
+              La vidéo est préparée dans votre navigateur. Son envoi sécurisé commence à la validation de la commande.
+            </p>
+
             {/* Video Player Preview */}
-            {videoUrl && (
+            {videoUrl ? (
               <div className="mt-8 rounded-2xl border border-border/80 bg-charcoal/5 p-6 shadow-luxury">
-                <div className="flex items-center justify-between border-b border-border/80 pb-3">
+                <div className="flex flex-col gap-2 border-b border-border/80 pb-3 sm:flex-row sm:items-center sm:justify-between">
                   <div>
-                    <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Vidéo sélectionnée
-                    </p>
+                    <div className="flex items-center gap-1.5 text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      {videoStatus === "loading" && <RotateCw className="h-3 w-3 animate-spin text-deep-brown" />}
+                      <span>
+                        {isDemoVideo
+                          ? "Vidéo de démonstration"
+                          : videoStatus === "loading"
+                            ? "Vérification de la vidéo"
+                            : videoStatus === "ready"
+                              ? "Vidéo prête"
+                              : "Vidéo à vérifier"}
+                      </span>
+                    </div>
                     <p className="font-medium text-sm text-charcoal">{videoName}</p>
                   </div>
                   <div className="text-right">
                     <span className="rounded-full bg-cream border border-border/60 px-3.5 py-1 text-xs font-semibold text-charcoal">
-                      Durée : {Math.floor(videoDuration / 60)}m {videoDuration % 60}s
+                      {videoStatus === "ready"
+                        ? `Durée : ${Math.floor(videoDuration / 60)}m ${videoDuration % 60}s`
+                        : videoStatus === "loading"
+                          ? "Lecture en cours de vérification…"
+                          : "Lecture impossible"}
                     </span>
                   </div>
                 </div>
@@ -985,33 +994,97 @@ function CommanderPage() {
                     ref={videoRef}
                     src={videoUrl}
                     controls
+                    preload="metadata"
                     className="h-full w-full object-contain"
                     onLoadedMetadata={(e) => {
-                      const d = Math.floor(e.currentTarget.duration);
-                      if (d > 0) setVideoDuration(d);
+                      const duration = e.currentTarget.duration;
+                      if (!Number.isFinite(duration) || duration <= 0) {
+                        setVideoStatus("error");
+                        setVideoErrorMessage("La durée de cette vidéo n’a pas pu être vérifiée. Choisissez un autre fichier.");
+                        return;
+                      }
+
+                      const roundedDuration = Math.ceil(duration);
+                      setVideoDuration(roundedDuration);
+                      if (roundedDuration > MAX_VIDEO_SECONDS) {
+                        setVideoStatus("error");
+                        setVideoErrorMessage("Cette vidéo dépasse la durée maximale de 30 minutes. Choisissez une vidéo plus courte.");
+                        return;
+                      }
+
+                      setVideoErrorMessage(
+                        isDemoVideo
+                          ? "Cette vidéo d’exemple sert uniquement à la démonstration. Importez votre propre vidéo pour continuer."
+                          : null,
+                      );
+                      setVideoStatus("ready");
+                    }}
+                    onError={() => {
+                      setVideoStatus("error");
+                      setVideoErrorMessage("Impossible de lire cette vidéo. Vérifiez le fichier ou choisissez une vidéo MP4, MOV ou WebM différente.");
                     }}
                   />
                 </div>
 
+                {videoStatus === "loading" && (
+                  <p className="mt-3 text-xs text-muted-foreground" role="status">
+                    Vérification de la lecture et de la durée de votre vidéo…
+                  </p>
+                )}
+                {videoErrorMessage && (
+                  <p className="mt-3 rounded-xl border border-destructive/25 bg-destructive/5 px-3.5 py-3 text-xs leading-relaxed text-destructive" role="alert">
+                    {videoErrorMessage}
+                  </p>
+                )}
+
                 {/* Surcharge breakdown if > 8 min */}
-                <div className="mt-4 rounded-xl bg-cream/70 border border-border/70 p-4 text-xs text-charcoal flex items-center justify-between">
+                <div className="mt-4 flex flex-col gap-2 rounded-xl bg-cream/70 border border-border/70 p-4 text-xs text-charcoal sm:flex-row sm:items-center sm:justify-between">
                   <span>8 premières minutes : <strong className="font-semibold text-charcoal">Incluses</strong></span>
-                  {videoDuration > INCLUDED_VIDEO_SECONDS ? (
+                  {isDemoVideo ? (
+                    <span className="font-medium text-muted-foreground">Exemple uniquement · non utilisable pour commander</span>
+                  ) : videoStatus === "ready" && videoDuration > INCLUDED_VIDEO_SECONDS ? (
                     <span className="text-deep-brown font-semibold">
                       +{extraVideoMinutes} min supplémentaires = +{formatTND(videoSurchargeCurrent)}
                     </span>
-                  ) : (
+                  ) : videoStatus === "ready" ? (
                     <span className="text-muted-foreground">Aucun supplément de durée</span>
+                  ) : (
+                    <span className="text-muted-foreground">Le coût sera confirmé après vérification.</span>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="mt-8 flex items-start gap-3 rounded-2xl border border-dashed border-border bg-cream/30 p-4 sm:p-5">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-cream text-deep-brown">
+                  <Video className="h-4 w-4" />
+                </div>
+                <div className="min-w-0">
+                  <p className="text-sm font-semibold text-charcoal">Aucune vidéo sélectionnée</p>
+                  <p className="mt-1 text-xs leading-relaxed text-muted-foreground">
+                    Choisissez une vidéo ci-dessus. Son aperçu et sa durée apparaîtront ici avant de continuer.
+                  </p>
+                  {videoErrorMessage && (
+                    <p className="mt-2 text-xs text-destructive" role="alert">{videoErrorMessage}</p>
                   )}
                 </div>
               </div>
             )}
 
             {/* Next step CTA */}
-            <div className="mt-10 flex justify-end border-t border-border/80 pt-6">
+            <div className="mt-8 flex flex-col gap-3 border-t border-border/80 pt-6 sm:mt-10 sm:flex-row sm:items-center sm:justify-between">
+              <p className="text-xs text-muted-foreground" role="status">
+                {isDemoVideo
+                  ? "Importez votre propre vidéo pour continuer."
+                  : videoStatus === "ready"
+                  ? "Votre vidéo est prête. Vous pourrez vérifier le recto à l’étape suivante."
+                  : videoStatus === "loading"
+                    ? "Patientez pendant la vérification de la vidéo."
+                    : "Ajoutez une vidéo lisible pour continuer."}
+              </p>
               <button
                 onClick={() => setFunnelStage("photo")}
-                className="inline-flex items-center gap-2 rounded-full bg-deep-brown px-8 py-4 text-xs uppercase tracking-widest font-semibold text-ivory hover:bg-charcoal transition-all shadow-luxury min-h-[48px]"
+                disabled={!canContinueWithVideo}
+                className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-deep-brown px-8 py-4 text-xs uppercase tracking-widest font-semibold text-ivory hover:bg-charcoal transition-all shadow-luxury min-h-[48px] disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
               >
                 <span>Valider la vidéo & Choisir la photo</span>
                 <ArrowRight className="h-4 w-4 text-champagne" />
@@ -1044,15 +1117,13 @@ function CommanderPage() {
                 <button
                   type="button"
                   onClick={() => setPhotoSelectionMode("extract")}
-                  className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition-all ${
-                    photoSelectionMode === "extract"
+                  className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition-all ${photoSelectionMode === "extract"
                       ? "border-deep-brown bg-sand/20 shadow-luxury"
                       : "border-border/80 bg-background hover:bg-cream/40"
-                  }`}
+                    }`}
                 >
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                    photoSelectionMode === "extract" ? "bg-deep-brown text-ivory shadow-xs" : "bg-cream text-charcoal"
-                  }`}>
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${photoSelectionMode === "extract" ? "bg-deep-brown text-ivory shadow-xs" : "bg-cream text-charcoal"
+                    }`}>
                     <Film className="h-5 w-5" />
                   </div>
                   <div>
@@ -1071,15 +1142,13 @@ function CommanderPage() {
                 <button
                   type="button"
                   onClick={() => setPhotoSelectionMode("upload")}
-                  className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition-all ${
-                    photoSelectionMode === "upload"
+                  className={`flex items-start gap-3 rounded-2xl border p-4 text-left transition-all ${photoSelectionMode === "upload"
                       ? "border-deep-brown bg-sand/20 shadow-luxury"
                       : "border-border/80 bg-background hover:bg-cream/40"
-                  }`}
+                    }`}
                 >
-                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${
-                    photoSelectionMode === "upload" ? "bg-deep-brown text-ivory shadow-xs" : "bg-cream text-charcoal"
-                  }`}>
+                  <div className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${photoSelectionMode === "upload" ? "bg-deep-brown text-ivory shadow-xs" : "bg-cream text-charcoal"
+                    }`}>
                     <Upload className="h-5 w-5" />
                   </div>
                   <div>
@@ -1276,16 +1345,12 @@ function CommanderPage() {
                 <div className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-deep-brown font-semibold">
                   <Gift className="h-4 w-4 text-champagne" />
                   <span>
-                    {selectedFormat === "box"
-                      ? "Personnalisation · Carte & Lettre d'émotion"
-                      : "Personnalisation · Carte avec message"}
+                    Personnalisation · Carte avec message
                   </span>
                 </div>
                 <h3 className="mt-1 font-serif text-2xl text-charcoal">Vos mots précieux</h3>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  {selectedFormat === "box"
-                    ? "Rédigez le mot court pour la carte, ainsi que votre lettre qui sera imprimée sur papier d'art et glissée dans le coffret."
-                    : "Votre photo NFC est glissée dans son enveloppe d'art avec une carte portant votre message personnalisé."}
+                  Votre photo NFC est glissée dans son enveloppe d'art avec une carte portant votre message personnalisé.
                 </p>
               </div>
 
@@ -1305,25 +1370,6 @@ function CommanderPage() {
                 />
               </div>
 
-              {/* Letter for Box */}
-              {selectedFormat === "box" && (
-                <div className="animate-in fade-in">
-                  <label className="text-xs font-semibold uppercase tracking-wider text-charcoal flex items-center justify-between">
-                    <span>Votre lettre d'émotion pour le coffret</span>
-                    <span className="text-[11px] font-normal text-deep-brown font-serif italic">Papier vergé d'art</span>
-                  </label>
-                  <textarea
-                    rows={5}
-                    value={letterContent}
-                    onChange={(e) => setLetterContent(e.target.value)}
-                    placeholder="Chère maman, mon amour, cher ami... Rédigez ici vos plus beaux souvenirs et sentiments. Notre atelier imprimera votre lettre avec raffinement pour l'insérer dans votre coffret cadeau."
-                    className="mt-1.5 w-full rounded-xl border border-border/80 bg-background p-4 text-sm font-serif leading-relaxed outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-inner"
-                  />
-                  <p className="mt-1 text-[11px] text-muted-foreground">
-                    Cette lettre sera délicatement pliée et cachetée aux côtés de votre photo NFC dans la boîte coffret.
-                  </p>
-                </div>
-              )}
             </div>
 
             {/* Next step CTA */}
@@ -1374,14 +1420,10 @@ function CommanderPage() {
                 <div>
                   <p className="eyebrow tracking-[0.25em] text-deep-brown font-semibold">Votre Création Personnalisée</p>
                   <h3 className="font-serif text-2xl text-charcoal mt-1">
-                    {selectedFormat === "box"
-                      ? "Mémora Coffret (Box, Carte & Lettre)"
-                      : "Mémora Simple (Enveloppe & Carte)"}
+                    Mémora Simple (Enveloppe & Carte)
                   </h3>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    {selectedFormat === "box"
-                      ? "89 DT · Coffret rigide prestige, carte souvenir et lettre d'émotion"
-                      : "49 DT · Photo NFC sous enveloppe d'art avec carte message"}
+                    Photo NFC sous enveloppe d'art avec carte message
                   </p>
                 </div>
 
@@ -1428,21 +1470,6 @@ function CommanderPage() {
                     « {cardMessage || "Pour toujours, je t'aime."} »
                   </p>
                 </div>
-
-                {/* Letter if box */}
-                {selectedFormat === "box" && letterContent && (
-                  <div className="rounded-xl border border-sand/70 bg-[#FAF8F5] p-4 shadow-xs">
-                    <div className="flex items-center justify-between">
-                      <p className="text-[10px] uppercase tracking-wider text-deep-brown font-semibold">
-                        Lettre d'émotion pour le coffret
-                      </p>
-                      <span className="font-serif text-[10px] italic text-muted-foreground">Papier vergé</span>
-                    </div>
-                    <p className="mt-1.5 font-serif text-xs text-charcoal leading-relaxed max-h-24 overflow-y-auto">
-                      {letterContent}
-                    </p>
-                  </div>
-                )}
 
                 {/* Reassurance points */}
                 <div className="space-y-2 border-t border-border/80 pt-4 text-xs text-muted-foreground">
@@ -1538,9 +1565,7 @@ function CommanderPage() {
                           <div className="flex items-start justify-between">
                             <div>
                               <h3 className="font-serif text-2xl text-charcoal">
-                                {item.format === "box" || item.productId === "p2"
-                                  ? "Mémora Coffret (Box, Carte & Lettre)"
-                                  : "Mémora Simple (Enveloppe & Carte)"}
+                                Mémora Simple (Enveloppe & Carte)
                               </h3>
                               <p className="text-xs text-muted-foreground mt-0.5">
                                 Vidéo liée : {item.videoName || "video_souvenir.mp4"} ({Math.floor(item.videoDurationSec / 60)}m)
@@ -1548,11 +1573,6 @@ function CommanderPage() {
                               {item.cardMessage && (
                                 <p className="mt-1 text-xs text-muted-foreground italic">
                                   Message carte : « {item.cardMessage} »
-                                </p>
-                              )}
-                              {item.letterContent && (
-                                <p className="mt-0.5 text-[11px] text-deep-brown font-medium">
-                                  ✓ Lettre d'émotion rédigée incluse
                                 </p>
                               )}
                             </div>
@@ -1850,11 +1870,10 @@ function CommanderPage() {
                   {getShippingOptions(shipping.country, quote.total).map((opt) => (
                     <label
                       key={opt.id}
-                      className={`flex cursor-pointer items-center justify-between rounded-xl border p-4 transition-all ${
-                        shipping.carrier === opt.id
+                      className={`flex cursor-pointer items-center justify-between rounded-xl border p-4 transition-all ${shipping.carrier === opt.id
                           ? "border-deep-brown bg-sand/20 shadow-xs ring-1 ring-deep-brown/10"
                           : "border-border/80 hover:bg-cream/40"
-                      }`}
+                        }`}
                     >
                       <div className="flex items-center gap-3">
                         <input
@@ -2053,8 +2072,8 @@ function CommanderPage() {
                   {isSubmitting
                     ? checkoutMessage || "Traitement en cours…"
                     : checkoutStep === "error"
-                    ? `Réessayer (${formatTND(quote.total)})`
-                    : `Confirmer ma commande (${formatTND(quote.total)})`}
+                      ? `Réessayer (${formatTND(quote.total)})`
+                      : `Confirmer ma commande (${formatTND(quote.total)})`}
                 </span>
               </button>
             </div>
@@ -2155,7 +2174,6 @@ function CommanderPage() {
       <PriceDrawer
         isOpen={isPriceDrawerOpen}
         onClose={() => setIsPriceDrawerOpen(false)}
-        initialFormat={selectedFormat === "magnet" ? "magnet" : "10x15"}
       />
 
       {/* Mobile Upload Hand-off QR Modal */}
@@ -2166,6 +2184,13 @@ function CommanderPage() {
           setVideoUrl(data.url);
           setVideoName(data.name);
           setVideoDuration(data.durationSec);
+          setIsDemoVideo(Boolean(data.isDemo));
+          setVideoStatus("loading");
+          setVideoErrorMessage(
+            data.isDemo
+              ? "Cette vidéo d’exemple sert uniquement à la démonstration. Importez votre propre vidéo pour continuer."
+              : null,
+          );
         }}
       />
     </div>

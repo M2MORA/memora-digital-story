@@ -63,7 +63,6 @@ function Studio() {
   const [previewSide, setPreviewSide] = useState<"recto" | "verso">("recto");
 
   const [cardMessage, setCardMessage] = useState("Pour toujours, je t'aime.");
-  const [letterContent, setLetterContent] = useState("");
 
   const surcharge = getVideoSurcharge(videoDuration, 1);
 
@@ -169,7 +168,6 @@ function Studio() {
       videoName,
       photoName,
       cardMessage,
-      letterContent,
       qty: 1,
     });
     toast.success("Votre création Mémora a été ajoutée au panier !");
@@ -318,21 +316,6 @@ function Studio() {
                     />
                   </div>
 
-                  {product.formatCode === "box" && (
-                    <div>
-                      <label className="text-xs font-semibold uppercase tracking-wider text-charcoal flex justify-between">
-                        <span>Votre lettre d'émotion pour le coffret</span>
-                        <span className="text-[11px] font-serif italic text-deep-brown">Papier d'art</span>
-                      </label>
-                      <textarea
-                        rows={4}
-                        value={letterContent}
-                        onChange={(e) => setLetterContent(e.target.value)}
-                        placeholder="Rédigez la lettre qui sera délicatement insérée dans votre coffret cadeau..."
-                        className="mt-1 w-full rounded-md border border-border bg-background p-3 text-xs font-serif leading-relaxed outline-hidden focus:border-deep-brown"
-                      />
-                    </div>
-                  )}
                 </div>
 
                 <div className="flex gap-4 pt-4 border-t border-border">

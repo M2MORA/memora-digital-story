@@ -136,22 +136,12 @@ export function useStore() {
 export const cart = {
   add(productId: string, itemData?: Partial<CartItem>) {
     load();
-    const format: Format =
-      itemData?.format ||
-      (productId === "p2" || productId.includes("box") || productId.includes("coffret")
-        ? "box"
-        : productId.includes("magnet")
-        ? "magnet"
-        : productId.includes("20x30")
-        ? "20x30"
-        : productId.includes("30x45")
-        ? "30x45"
-        : "10x15");
+    const format: Format = "10x15";
 
     const key = itemData?.key ?? `item_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const newItem: CartItem = {
       key,
-      productId,
+      productId: "p1",
       format,
       qty: itemData?.qty ?? 1,
       withFrame: itemData?.withFrame ?? (productId.includes("encadre") || productId.includes("galerie")),

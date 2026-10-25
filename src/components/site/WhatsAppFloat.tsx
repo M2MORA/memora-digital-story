@@ -14,11 +14,10 @@ export function WhatsAppFloat() {
         target="_blank"
         rel="noopener noreferrer"
         aria-label="Discuter sur WhatsApp"
-        className="flex items-center gap-2.5 rounded-full bg-[#25D366] px-4 py-3 text-xs font-semibold text-white shadow-xl transition-all duration-300 hover:scale-105 hover:bg-[#20bd5a] hover:shadow-2xl"
+        className="flex h-12 w-12 items-center justify-center rounded-full bg-[#25D366] p-0 text-xs font-semibold text-white shadow-xl transition-all duration-300 hover:scale-105 hover:bg-[#20bd5a] hover:shadow-2xl md:h-auto md:w-auto md:gap-2.5 md:px-4 md:py-3"
       >
-        <MessageCircle className="h-4 w-4 fill-current shrink-0" />
-        <span className="hidden sm:inline">Besoin d'aide ? WhatsApp</span>
-        <span className="sm:hidden">WhatsApp</span>
+        <MessageCircle className="h-5 w-5 fill-current shrink-0 md:h-4 md:w-4" />
+        <span className="hidden md:inline">Besoin d'aide ? WhatsApp</span>
       </a>
     </aside>
   );

@@ -116,8 +116,12 @@ export default function Dashboard({ email }: { email: string }) {
   const slugFor = (o: Order, itemIndex: number) =>
     o.items.length > 1 ? `${o.order_number.toLowerCase()}-${itemIndex + 1}` : o.order_number.toLowerCase();
 
+  // Keep the NFC URL stable; the public server route resolves it to a fresh,
+  // short-lived signed R2 video URL whenever it is opened or scanned.
+  const nfcLinkFor = (slug: string) => `${siteUrl}/m/${encodeURIComponent(slug)}`;
+
   const copyLink = async (slug: string) => {
-    const fullUrl = `${siteUrl}/m/${slug}`;
+    const fullUrl = nfcLinkFor(slug);
     await navigator.clipboard.writeText(fullUrl);
     setCopiedSlug(slug);
     setTimeout(() => setCopiedSlug(null), 3000);
@@ -544,7 +548,7 @@ export default function Dashboard({ email }: { email: string }) {
                       {o.items.map((it, i) => {
                         const slug = slugFor(o, i);
                         const existingMemory = memories.find((m) => m.slug === slug);
-                        const nfcLink = `${siteUrl}/m/${slug}`;
+                        const nfcLink = nfcLinkFor(slug);
                         const qrCodeUrl = `https://api.qrserver.com/v1/create-qr-code/?size=140x140&data=${encodeURIComponent(nfcLink)}`;
                         const videoUrl = resolveMedia(o, it, "video", i);
                         const photoUrl = resolveMedia(o, it, "photo", i);
@@ -657,9 +661,13 @@ export default function Dashboard({ email }: { email: string }) {
                                           rel="noreferrer"
                                           className="btn btn-test"
                                         >
-                                          🔗 Tester (/m/...)
+                                          ▶ Tester l’ouverture vidéo
                                         </a>
                                       </div>
+
+                                      <p className="muted">
+                                        Ce lien permanent redirige directement vers la vidéo. Aucune page MÉMORA ne s’affiche et une nouvelle URL R2 est signée à chaque scan.
+                                      </p>
 
                                       {/* QR Code pour programmation rapide par téléphone */}
                                       <div className="qr-container">
@@ -853,21 +861,21 @@ export default function Dashboard({ email }: { email: string }) {
             <div className="table-wrap">
               <table>
                 <thead>
-                  <tr><th>Photo</th><th>Titre / Lien NFC</th><th>Scans</th><th>Statut</th><th>Actions</th></tr>
+                  <tr><th>Photo</th><th>Titre / Lien NFC (vidéo directe)</th><th>Scans</th><th>Statut</th><th>Actions</th></tr>
                 </thead>
                 <tbody>
                   {memories.length === 0 && (
                     <tr><td colSpan={5} className="empty">Aucun souvenir actif.</td></tr>
                   )}
                   {memories.map((m) => {
-                    const fullLink = `${siteUrl}/m/${m.slug}`;
+                    const fullLink = nfcLinkFor(m.slug);
                     return (
                       <tr key={m.id}>
                         <td>{m.photo_url ? <img className="thumb" src={m.photo_url} alt={m.title} /> : "—"}</td>
                         <td>
                           <strong>{m.title}</strong><br />
-                          <a href={fullLink} target="_blank" rel="noreferrer" className="link-slug">
-                            /m/{m.slug}
+                          <a href={fullLink} target="_blank" rel="noreferrer" className="link-slug" title="Ouvre directement la vidéo dans le navigateur">
+                            {fullLink}
                           </a>
                         </td>
                         <td><strong>{m.view_count ?? 0}</strong> scans</td>
@@ -885,7 +893,7 @@ export default function Dashboard({ email }: { email: string }) {
                         <td>
                           <div className="actions-cell">
                             <button className="btn btn-sm" onClick={() => copyLink(m.slug)}>
-                              📋 Copier lien
+                              {copiedSlug === m.slug ? "✓ Lien copié !" : "📋 Copier lien NFC vidéo"}
                             </button>
                             <button
                               type="button"

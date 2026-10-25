@@ -1,18 +1,9 @@
-import envelopeImg from "@/assets/product-envelope.jpg";
-import boxLetterImg from "@/assets/product-box-letter.jpg";
-import moments from "@/assets/product-moments.jpg";
-import box from "@/assets/product-box.jpg";
-import hero from "@/assets/hero.jpg";
-import scan from "@/assets/scan.jpg";
+import envelopeImg from "@/assets/product-envelope-v2.jpg";
+import moments from "@/assets/product-moments-v2.jpg";
+import hero from "@/assets/hero-v2.jpg";
 import { formatTND, Format } from "./pricing";
 
-export type Category = "enveloppe" | "coffret-box" | "classique" | "magnet" | "grand-format" | "gift-card" | "sur-mesure";
-
-export const CATEGORIES: { id: Category | "all"; label: string }[] = [
-  { id: "all", label: "Tous les produits" },
-  { id: "enveloppe", label: "L'Enveloppe & Carte" },
-  { id: "coffret-box", label: "Le Coffret Box & Lettre" },
-];
+export type Category = "enveloppe";
 
 export type Product = {
   id: string;
@@ -62,41 +53,11 @@ export const PRODUCTS: Product[] = [
     badge: "L'Essentiel",
     includedVideoMin: 8,
   },
-  {
-    id: "p2",
-    slug: "memora-coffret-box",
-    name: "Mémora Coffret (Box, Carte & Lettre)",
-    tagline: "Le coffret prestige : tirage photo NFC, boîte cadeau luxueuse, carte et lettre d'émotion.",
-    description:
-      "L'expérience cadeau ultime et mémorable. Présenté dans un somptueux coffret rigide aux finitions d'exception, découvrez votre tirage photo connecté NFC, une carte souvenir dédiée et une véritable lettre personnalisée rédigée sur papier d'art pour immortaliser vos sentiments. Un déballage unique pour un moment inoubliable.",
-    category: "coffret-box",
-    priceTND: 89,
-    price: 89,
-    formatCode: "box",
-    images: [boxLetterImg, box, scan],
-    materials: [
-      "Coffret rigide luxueux à fermeture aimantée",
-      "Tirage photo d'art 300g/m² avec puce NFC",
-      "Lettre d'émotion rédigée sur papier vergé d'art",
-      "Carte souvenir personnalisée",
-    ],
-    dimensions: "Coffret 14 × 19 cm (Tirage 10 × 15 cm)",
-    connectivity: ["nfc"],
-    occasions: ["love", "wedding", "birthday", "family", "special"],
-    style: "romantic",
-    delivery: "Confection artisanale en 48h. Livraison express Aramex en 2 à 3 jours.",
-    badge: "Coffret Cadeau Prestige",
-    includedVideoMin: 8,
-  },
 ];
 
 export const getProduct = (slugOrId: string) => {
   const found = PRODUCTS.find((p) => p.slug === slugOrId || p.id === slugOrId);
-  if (found) return found;
-  if (slugOrId.includes("box") || slugOrId.includes("magnet") || slugOrId.includes("encadre") || slugOrId.includes("p2")) {
-    return PRODUCTS[1];
-  }
-  return PRODUCTS[0];
+  return found ?? PRODUCTS[0]!;
 };
 
 export const formatPrice = (n: number) => formatTND(n);

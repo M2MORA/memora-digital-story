@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
-import { Search, Sparkles } from "lucide-react";
-import { CATEGORIES, PRODUCTS } from "@/lib/products";
+import { Search } from "lucide-react";
+import { PRODUCTS } from "@/lib/products";
 import { PageHero } from "@/components/site/ProductCard";
 import { formatTND } from "@/lib/pricing";
 import { PriceDrawer } from "@/components/site/PriceDrawer";
@@ -13,7 +13,7 @@ export const Route = createFileRoute("/shop")({
       {
         name: "description",
         content:
-          "Vos plus belles photos méritent mieux qu'un écran. Découvrez la collection MÉMORA : tirages photo NFC, Magnets aimantés, Grands formats encadrés et cartes cadeaux.",
+          "Vos plus belles photos méritent mieux qu'un écran. Découvrez le tirage photo NFC MÉMORA, présenté dans son enveloppe d'art.",
       },
     ],
   }),
@@ -21,18 +21,16 @@ export const Route = createFileRoute("/shop")({
 });
 
 function Shop() {
-  const [cat, setCat] = useState("all");
   const [q, setQ] = useState("");
   const [isPriceDrawerOpen, setIsPriceDrawerOpen] = useState(false);
 
   const list = useMemo(() => {
     return PRODUCTS.filter(
       (p) =>
-        (cat === "all" || p.category === cat) &&
-        (p.name.toLowerCase().includes(q.toLowerCase()) ||
-          p.description.toLowerCase().includes(q.toLowerCase())),
+        p.name.toLowerCase().includes(q.toLowerCase()) ||
+        p.description.toLowerCase().includes(q.toLowerCase()),
     );
-  }, [cat, q]);
+  }, [q]);
 
   return (
     <>
@@ -44,23 +42,7 @@ function Shop() {
 
       <section className="container-x pb-32">
         {/* Filter bar */}
-        <div className="flex flex-col gap-6 border-y border-sand/20 py-6 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap gap-2">
-            {CATEGORIES.map((c) => (
-              <button
-                key={c.id}
-                onClick={() => setCat(c.id)}
-                className={`px-4 py-2 text-xs uppercase tracking-[0.15em] transition-all rounded-full ${
-                  cat === c.id
-                    ? "bg-foreground text-background font-semibold shadow-xs"
-                    : "border border-sand/30 text-muted-foreground hover:text-foreground hover:bg-sand/15"
-                }`}
-              >
-                {c.label}
-              </button>
-            ))}
-          </div>
-
+        <div className="flex justify-end border-y border-sand/20 py-6">
           <div className="flex flex-wrap items-center gap-5 text-sm">
             <label className="flex items-center gap-2 rounded-full border border-sand/30 bg-card/60 px-3.5 py-1.5 focus-within:border-deep-brown transition-all">
               <Search className="h-4 w-4 text-muted-foreground" />
@@ -80,8 +62,8 @@ function Shop() {
           </div>
         </div>
 
-        {/* Product Cards Grid - 2 Products Showcase */}
-        <div className="mt-14 mx-auto max-w-4xl grid gap-8 sm:grid-cols-2">
+        {/* Single product card */}
+        <div className="mt-14 mx-auto max-w-2xl grid grid-cols-1 gap-8">
           {list.map((p) => (
             <div
               key={p.id}

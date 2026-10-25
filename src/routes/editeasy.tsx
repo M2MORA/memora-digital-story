@@ -18,9 +18,9 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { MobileUploadModal } from "@/components/site/MobileUploadModal";
-import hero from "@/assets/hero.jpg";
-import scan from "@/assets/scan.jpg";
-import moments from "@/assets/product-moments.jpg";
+import hero from "@/assets/hero-v2.jpg";
+import scan from "@/assets/scan-v2.jpg";
+import moments from "@/assets/product-moments-v2.jpg";
 
 export const Route = createFileRoute("/editeasy")({
   head: () => ({

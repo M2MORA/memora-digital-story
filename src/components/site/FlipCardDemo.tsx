@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { RotateCw, Smartphone, Sparkles, CheckCircle2 } from "lucide-react";
-import hero from "@/assets/hero.jpg";
+import { RotateCw, Smartphone, CheckCircle2 } from "lucide-react";
+import rectoPhoto from "@/assets/recto-family-v2.jpg";
 
 export function FlipCardDemo() {
   const [isFlipped, setIsFlipped] = useState(false);
@@ -9,32 +9,21 @@ export function FlipCardDemo() {
     <div className="flex flex-col items-center">
       {/* 3D Flip Container */}
       <div
-        className="relative h-[420px] w-full max-w-[320px] cursor-pointer select-none [perspective:1200px]"
+          className="relative h-[420px] w-full max-w-[280px] cursor-pointer select-none [perspective:1200px]"
         onClick={() => setIsFlipped(!isFlipped)}
       >
         <div
-          className={`relative h-full w-full rounded-2xl shadow-2xl transition-transform duration-700 [transform-style:preserve-3d] ${
-            isFlipped ? "[transform:rotateY(180deg)]" : ""
-          }`}
+          className={`relative h-full w-full rounded-2xl shadow-2xl transition-transform duration-700 [transform-style:preserve-3d] ${isFlipped ? "[transform:rotateY(180deg)]" : ""
+            }`}
         >
           {/* RECTO (Front) */}
-          <div className="absolute inset-0 flex flex-col overflow-hidden rounded-2xl border-4 border-ivory bg-cream shadow-xl [backface-visibility:hidden]">
-            <div className="relative flex-1 overflow-hidden">
+          <div className="absolute inset-0 flex flex-col overflow-hidden rounded-2xl border-4 border-ivory bg-white p-3 shadow-xl [backface-visibility:hidden]">
+            <div className="relative flex-1 overflow-hidden rounded-lg">
               <img
-                src={hero}
-                alt="Photo Mémora imprimée"
-                className="h-full w-full object-cover transition-transform duration-700 hover:scale-105"
+                src={rectoPhoto}
+                alt="Photo souvenir d'une famille au bord de la mer"
+                className="h-full w-full object-cover"
               />
-              <div className="absolute inset-0 bg-linear-to-t from-charcoal/40 via-transparent to-transparent" />
-              <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between text-ivory">
-                <div>
-                  <p className="font-serif text-lg tracking-wide">MÉMORA 10×15</p>
-                  <p className="text-[11px] uppercase tracking-widest text-sand">Tirage photographique d'art</p>
-                </div>
-                <span className="flex items-center gap-1 rounded-full bg-charcoal/60 px-2.5 py-1 text-[10px] uppercase tracking-wider backdrop-blur">
-                  <Sparkles className="h-3 w-3 text-sand" /> Puce NFC intégrée
-                </span>
-              </div>
             </div>
           </div>
 

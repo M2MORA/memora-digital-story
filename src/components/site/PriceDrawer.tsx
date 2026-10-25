@@ -1,15 +1,13 @@
 import { X, Check, Sparkles, ShieldCheck, Truck } from "lucide-react";
 import { Link } from "@tanstack/react-router";
-import { TIERS_10X15, TIERS_BOX, FREE_SHIPPING_THRESHOLD_TND, formatTND } from "@/lib/pricing";
+import { TIERS_10X15, FREE_SHIPPING_THRESHOLD_TND, formatTND } from "@/lib/pricing";
 
 export function PriceDrawer({
   isOpen,
   onClose,
-  initialFormat = "10x15",
 }: {
   isOpen: boolean;
   onClose: () => void;
-  initialFormat?: "10x15" | "box" | "magnet" | string;
 }) {
   if (!isOpen) return null;
 
@@ -52,14 +50,12 @@ export function PriceDrawer({
             <thead className="bg-cream/80 border-b border-sand/20 font-serif text-base text-charcoal">
               <tr>
                 <th className="p-3.5">Quantité</th>
-                <th className="p-3.5">Simple (Enveloppe)</th>
-                <th className="p-3.5">Coffret (Box &amp; Lettre)</th>
+                <th className="p-3.5">Mémora Simple (Enveloppe &amp; Carte)</th>
                 <th className="p-3.5 text-right">Remise</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-sand/15">
-              {TIERS_10X15.map((tier, idx) => {
-                const boxPrice = TIERS_BOX[idx]?.unitPriceTND ?? 49;
+              {TIERS_10X15.map((tier) => {
                 const label =
                   tier.minQty === 1
                     ? "1 à 4"
@@ -78,10 +74,6 @@ export function PriceDrawer({
                       <span className="font-semibold text-charcoal">{formatTND(tier.unitPriceTND)}</span>
                       <span className="text-xs text-muted-foreground"> /u</span>
                     </td>
-                    <td className="p-3.5">
-                      <span className="font-semibold text-charcoal">{formatTND(boxPrice)}</span>
-                      <span className="text-xs text-muted-foreground"> /u</span>
-                    </td>
                     <td className="p-3.5 text-right font-medium text-deep-brown">
                       {tier.discountPercent > 0 ? `-${tier.discountPercent}%` : "Prix base"}
                     </td>
@@ -90,7 +82,7 @@ export function PriceDrawer({
               })}
               <tr className="bg-sand/10">
                 <td className="p-3.5 font-medium">&gt; 500 ex.</td>
-                <td colSpan={3} className="p-3.5 text-right">
+                <td colSpan={2} className="p-3.5 text-right">
                   <Link to="/espace-entreprise" onClick={onClose} className="font-medium underline hover:text-deep-brown">
                     Sur devis personnalisé
                   </Link>
@@ -117,10 +109,6 @@ export function PriceDrawer({
           </div>
           <div className="flex items-start gap-2.5 text-xs text-charcoal">
             <Check className="h-4 w-4 shrink-0 text-deep-brown mt-0.5" />
-            <span>Véritable lettre d'émotion sur papier d'art (incluse dans la formule Coffret)</span>
-          </div>
-          <div className="flex items-start gap-2.5 text-xs text-charcoal">
-            <Check className="h-4 w-4 shrink-0 text-deep-brown mt-0.5" />
             <span>8 minutes de vidéo incluses (+1,50 DT / min supplémentaire, max 30 min)</span>
           </div>
           <div className="flex items-start gap-2.5 text-xs text-charcoal">
@@ -141,7 +129,7 @@ export function PriceDrawer({
         <div className="mt-8 border-t border-sand/20 pt-6">
           <Link
             to="/commander"
-            search={{ format: initialFormat === "box" ? "box" : "10x15", stage: "video" }}
+            search={{ format: "10x15", stage: "video" }}
             onClick={onClose}
             className="flex w-full items-center justify-center rounded-full bg-primary py-4 text-xs uppercase tracking-[0.2em] text-primary-foreground hover:bg-charcoal transition-all shadow-luxury hover:shadow-luxury-lg font-semibold cursor-pointer"
           >

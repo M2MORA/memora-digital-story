@@ -2,7 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Plus, Minus, Trash2, Copy, Sparkles, ArrowRight, Truck } from "lucide-react";
 import { cart, useStore } from "@/lib/cart";
 import { formatTND, FREE_SHIPPING_THRESHOLD_TND, getUnitPrice, getVideoSurcharge } from "@/lib/pricing";
-import hero from "@/assets/hero.jpg";
+import hero from "@/assets/hero-v2.jpg";
 
 export const Route = createFileRoute("/cart")({
   head: () => ({
@@ -75,9 +75,7 @@ function CartPage() {
                       <div className="flex items-start justify-between">
                         <div>
                           <h3 className="font-serif text-xl sm:text-2xl text-charcoal">
-                            {item.format === "box" || item.productId === "p2"
-                              ? "Mémora Coffret (Box, Carte & Lettre)"
-                              : "Mémora Simple (Enveloppe & Carte)"}
+                            Mémora Simple (Enveloppe & Carte)
                           </h3>
                           <p className="text-xs text-muted-foreground mt-0.5">
                             Vidéo : {item.videoName || "video_souvenir.mp4"} ({Math.floor(item.videoDurationSec / 60)}m)
@@ -85,11 +83,6 @@ function CartPage() {
                           {item.cardMessage && (
                             <p className="mt-1 text-xs text-muted-foreground italic font-serif">
                               Message carte : « {item.cardMessage} »
-                            </p>
-                          )}
-                          {item.letterContent && (
-                            <p className="mt-1 text-[11px] text-deep-brown font-medium flex items-center gap-1">
-                              <span>✓</span> Lettre d'émotion personnalisée incluse
                             </p>
                           )}
                         </div>

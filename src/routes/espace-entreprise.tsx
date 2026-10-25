@@ -12,8 +12,8 @@ import {
   Package,
 } from "lucide-react";
 import { toast } from "sonner";
-import moments from "@/assets/product-moments.jpg";
-import scan from "@/assets/scan.jpg";
+import moments from "@/assets/product-moments-v2.jpg";
+import scan from "@/assets/scan-v2.jpg";
 
 export const Route = createFileRoute("/espace-entreprise")({
   head: () => ({

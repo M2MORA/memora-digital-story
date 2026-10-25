@@ -104,9 +104,19 @@
   --border: oklch(0.88 0.018 78);
   --input: oklch(0.88 0.018 78);
   --ring: var(--champagne);
-  --chart-1: var(--deep-brown); --chart-2: var(--taupe); --chart-3: var(--sand); --chart-4: var(--cream); --chart-5: var(--charcoal);
-  --sidebar: var(--cream); --sidebar-foreground: var(--charcoal); --sidebar-primary: var(--deep-brown); --sidebar-primary-foreground: var(--ivory);
-  --sidebar-accent: var(--sand); --sidebar-accent-foreground: var(--charcoal); --sidebar-border: var(--border); --sidebar-ring: var(--taupe);
+  --chart-1: var(--deep-brown);
+  --chart-2: var(--taupe);
+  --chart-3: var(--sand);
+  --chart-4: var(--cream);
+  --chart-5: var(--charcoal);
+  --sidebar: var(--cream);
+  --sidebar-foreground: var(--charcoal);
+  --sidebar-primary: var(--deep-brown);
+  --sidebar-primary-foreground: var(--ivory);
+  --sidebar-accent: var(--sand);
+  --sidebar-accent-foreground: var(--charcoal);
+  --sidebar-border: var(--border);
+  --sidebar-ring: var(--taupe);
 }
 
 .dark {
@@ -142,7 +152,12 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  h1, h2, h3, h4, h5, h6 {
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
     font-family: var(--font-serif);
     font-weight: 400;
     letter-spacing: -0.015em;
@@ -168,8 +183,14 @@
   max-width: 88rem;
   margin-inline: auto;
   padding-inline: 1.25rem;
-  @media (min-width: 640px) { padding-inline: 2rem; }
-  @media (min-width: 1024px) { padding-inline: 3.5rem; }
+
+  @media (min-width: 640px) {
+    padding-inline: 2rem;
+  }
+
+  @media (min-width: 1024px) {
+    padding-inline: 3.5rem;
+  }
 }
 
 @utility glass-panel {
@@ -188,13 +209,25 @@
 }
 
 @keyframes rise {
-  from { opacity: 0; transform: translateY(20px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slow-zoom {
-  from { transform: scale(1.06); }
-  to { transform: scale(1); }
+  from {
+    transform: scale(1.06);
+  }
+
+  to {
+    transform: scale(1);
+  }
 }
 
 @utility animate-rise {

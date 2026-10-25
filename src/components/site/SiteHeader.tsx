@@ -35,11 +35,10 @@ export function SiteHeader() {
 
   return (
     <header
-      className={`fixed inset-x-0 top-0 z-50 bg-background/90 backdrop-blur-md border-b border-border/80 transition-all duration-500 ease-out after:absolute after:bottom-0 after:inset-x-0 after:h-px after:bg-linear-to-r after:from-transparent after:via-champagne/30 after:to-transparent ${
-        isHidden
+      className={`fixed inset-x-0 top-0 z-50 bg-background/90 backdrop-blur-md border-b border-border/80 transition-all duration-500 ease-out after:absolute after:bottom-0 after:inset-x-0 after:h-px after:bg-linear-to-r after:from-transparent after:via-champagne/30 after:to-transparent ${isHidden
           ? "-translate-y-full opacity-0 pointer-events-none"
           : "translate-y-0 opacity-100 pointer-events-auto shadow-[0_2px_16px_rgba(44,36,32,0.03)]"
-      }`}
+        }`}
     >
       <div className="container-x flex h-20 items-center justify-between">
         <Link

@@ -6,15 +6,13 @@ import {
   CheckCircle2,
   ArrowRight,
   Play,
-  Film,
   Building2,
   Eye,
   Star,
 } from "lucide-react";
-import hero from "@/assets/hero.jpg";
-import scan from "@/assets/scan.jpg";
-import box from "@/assets/product-box.jpg";
-import moments from "@/assets/product-moments.jpg";
+import hero from "@/assets/hero-v2.jpg";
+import scan from "@/assets/scan-v2.jpg";
+import moments from "@/assets/product-moments-v2.jpg";
 import { PRODUCTS } from "@/lib/products";
 import { formatTND } from "@/lib/pricing";
 import { FlipCardDemo } from "@/components/site/FlipCardDemo";
@@ -38,7 +36,6 @@ export const Route = createFileRoute("/")({
 
 export function Home() {
   const [isPriceDrawerOpen, setIsPriceDrawerOpen] = useState(false);
-  const [drawerFormat, setDrawerFormat] = useState<"10x15" | "magnet">("10x15");
 
   return (
     <>
@@ -246,7 +243,6 @@ export function Home() {
             </div>
             <button
               onClick={() => {
-                setDrawerFormat("10x15");
                 setIsPriceDrawerOpen(true);
               }}
               className="text-xs uppercase tracking-widest font-semibold text-deep-brown hover:text-charcoal underline underline-offset-6 transition-colors"
@@ -255,7 +251,7 @@ export function Home() {
             </button>
           </div>
 
-          <div className="mt-14 mx-auto max-w-4xl grid gap-8 sm:grid-cols-2">
+          <div className="mt-14 mx-auto max-w-2xl grid grid-cols-1 gap-8">
             {PRODUCTS.map((p) => (
               <div
                 key={p.id}
@@ -307,7 +303,6 @@ export function Home() {
                   </Link>
                   <button
                     onClick={() => {
-                      setDrawerFormat(p.formatCode === "box" ? "box" as any : "10x15");
                       setIsPriceDrawerOpen(true);
                     }}
                     className="w-full text-center text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 py-1.5 transition-colors"
@@ -317,32 +312,6 @@ export function Home() {
                 </div>
               </div>
             ))}
-          </div>
-        </div>
-      </section>
-
-      {/* Auto-Editor Promo Section (EditEasy) */}
-      <section className="container-x py-28">
-        <div className="rounded-3xl bg-linear-to-br from-[#27201c] via-charcoal to-[#1a1715] p-8 sm:p-14 text-ivory shadow-luxury-lg border border-champagne/20 relative overflow-hidden">
-          <div className="max-w-2xl">
-            <div className="inline-flex items-center gap-2 rounded-full bg-champagne/15 border border-champagne/30 px-3.5 py-1 text-xs uppercase tracking-widest text-champagne backdrop-blur-sm">
-              <Film className="h-3.5 w-3.5" />
-              <span>Nouveau · Outil Gratuit</span>
-            </div>
-            <h2 className="mt-4 font-serif text-3xl sm:text-5xl leading-tight text-ivory font-normal">
-              Ne laissez pas vos souvenirs dans votre téléphone.
-            </h2>
-            <p className="mt-4 text-ivory/80 text-sm sm:text-base leading-relaxed">
-              Découvrez notre <strong className="text-champagne font-semibold">studio de montage automatique</strong> : glissez vos clips en vrac, choisissez une musique d'ambiance et laissez notre système créer une vidéo parfaitement synchronisée prête pour votre tirage Mémora.
-            </p>
-            <div className="mt-8 flex flex-wrap gap-4">
-              <Link
-                to="/editeasy"
-                className="rounded-full bg-champagne px-8 py-4 text-xs uppercase tracking-widest font-semibold text-charcoal hover:bg-ivory transition-all shadow-md min-h-[48px] inline-flex items-center"
-              >
-                Lancer le montage automatique gratuit
-              </Link>
-            </div>
           </div>
         </div>
       </section>
@@ -417,7 +386,6 @@ export function Home() {
       <PriceDrawer
         isOpen={isPriceDrawerOpen}
         onClose={() => setIsPriceDrawerOpen(false)}
-        initialFormat={drawerFormat}
       />
     </>
   );

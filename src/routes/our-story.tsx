@@ -1,6 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
-import hero from "@/assets/hero.jpg";
-import box from "@/assets/product-box.jpg";
+import product from "@/assets/product-envelope-v2.jpg";
+import lifestyle from "@/assets/lifestyle-emotion-v2.jpg";
 import { PageHero } from "@/components/site/ProductCard";
 
 export const Route = createFileRoute("/our-story")({
@@ -56,7 +56,7 @@ function Story() {
       />
       <div className="container-x pb-8">
         <div className="overflow-hidden rounded-3xl border border-sand/20 shadow-luxury-lg">
-          <img src={hero} alt="Souvenirs MÉMORA" loading="lazy" className="h-[50vh] sm:h-[60vh] w-full object-cover" />
+          <img src={lifestyle} alt="Deux générations partagent un souvenir photo" loading="lazy" className="h-[50vh] sm:h-[60vh] w-full object-cover" />
         </div>
       </div>
       <section className="container-x py-20 sm:py-24">
@@ -80,7 +80,7 @@ function Story() {
             MÉMORA · Make Memories Last
           </p>
         </div>
-        <img src={box} alt="Coffret tirage MÉMORA" loading="lazy" className="aspect-square w-full object-cover" />
+        <img src={product} alt="Tirage MÉMORA dans son enveloppe d'art" loading="lazy" className="aspect-square w-full object-cover" />
       </section>
     </>
   );

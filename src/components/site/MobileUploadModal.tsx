@@ -9,7 +9,7 @@ export function MobileUploadModal({
 }: {
   isOpen: boolean;
   onClose: () => void;
-  onVideoReceived: (videoData: { url: string; name: string; durationSec: number }) => void;
+  onVideoReceived: (videoData: { url: string; name: string; durationSec: number; isDemo?: boolean }) => void;
 }) {
   const [secondsRemaining, setSecondsRemaining] = useState(7140); // ~1h 59m
   const [copied, setCopied] = useState(false);
@@ -47,8 +47,9 @@ export function MobileUploadModal({
         url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
         name: "video_mobile_souvenir.mp4",
         durationSec: 15,
+        isDemo: true,
       });
-      toast.success("Vidéo reçue depuis votre smartphone !");
+      toast.info("Exemple chargé : il ne peut pas être utilisé pour une commande.");
       onClose();
     }, 2000);
   };
@@ -185,6 +186,7 @@ export function MobileUploadModal({
         </div>
 
         {/* Fast simulation button for demo testing */}
+        {import.meta.env.DEV && (
         <div className="mt-5 text-center">
           <button
             onClick={handleSimulateMobileUpload}
@@ -197,10 +199,11 @@ export function MobileUploadModal({
                 Réception de la vidéo en cours...
               </>
             ) : (
-              "Tester directement avec une vidéo d'exemple mobile"
+              "Simulation développeur · vidéo d’exemple"
             )}
           </button>
         </div>
+        )}
       </div>
     </div>
   );
