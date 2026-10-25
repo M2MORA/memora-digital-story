@@ -939,16 +939,9 @@ export default {
       if (url.pathname === "/api/media" && request.method === "GET") {
         return await handleMediaRoute(request, env);
       }
-      const memoryMatch = url.pathname.match(/^\/m\/([^/]+)\/?$/);
-      if (memoryMatch && (request.method === "GET" || request.method === "HEAD")) {
-        try {
-          return await handleNfcMemoryRoute(request, env, decodeURIComponent(memoryMatch[1]!));
-        } catch {
-          return new Response("Souvenir introuvable ou indisponible", {
-            status: 404,
-            headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
-          });
-        }
+      if (url.pathname === "/api/nfc-video" && (request.method === "GET" || request.method === "HEAD")) {
+        const slug = url.searchParams.get("slug") ?? "";
+        return await handleNfcMemoryRoute(request, env, slug);
       }
       if (url.pathname === "/api/admin/orders" && request.method === "OPTIONS") {
         return new Response(null, {
