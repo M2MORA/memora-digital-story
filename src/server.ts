@@ -11,8 +11,9 @@ import {
   timingSafeCompare,
 } from "./lib/r2-backend";
 import { createClient } from "@supabase/supabase-js";
-import { S3Client, GetObjectCommand } from "@aws-sdk/client-s3";
+import { S3Client, GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
+import { resolveStreamingResponse } from "./lib/streaming-handler";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -680,6 +681,175 @@ export async function handleMediaRoute(request: Request, env: any): Promise<Resp
   }
 }
 
+type R2ObjectClient = {
+  send(command: HeadObjectCommand | GetObjectCommand): Promise<any>;
+};
+
+function r2BodyToReadableStream(body: unknown): ReadableStream<Uint8Array> | null {
+  if (!body) return null;
+
+  const streamWithMixin = body as { transformToWebStream?: () => ReadableStream<Uint8Array> };
+  if (typeof streamWithMixin.transformToWebStream === "function") {
+    return streamWithMixin.transformToWebStream();
+  }
+
+  if (typeof ReadableStream !== "undefined" && body instanceof ReadableStream) {
+    return body as ReadableStream<Uint8Array>;
+  }
+
+  const iterable = body as AsyncIterable<Uint8Array>;
+  if (typeof iterable[Symbol.asyncIterator] !== "function") return null;
+
+  const iterator = iterable[Symbol.asyncIterator]();
+  return new ReadableStream<Uint8Array>({
+    async pull(controller) {
+      const next = await iterator.next();
+      if (next.done) {
+        controller.close();
+        return;
+      }
+      controller.enqueue(next.value);
+    },
+    async cancel(reason) {
+      await iterator.return?.(reason);
+    },
+  });
+}
+
+function memoryVideoKey(videoUrl: string, requestOrigin: string): { key: string; contentType: string } | null {
+  let storedUrl: URL;
+  try {
+    storedUrl = new URL(videoUrl, requestOrigin);
+  } catch {
+    return null;
+  }
+
+  // `video_url` is an internal pointer written by the existing upload/admin flow.
+  // Only this server-side value is accepted; a caller can never provide an R2 key.
+  if (
+    !["https:", "http:"].includes(storedUrl.protocol) ||
+    storedUrl.username ||
+    storedUrl.password ||
+    storedUrl.pathname !== "/api/media"
+  ) {
+    return null;
+  }
+
+  const key = storedUrl.searchParams.get("key")?.trim() ?? "";
+  const isPrivateVideoKey =
+    /^staging\/[a-zA-Z0-9_-]{3,64}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:mp4|webm|mov)$/i.test(key);
+  if (!isPrivateVideoKey) return null;
+
+  const extension = key.split(".").pop()?.toLowerCase();
+  const contentTypeByExtension: Record<string, string> = {
+    mp4: "video/mp4",
+    webm: "video/webm",
+    mov: "video/quicktime",
+  };
+  const contentType = extension ? contentTypeByExtension[extension] : undefined;
+  return contentType ? { key, contentType } : null;
+}
+
+/**
+ * NFC entry point: resolve an active memory server-side, then stream its
+ * private R2 object through the permanent MÉMORA URL. No R2 URL is exposed.
+ */
+export async function handleNfcMemoryRoute(
+  request: Request,
+  env: any,
+  slug: string,
+  dependencies?: { supabaseAdmin?: any; r2Client?: R2ObjectClient },
+): Promise<Response> {
+  const unavailable = () =>
+    new Response("Souvenir introuvable ou indisponible", {
+      status: 404,
+      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+    });
+
+  const unavailableService = () =>
+    new Response("Service vidéo indisponible", {
+      status: 503,
+      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+    });
+
+  // A route segment has already excluded '/', but reject malformed values before
+  // querying the database. Existing order-derived slugs remain valid.
+  if (!slug || slug.length > 160 || /[\0\r\n]/.test(slug)) return unavailable();
+
+  try {
+    const supabaseAdmin = dependencies?.supabaseAdmin ?? getSupabaseAdmin(env);
+    const { data: memory, error } = await supabaseAdmin
+      .from("memories")
+      .select("video_url")
+      .eq("slug", slug)
+      .eq("status", "active")
+      .maybeSingle();
+
+    if (error || !memory?.video_url) return unavailable();
+
+    const video = memoryVideoKey(memory.video_url, new URL(request.url).origin);
+    if (!video) return unavailable();
+
+    const accountId = env?.R2_ACCOUNT_ID || (typeof process !== "undefined" ? process.env?.["R2_ACCOUNT_ID"] : "") || "";
+    const accessKeyId = env?.R2_ACCESS_KEY_ID || (typeof process !== "undefined" ? process.env?.["R2_ACCESS_KEY_ID"] : "") || "";
+    const secretAccessKey = env?.R2_SECRET_ACCESS_KEY || (typeof process !== "undefined" ? process.env?.["R2_SECRET_ACCESS_KEY"] : "") || "";
+    const bucketName = env?.R2_BUCKET_NAME || (typeof process !== "undefined" ? process.env?.["R2_BUCKET_NAME"] : "") || "memora-videos";
+
+    if ((!accountId || !accessKeyId || !secretAccessKey) && !dependencies?.r2Client) return unavailableService();
+
+    const r2Client = dependencies?.r2Client ?? new S3Client({
+      region: "auto",
+      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+      credentials: { accessKeyId, secretAccessKey },
+    });
+
+    const head = await r2Client.send(new HeadObjectCommand({ Bucket: bucketName, Key: video.key }));
+    const totalSize = head.ContentLength;
+    if (!Number.isSafeInteger(totalSize) || totalSize <= 0) return unavailable();
+
+    const lastModified = head.LastModified instanceof Date ? head.LastModified.toUTCString() : undefined;
+    const etag = head.ETag || `\"memora-${totalSize}-${head.LastModified?.getTime?.() ?? 0}\"`;
+    const decision = resolveStreamingResponse({
+      method: request.method as "GET" | "HEAD",
+      rangeHeader: request.headers.get("range"),
+      ifRangeHeader: request.headers.get("if-range"),
+      ifNoneMatchHeader: request.headers.get("if-none-match"),
+      ifModifiedSinceHeader: request.headers.get("if-modified-since"),
+      totalSize,
+      contentType: video.contentType,
+      etag,
+      lastModified,
+    });
+
+    const extension = video.key.split(".").pop()?.toLowerCase() ?? "mp4";
+    const filename = `${slug.replace(/[^a-zA-Z0-9._-]/g, "_")}.${extension}`;
+    const headers = new Headers(decision.headers);
+    headers.set("Content-Disposition", `inline; filename=\"${filename}\"`);
+    headers.set("Cache-Control", "private, no-store");
+    headers.set("X-Content-Type-Options", "nosniff");
+
+    if (decision.isHead || decision.status === 304 || decision.status === 416) {
+      return new Response(null, { status: decision.status, headers });
+    }
+
+    const getInput = {
+      Bucket: bucketName,
+      Key: video.key,
+      ...(decision.range
+        ? { Range: `bytes=${decision.range.start}-${decision.range.end}` }
+        : {}),
+    };
+    const object = await r2Client.send(new GetObjectCommand(getInput));
+    const body = r2BodyToReadableStream(object.Body);
+    if (!body) return unavailableService();
+
+    return new Response(body, { status: decision.status, headers });
+  } catch (error) {
+    console.error("[nfc-memory] Unable to stream video:", error);
+    return unavailableService();
+  }
+}
+
 export async function handleDeleteOrderRoute(request: Request, env: any): Promise<Response> {
   const url = new URL(request.url);
   const id = url.searchParams.get("id");
@@ -768,6 +938,17 @@ export default {
       }
       if (url.pathname === "/api/media" && request.method === "GET") {
         return await handleMediaRoute(request, env);
+      }
+      const memoryMatch = url.pathname.match(/^\/m\/([^/]+)\/?$/);
+      if (memoryMatch && (request.method === "GET" || request.method === "HEAD")) {
+        try {
+          return await handleNfcMemoryRoute(request, env, decodeURIComponent(memoryMatch[1]!));
+        } catch {
+          return new Response("Souvenir introuvable ou indisponible", {
+            status: 404,
+            headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+          });
+        }
       }
       if (url.pathname === "/api/admin/orders" && request.method === "OPTIONS") {
         return new Response(null, {
