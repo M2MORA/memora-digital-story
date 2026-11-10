@@ -1002,34 +1002,56 @@ export async function handleNfcMemoryRoute(
   }
 }
 
-export async function handleDeleteOrderRoute(request: Request, env: any): Promise<Response> {
+export async function handleDeleteOrderRoute(
+  request: Request,
+  env: any,
+  dependencies?: { supabaseAdmin?: any },
+): Promise<Response> {
+  const deny = (status: number, error: string) =>
+    new Response(JSON.stringify({ error }), {
+      status,
+      headers: { "content-type": "application/json", "Access-Control-Allow-Origin": "*" },
+    });
+
+  const accessToken = request.headers.get("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1];
+  if (!accessToken) return deny(401, "Authentification requise");
+
+  let supabase = dependencies?.supabaseAdmin;
+  if (!supabase) {
+    const supabaseUrl =
+      env?.VITE_SUPABASE_URL ||
+      env?.SUPABASE_URL ||
+      (typeof process !== "undefined"
+        ? process.env?.["VITE_SUPABASE_URL"] || process.env?.["SUPABASE_URL"]
+        : "");
+    const serviceKey =
+      env?.SUPABASE_SERVICE_ROLE_KEY ||
+      (typeof process !== "undefined" ? process.env?.["SUPABASE_SERVICE_ROLE_KEY"] : "");
+
+    if (!supabaseUrl || !serviceKey) return deny(500, "Supabase service role non configuré");
+
+    supabase = createClient(supabaseUrl, serviceKey, {
+      auth: { persistSession: false, autoRefreshToken: false },
+    });
+  }
+
+  // Le service role contourne le RLS : le jeton de l'appelant doit être validé ici.
+  // Seul app_metadata fait foi, user_metadata étant modifiable par l'utilisateur.
+  let caller: { app_metadata?: Record<string, unknown> } | null | undefined;
+  try {
+    const { data, error } = await supabase.auth.getUser(accessToken);
+    if (error) return deny(401, "Session invalide ou expirée");
+    caller = data?.user;
+  } catch (err) {
+    console.error("[admin/orders] Échec de vérification de la session:", err);
+    return deny(503, "Vérification de la session indisponible");
+  }
+  if (!caller) return deny(401, "Session invalide ou expirée");
+  if (caller.app_metadata?.["role"] !== "admin") return deny(403, "Accès administrateur requis");
+
   const url = new URL(request.url);
   const id = url.searchParams.get("id");
-  if (!id) {
-    return new Response(JSON.stringify({ error: "Paramètre id requis" }), {
-      status: 400,
-      headers: { "content-type": "application/json", "Access-Control-Allow-Origin": "*" },
-    });
-  }
-
-  const supabaseUrl =
-    env?.VITE_SUPABASE_URL ||
-    env?.SUPABASE_URL ||
-    (typeof process !== "undefined"
-      ? process.env?.["VITE_SUPABASE_URL"] || process.env?.["SUPABASE_URL"]
-      : "");
-  const serviceKey =
-    env?.SUPABASE_SERVICE_ROLE_KEY ||
-    (typeof process !== "undefined" ? process.env?.["SUPABASE_SERVICE_ROLE_KEY"] : "");
-
-  if (!supabaseUrl || !serviceKey) {
-    return new Response(JSON.stringify({ error: "Supabase service role non configuré" }), {
-      status: 500,
-      headers: { "content-type": "application/json", "Access-Control-Allow-Origin": "*" },
-    });
-  }
-
-  const supabase = createClient(supabaseUrl, serviceKey);
+  if (!id) return deny(400, "Paramètre id requis");
 
   // Règle de sécurité stricte : seule une commande avec le statut 'cancelled' peut être supprimée
   const { data: order, error: fetchErr } = await supabase
@@ -1105,7 +1127,7 @@ export default {
           headers: {
             "Access-Control-Allow-Origin": "*",
             "Access-Control-Allow-Methods": "DELETE, OPTIONS",
-            "Access-Control-Allow-Headers": "Content-Type",
+            "Access-Control-Allow-Headers": "Authorization, Content-Type",
           },
         });
       }

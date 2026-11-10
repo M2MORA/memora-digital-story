@@ -366,8 +366,14 @@ export default function Dashboard({ email }: { email: string }) {
     setError("");
     try {
       // 1. Tenter via le point de terminaison sécurisé du serveur
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
+      if (!session) throw new Error("Session expirée, veuillez vous reconnecter.");
+
       const res = await fetch(`${apiBase}/api/admin/orders?id=${encodeURIComponent(id)}`, {
         method: "DELETE",
+        headers: { Authorization: `Bearer ${session.access_token}` },
       });
       if (res.ok) {
         setOrders((prev) => prev.filter((o) => o.id !== id));
