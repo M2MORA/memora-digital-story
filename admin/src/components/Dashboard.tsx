@@ -112,11 +112,18 @@ export default function Dashboard({ email }: { email: string }) {
   });
 
   // « memora.tn » saisi sans https:// serait lu comme un chemin relatif à l'admin
-  const apiBase = !siteUrl
-    ? defaultEnvUrl
-    : /^https?:\/\//i.test(siteUrl)
-      ? siteUrl
-      : `https://${siteUrl}`;
+  const apiBase = (() => {
+    const raw = !siteUrl ? defaultEnvUrl : /^https?:\/\//i.test(siteUrl) ? siteUrl : `https://${siteUrl}`;
+    try {
+      const api = new URL(raw);
+      const site = new URL(publicSiteUrl);
+      // memora.tn redirige vers www.memora.tn, et le navigateur bloque une suppression redirigée
+      if (site.hostname === `www.${api.hostname}`) return site.origin;
+      return api.origin;
+    } catch {
+      return raw;
+    }
+  })();
 
   const handleSiteUrlChange = (newUrl: string) => {
     const clean = newUrl.trim().replace(/\/+$/, "");
