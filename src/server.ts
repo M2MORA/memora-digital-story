@@ -736,9 +736,13 @@ function signedMediaRedirect(signedUrl: string): Response {
  * est ignorée, car elle peut être celle de l'admin (ex. localhost).
  */
 function privateMediaKey(stored: string, requestOrigin: string, kind: "video" | "photo"): string | null {
+  // L'admin a pu enregistrer « memora.tn/api/media?... » sans https://
+  const withScheme =
+    /^[a-z][a-z0-9+.-]*:\/\//i.test(stored) || stored.startsWith("/") ? stored : `https://${stored}`;
+
   let storedUrl: URL;
   try {
-    storedUrl = new URL(stored, requestOrigin);
+    storedUrl = new URL(withScheme, requestOrigin);
   } catch {
     return null;
   }
