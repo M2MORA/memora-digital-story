@@ -746,7 +746,8 @@ export async function handleMediaRoute(request: Request, env: any): Promise<Resp
       headers: {
         Location: signedUrl,
         "Access-Control-Allow-Origin": "*",
-        "Cache-Control": "public, max-age=3600",
+        // Bien plus court que la validité du lien signé (1 h), pour ne jamais rejouer un lien expiré
+        "Cache-Control": "private, max-age=300",
       },
     });
   } catch (err: any) {
