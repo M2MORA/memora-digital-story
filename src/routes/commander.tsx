@@ -150,9 +150,10 @@ function CommanderPage() {
   const [funnelStage, setFunnelStage] = useState<
     "picker" | "video" | "photo" | "preview" | "cart" | "delivery" | "payment" | "confirmation"
   >(() => {
-    if (search.stage) return search.stage;
-    if (search.format) return "video";
-    return "picker";
+    // L'ancienne étape « payment » est fusionnée dans « delivery »
+    if (search.stage) return search.stage === "payment" ? "delivery" : search.stage;
+    // Un seul produit : le client commence directement par sa vidéo
+    return "video";
   });
 
   // Clé d'article stable pour la création en cours dans commander.tsx
@@ -290,15 +291,22 @@ function CommanderPage() {
     selectedItemBasePrice + (videoStatus === "ready" && !isDemoVideo ? videoSurchargeCurrent : 0);
   const canContinueWithVideo = videoStatus === "ready" && !isDemoVideo;
 
+  // 4 étapes visibles : l'aperçu fait partie de « Photo », la validation de « Livraison »
   const funnelSteps = [
     { id: "video", label: "Vidéo", num: 1 },
     { id: "photo", label: "Photo", num: 2 },
-    { id: "preview", label: "Aperçu", num: 3 },
-    { id: "cart", label: "Panier", num: 4 },
-    { id: "delivery", label: "Livraison", num: 5 },
-    { id: "payment", label: "Validation", num: 6 },
+    { id: "cart", label: "Panier", num: 3 },
+    { id: "delivery", label: "Livraison", num: 4 },
   ] as const;
-  const activeStepIndex = funnelSteps.findIndex((step) => step.id === funnelStage);
+  const stageToStepIndex: Record<string, number> = {
+    video: 0,
+    photo: 1,
+    preview: 1,
+    cart: 2,
+    delivery: 3,
+    payment: 3,
+  };
+  const activeStepIndex = stageToStepIndex[funnelStage] ?? 0;
   const activeStep = funnelSteps[activeStepIndex];
 
   // Overall quote calculation
@@ -703,7 +711,7 @@ function CommanderPage() {
                 else if (funnelStage === "preview") setFunnelStage("photo");
                 else if (funnelStage === "cart") setFunnelStage("preview");
                 else if (funnelStage === "delivery") setFunnelStage("cart");
-                else if (funnelStage === "payment") setFunnelStage("delivery");
+                else if (funnelStage === "payment") setFunnelStage("cart");
               }}
               className="inline-flex shrink-0 items-center gap-1.5 text-muted-foreground hover:text-charcoal transition-colors font-medium py-1"
             >
@@ -734,14 +742,9 @@ function CommanderPage() {
             </div>
 
             <div className="hidden min-w-0 flex-1 items-center justify-end gap-3 lg:flex xl:gap-5">
-              {funnelSteps.map((step) => {
-                const isActive = funnelStage === step.id;
-                const isPassed =
-                  (step.id === "video" && funnelStage !== "video") ||
-                  (step.id === "photo" && !["video", "photo"].includes(funnelStage)) ||
-                  (step.id === "preview" && !["video", "photo", "preview"].includes(funnelStage)) ||
-                  (step.id === "cart" && ["delivery", "payment"].includes(funnelStage)) ||
-                  (step.id === "delivery" && funnelStage === "payment");
+              {funnelSteps.map((step, stepIndex) => {
+                const isActive = stepIndex === activeStepIndex;
+                const isPassed = stepIndex < activeStepIndex;
 
                 return (
                   <div
@@ -1790,391 +1793,215 @@ function CommanderPage() {
       )}
 
       {/* ========================================================
-          STEP 5: DELIVERY & ADDRESS
+          STEP 4: LIVRAISON + VALIDATION (un seul écran, 4 champs)
          ======================================================== */}
-      {funnelStage === "delivery" && (
-        <section className="container-x mt-8 max-w-3xl">
-          <div className="rounded-3xl border border-border/80 bg-card p-6 sm:p-10 shadow-luxury animate-in fade-in">
-            <div className="border-b border-border/80 pb-6">
-              <div className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-deep-brown font-semibold">
-                <Truck className="h-4 w-4 text-champagne" />
-                <span>Étape 5 · Coordonnées & Livraison</span>
-              </div>
-              <h2 className="mt-1 font-serif text-3xl sm:text-4xl text-charcoal">Où devons-nous expédier vos Mémora ?</h2>
-            </div>
+      {(funnelStage === "delivery" || funnelStage === "payment") && (
+        <section className="container-x mt-8 max-w-xl">
+          <div className="rounded-3xl border border-border/80 bg-card p-5 sm:p-8 shadow-luxury animate-in fade-in">
+            <h2 className="font-serif text-3xl sm:text-4xl text-charcoal">On livre où ?</h2>
+            <p className="mt-1.5 text-sm text-muted-foreground">
+              Tu paies en espèces à la livraison. On t'appelle pour confirmer.
+            </p>
 
             <form
               onSubmit={(e) => {
                 e.preventDefault();
-                setFunnelStage("payment");
+                void handleConfirmOrder();
               }}
-              className="mt-8 space-y-6"
+              className="mt-6 space-y-4"
             >
-              {/* Customer Names */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-charcoal">
-                    Prénom *
-                  </label>
-                  <input
-                    required
-                    type="text"
-                    value={customer.firstName}
-                    onChange={(e) => setCustomer({ ...customer, firstName: e.target.value })}
-                    className="mt-1.5 w-full rounded-xl border border-border/80 bg-background px-4 py-3 text-sm outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-charcoal">
-                    Nom *
-                  </label>
-                  <input
-                    required
-                    type="text"
-                    value={customer.lastName}
-                    onChange={(e) => setCustomer({ ...customer, lastName: e.target.value })}
-                    className="mt-1.5 w-full rounded-xl border border-border/80 bg-background px-4 py-3 text-sm outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-xs"
-                  />
-                </div>
-              </div>
-
-              {/* Email & Phone */}
-              <div className="grid gap-4 sm:grid-cols-2">
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-charcoal">
-                    Email pour le suivi *
-                  </label>
-                  <input
-                    required
-                    type="email"
-                    value={customer.email}
-                    onChange={(e) => setCustomer({ ...customer, email: e.target.value })}
-                    className="mt-1.5 w-full rounded-xl border border-border/80 bg-background px-4 py-3 text-sm outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-xs"
-                  />
-                </div>
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-charcoal">
-                    Téléphone (pour le livreur) *
-                  </label>
-                  <input
-                    required
-                    type="tel"
-                    placeholder="Ex: 20 123 456 ou 98 123 456"
-                    value={customer.phone}
-                    onChange={(e) => setCustomer({ ...customer, phone: e.target.value })}
-                    className="mt-1.5 w-full rounded-xl border border-border/80 bg-background px-4 py-3 text-sm outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-xs"
-                  />
-                </div>
-              </div>
-
-              {/* Street Address */}
               <div>
-                <label className="text-xs font-semibold uppercase tracking-wider text-charcoal">
-                  Adresse de livraison *
+                <label htmlFor="cmd-name" className="text-xs font-semibold uppercase tracking-wider text-charcoal">
+                  Nom et prénom
                 </label>
                 <input
+                  id="cmd-name"
                   required
+                  minLength={2}
                   type="text"
+                  autoComplete="name"
+                  placeholder="Sarra Ben Ali"
+                  value={`${customer.firstName}${customer.lastName ? ` ${customer.lastName}` : ""}`}
+                  onChange={(e) => setCustomer({ ...customer, firstName: e.target.value, lastName: "" })}
+                  className="mt-1.5 h-14 w-full rounded-2xl border border-border/80 bg-background px-4 text-base outline-hidden focus:border-deep-brown focus:ring-1 focus:ring-deep-brown/30"
+                />
+              </div>
+
+              <div>
+                <label htmlFor="cmd-phone" className="text-xs font-semibold uppercase tracking-wider text-charcoal">
+                  Téléphone
+                </label>
+                <div className="mt-1.5 flex h-14 overflow-hidden rounded-2xl border border-border/80 bg-background focus-within:border-deep-brown focus-within:ring-1 focus-within:ring-deep-brown/30">
+                  <span className="flex items-center border-r border-border/80 px-4 text-base font-semibold text-muted-foreground">
+                    +216
+                  </span>
+                  <input
+                    id="cmd-phone"
+                    required
+                    type="tel"
+                    inputMode="numeric"
+                    autoComplete="tel-national"
+                    pattern="[0-9 ]{8,11}"
+                    title="8 chiffres, par exemple 20 123 456"
+                    placeholder="20 123 456"
+                    value={customer.phone}
+                    onChange={(e) =>
+                      setCustomer({ ...customer, phone: e.target.value.replace(/[^\d ]/g, "").slice(0, 11) })
+                    }
+                    className="min-w-0 flex-1 bg-transparent px-4 text-base outline-hidden"
+                  />
+                </div>
+              </div>
+
+              <div>
+                <label htmlFor="cmd-gov" className="text-xs font-semibold uppercase tracking-wider text-charcoal">
+                  Gouvernorat
+                </label>
+                <select
+                  id="cmd-gov"
+                  required
+                  value={shipping.city}
+                  onChange={(e) => setShipping({ ...shipping, city: e.target.value })}
+                  className="mt-1.5 h-14 w-full rounded-2xl border border-border/80 bg-background px-4 text-base outline-hidden focus:border-deep-brown focus:ring-1 focus:ring-deep-brown/30"
+                >
+                  <option value="">Choisir…</option>
+                  {TUNISIAN_GOVERNORATES.map((g) => (
+                    <option key={g} value={g}>
+                      {g}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div>
+                <label htmlFor="cmd-address" className="text-xs font-semibold uppercase tracking-wider text-charcoal">
+                  Adresse
+                </label>
+                <input
+                  id="cmd-address"
+                  required
+                  minLength={4}
+                  type="text"
+                  autoComplete="street-address"
+                  placeholder="Rue, quartier, ville"
                   value={shipping.address}
                   onChange={(e) => setShipping({ ...shipping, address: e.target.value })}
-                  placeholder="Rue, quartier, résidence, n° d'appartement..."
-                  className="mt-1.5 w-full rounded-xl border border-border/80 bg-background px-4 py-3 text-sm outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-xs"
+                  className="mt-1.5 h-14 w-full rounded-2xl border border-border/80 bg-background px-4 text-base outline-hidden focus:border-deep-brown focus:ring-1 focus:ring-deep-brown/30"
                 />
               </div>
 
-              {/* City, Postal, Country */}
-              <div className="grid gap-4 sm:grid-cols-3">
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-charcoal">
-                    Code postal
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Ex: 1001, 4000..."
-                    value={shipping.postalCode}
-                    onChange={(e) => setShipping({ ...shipping, postalCode: e.target.value })}
-                    className="mt-1.5 w-full rounded-xl border border-border/80 bg-background px-4 py-3 text-sm outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-xs"
-                  />
+              {/* Récapitulatif */}
+              <div className="rounded-2xl border border-border/80 bg-cream/40 p-4 text-sm space-y-2">
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">
+                    {quote.totalQuantity} MÉMORA
+                  </span>
+                  <span className="text-charcoal">{formatTND(quote.itemsSubtotal + quote.framesSubtotal + quote.videoSurcharges)}</span>
                 </div>
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-charcoal">
-                    Gouvernorat / Ville *
-                  </label>
-                  <input
-                    required
-                    type="text"
-                    list="tunisian-cities"
-                    placeholder="Choisir ou saisir la ville..."
-                    value={shipping.city}
-                    onChange={(e) => setShipping({ ...shipping, city: e.target.value })}
-                    className="mt-1.5 w-full rounded-xl border border-border/80 bg-background px-4 py-3 text-sm outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-xs"
-                  />
-                  <datalist id="tunisian-cities">
-                    {TUNISIAN_GOVERNORATES.map((g) => (
-                      <option key={g} value={g} />
-                    ))}
-                  </datalist>
-                </div>
-                <div>
-                  <label className="text-xs font-semibold uppercase tracking-wider text-charcoal">
-                    Pays *
-                  </label>
-                  <select
-                    value={shipping.country}
-                    onChange={(e) => setShipping({ ...shipping, country: e.target.value })}
-                    className="mt-1.5 w-full rounded-xl border border-border/80 bg-background px-4 py-3 text-sm outline-hidden focus:border-champagne focus:ring-1 focus:ring-champagne/30 shadow-xs"
-                  >
-                    <option value="TN">Tunisie</option>
-                  </select>
-                </div>
-              </div>
-
-              {/* Carrier Selection */}
-              <div className="pt-4 border-t border-border/80">
-                <p className="text-xs font-semibold uppercase tracking-wider text-charcoal mb-3">
-                  Mode de livraison
-                </p>
-                <div className="space-y-3">
-                  {getShippingOptions(shipping.country, quote.total).map((opt) => (
-                    <label
-                      key={opt.id}
-                      className={`flex cursor-pointer items-center justify-between rounded-xl border p-4 transition-all ${shipping.carrier === opt.id
-                          ? "border-deep-brown bg-sand/20 shadow-xs ring-1 ring-deep-brown/10"
-                          : "border-border/80 hover:bg-cream/40"
-                        }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <input
-                          type="radio"
-                          name="carrier"
-                          checked={shipping.carrier === opt.id}
-                          onChange={() => setShipping({ ...shipping, carrier: opt.id })}
-                          className="accent-deep-brown"
-                        />
-                        <div>
-                          <p className="font-semibold text-sm text-charcoal">{opt.name}</p>
-                          <p className="text-xs text-muted-foreground">{opt.description} · Délai {opt.etaDays}</p>
-                        </div>
-                      </div>
-                      <span className="font-serif text-base font-bold text-charcoal">
-                        {opt.priceTND === 0 ? "Gratuit" : formatTND(opt.priceTND)}
-                      </span>
-                    </label>
-                  ))}
-                </div>
-              </div>
-
-              {/* Submit to Payment */}
-              <div className="mt-8 flex items-center justify-between border-t border-border/80 pt-6">
-                <button
-                  type="button"
-                  onClick={() => setFunnelStage("cart")}
-                  className="text-xs uppercase tracking-widest text-muted-foreground hover:text-charcoal transition-colors py-2"
-                >
-                  Retour au panier
-                </button>
-                <button
-                  type="submit"
-                  className="inline-flex items-center gap-2 rounded-full bg-deep-brown px-8 py-4 text-xs uppercase tracking-widest font-semibold text-ivory hover:bg-charcoal transition-all shadow-luxury min-h-[48px]"
-                >
-                  <span>Valider la commande ({formatTND(quote.total)})</span>
-                  <ArrowRight className="h-4 w-4 text-champagne" />
-                </button>
-              </div>
-            </form>
-          </div>
-        </section>
-      )}
-
-      {/* ========================================================
-          STEP 6: VALIDATION & PAIEMENT À LA LIVRAISON
-         ======================================================== */}
-      {funnelStage === "payment" && (
-        <section className="container-x mt-8 max-w-3xl">
-          <div className="rounded-3xl border border-border/80 bg-card p-6 sm:p-10 shadow-luxury animate-in fade-in">
-            <div className="border-b border-border/80 pb-6">
-              <div className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-deep-brown font-semibold">
-                <Banknote className="h-4 w-4 text-champagne" />
-                <span>Étape 6 · Validation de votre commande</span>
-              </div>
-              <h2 className="mt-1 font-serif text-3xl sm:text-4xl text-charcoal">Paiement à la livraison</h2>
-              <p className="mt-1 text-sm text-muted-foreground">
-                Réglez en toute sérénité en espèces auprès du livreur à la réception de votre colis.
-              </p>
-            </div>
-
-            {/* Exclusive Payment Method: Cash On Delivery */}
-            <div className="mt-8 rounded-2xl border-2 border-deep-brown bg-sand/15 p-6 sm:p-8 shadow-luxury">
-              <div className="flex items-start gap-4">
-                <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-xl bg-deep-brown text-ivory shadow-xs">
-                  <Banknote className="h-6 w-6" />
-                </div>
-                <div className="flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <h3 className="font-semibold text-base text-charcoal">Paiement en espèces à la livraison (COD)</h3>
-                    <span className="rounded-full bg-sand/80 px-2.5 py-0.5 text-[11px] font-semibold text-deep-brown">
-                      100% Sécurisé · Zéro carte requise
-                    </span>
+                {quote.discount > 0 && (
+                  <div className="flex justify-between text-deep-brown">
+                    <span>Réduction</span>
+                    <span>-{formatTND(quote.discount)}</span>
                   </div>
-                  <p className="mt-2 text-xs text-muted-foreground leading-relaxed">
-                    Votre commande est mise en fabrication dès validation. Vous ne payez rien sur le site : vous remettez simplement la somme de <strong className="text-charcoal font-semibold text-sm">{formatTND(quote.total)}</strong> en espèces au livreur lors de la remise en main propre de votre colis.
-                  </p>
-
-                  <div className="mt-5 grid gap-3 sm:grid-cols-3 border-t border-deep-brown/15 pt-4 text-xs text-charcoal">
-                    <div className="flex items-center gap-2">
-                      <ShieldCheck className="h-4 w-4 text-champagne shrink-0" />
-                      <span>Aucune carte bancaire requise</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Truck className="h-4 w-4 text-champagne shrink-0" />
-                      <span>Livraison suivie par transporteur</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <CheckCircle2 className="h-4 w-4 text-champagne shrink-0" />
-                      <span>Paiement après réception</span>
-                    </div>
-                  </div>
+                )}
+                <div className="flex justify-between">
+                  <span className="text-muted-foreground">Livraison</span>
+                  <span className="text-charcoal">
+                    {quote.isFreeShipping ? "Offerte" : formatTND(quote.shippingCost)}
+                  </span>
+                </div>
+                <div className="flex justify-between border-t border-border/80 pt-3 text-base font-semibold text-charcoal">
+                  <span>Total à payer à la livraison</span>
+                  <span>{formatTND(quote.total)}</span>
                 </div>
               </div>
-            </div>
 
-            {/* Delivery Recap Card */}
-            <div className="mt-6 rounded-xl border border-border/80 bg-cream/40 p-4 text-xs text-charcoal flex flex-col sm:flex-row sm:items-center justify-between gap-3 shadow-xs">
-              <div>
-                <p className="font-semibold text-deep-brown uppercase tracking-wider text-[10px]">
-                  Adresse de livraison enregistrée :
-                </p>
-                <p className="mt-0.5 text-xs text-charcoal font-medium">
-                  {customer.firstName} {customer.lastName} · {shipping.address}, {shipping.postalCode} {shipping.city}
-                </p>
-                <p className="text-[11px] text-muted-foreground mt-0.5">Tél : {customer.phone || "Non renseigné"}</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setFunnelStage("delivery")}
-                className="text-deep-brown hover:underline text-[11px] font-semibold self-start sm:self-auto shrink-0"
-              >
-                Modifier l'adresse
-              </button>
-            </div>
-
-            {/* Legal consent check */}
-            <div className="mt-8 border-t border-border/80 pt-6">
-              <label className="flex items-start gap-3 text-xs text-charcoal cursor-pointer">
+              <label className="flex items-start gap-3 text-sm text-charcoal cursor-pointer py-1">
                 <input
                   type="checkbox"
+                  required
                   checked={legalConsent}
                   onChange={(e) => setLegalConsent(e.target.checked)}
-                  className="mt-0.5 accent-deep-brown h-4 w-4"
+                  className="mt-0.5 h-5 w-5 shrink-0 accent-deep-brown"
                 />
                 <span>
-                  J'accepte expressément les <strong>Conditions Générales de Vente</strong> et m'engage à régler la somme de <strong>{formatTND(quote.total)}</strong> en espèces au livreur à la réception de mon colis.
+                  J'accepte les{" "}
+                  <a href="/terms" target="_blank" rel="noreferrer" className="font-semibold underline underline-offset-2">
+                    conditions générales de vente
+                  </a>
+                  .
                 </span>
               </label>
-            </div>
 
-            {/* Progression des envois en arrière-plan */}
-            {!isSubmitting && isUploadingMedia && (
-              <div className="mt-6 rounded-2xl border border-champagne/40 bg-cream/60 p-5 shadow-luxury">
-                <div className="flex items-center justify-between gap-3 text-xs font-semibold text-deep-brown">
-                  <span>Envoi de vos fichiers en cours…</span>
-                  <span>{uploadPercent} %</span>
-                </div>
-                <div
-                  role="progressbar"
-                  aria-label="Progression de l'envoi de vos fichiers"
-                  aria-valuemin={0}
-                  aria-valuemax={100}
-                  aria-valuenow={uploadPercent}
-                  className="mt-2 h-1.5 overflow-hidden rounded-full bg-cream"
-                >
+              {/* Progression des envois en arrière-plan */}
+              {!isSubmitting && isUploadingMedia && (
+                <div className="rounded-2xl border border-champagne/40 bg-cream/60 p-4">
+                  <div className="flex items-center justify-between gap-3 text-xs font-semibold text-deep-brown">
+                    <span>Envoi de tes fichiers…</span>
+                    <span>{uploadPercent} %</span>
+                  </div>
                   <div
-                    className="h-full rounded-full bg-deep-brown transition-[width] duration-300"
-                    style={{ width: `${uploadPercent}%` }}
-                  />
+                    role="progressbar"
+                    aria-label="Progression de l'envoi de tes fichiers"
+                    aria-valuemin={0}
+                    aria-valuemax={100}
+                    aria-valuenow={uploadPercent}
+                    className="mt-2 h-1.5 overflow-hidden rounded-full bg-cream"
+                  >
+                    <div
+                      className="h-full rounded-full bg-deep-brown transition-[width] duration-300"
+                      style={{ width: `${uploadPercent}%` }}
+                    />
+                  </div>
+                  <p className="mt-2 text-xs text-charcoal">Tu peux déjà confirmer ta commande.</p>
                 </div>
-                <p className="mt-2 text-xs text-charcoal">
-                  {uploadReadyCount}/{mediaUploads.length} fichiers prêts. Vous pouvez déjà confirmer votre commande.
-                </p>
-              </div>
-            )}
+              )}
 
-            {!isSubmitting && !isUploadingMedia && hasUploadError && checkoutStep !== "error" && (
-              <div className="mt-6 rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-xs text-charcoal">
-                Un fichier n'a pas pu être envoyé. Vérifiez votre connexion : il sera renvoyé lorsque vous confirmerez votre commande.
-              </div>
-            )}
+              {!isSubmitting && !isUploadingMedia && hasUploadError && checkoutStep !== "error" && (
+                <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-xs text-charcoal">
+                  Un fichier n'a pas pu être envoyé. Vérifie ta connexion : il sera renvoyé quand tu confirmeras.
+                </div>
+              )}
 
-            {/* Status Feedback and Progress Indicator */}
-            {isSubmitting && (
-              <div className="mt-6 rounded-2xl border border-champagne/40 bg-cream/60 p-5 shadow-luxury animate-in fade-in">
-                <div className="flex items-center gap-3">
-                  <RotateCw className="h-5 w-5 text-deep-brown animate-spin shrink-0" />
+              {isSubmitting && (
+                <div className="flex items-center gap-3 rounded-2xl border border-champagne/40 bg-cream/60 p-4">
+                  <RotateCw className="h-5 w-5 shrink-0 animate-spin text-deep-brown" />
                   <div className="flex-1">
                     <p className="text-xs font-semibold uppercase tracking-wider text-deep-brown">
                       {checkoutStep === "preparing" && "1/3 · Préparation des fichiers"}
-                      {checkoutStep === "uploading_media" && `2/3 · Envoi de vos fichiers · ${uploadPercent} %`}
+                      {checkoutStep === "uploading_media" && `2/3 · Envoi de tes fichiers · ${uploadPercent} %`}
                       {checkoutStep === "finalizing" && "3/3 · Enregistrement de la commande"}
                     </p>
                     <p className="mt-0.5 text-xs text-charcoal">{checkoutMessage}</p>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Error & Retry Banner */}
-            {checkoutStep === "error" && checkoutError && !isSubmitting && (
-              <div className="mt-6 rounded-2xl border border-destructive/30 bg-destructive/10 p-5 shadow-xs animate-in fade-in">
-                <div className="flex items-start gap-3">
-                  <div className="rounded-full bg-destructive/20 p-1 text-destructive shrink-0 mt-0.5">
-                    <RotateCw className="h-4 w-4" />
-                  </div>
-                  <div className="flex-1">
-                    <p className="text-xs font-semibold text-destructive uppercase tracking-wider">
-                      Échec de la validation de la commande
-                    </p>
-                    <p className="mt-1 text-xs text-charcoal leading-relaxed">{checkoutError}</p>
-                    <button
-                      type="button"
-                      onClick={handleConfirmOrder}
-                      className="mt-3 inline-flex items-center gap-1.5 rounded-full bg-destructive px-5 py-2 text-xs font-semibold uppercase tracking-wider text-destructive-foreground hover:bg-destructive/90 transition-colors shadow-xs"
-                    >
-                      <RotateCw className="h-3.5 w-3.5" />
-                      <span>Réessayer l'envoi et la commande</span>
-                    </button>
-                  </div>
+              {checkoutStep === "error" && checkoutError && !isSubmitting && (
+                <div className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-xs text-charcoal">
+                  <p className="font-semibold uppercase tracking-wider text-destructive">La commande n'est pas passée</p>
+                  <p className="mt-1 leading-relaxed">{checkoutError}</p>
                 </div>
-              </div>
-            )}
+              )}
 
-            {/* Confirm Order CTA */}
-            <div className="mt-8 flex items-center justify-between border-t border-border/80 pt-6">
               <button
-                type="button"
-                onClick={() => setFunnelStage("delivery")}
-                className="text-xs uppercase tracking-widest text-muted-foreground hover:text-charcoal transition-colors py-2"
-              >
-                Retour
-              </button>
-              <button
-                onClick={handleConfirmOrder}
+                type="submit"
                 disabled={isSubmitting}
-                className="inline-flex items-center gap-2 rounded-full bg-deep-brown px-8 sm:px-10 py-4 text-xs uppercase tracking-widest font-semibold text-ivory hover:bg-charcoal transition-all shadow-luxury disabled:opacity-60 disabled:cursor-wait min-h-[48px]"
+                className="flex h-14 w-full items-center justify-center gap-2 rounded-full bg-deep-brown text-base font-semibold text-ivory shadow-luxury transition-all hover:bg-charcoal disabled:cursor-wait disabled:opacity-60"
               >
                 {isSubmitting ? (
-                  <RotateCw className="h-4 w-4 text-champagne animate-spin" />
-                ) : (
-                  <ShieldCheck className="h-4 w-4 text-champagne" />
-                )}
+                  <RotateCw className="h-5 w-5 animate-spin text-champagne" />
+                ) : null}
                 <span>
                   {isSubmitting
-                    ? checkoutMessage || "Traitement en cours…"
+                    ? "Envoi en cours…"
                     : checkoutStep === "error"
-                      ? `Réessayer (${formatTND(quote.total)})`
-                      : `Confirmer ma commande (${formatTND(quote.total)})`}
+                      ? `Réessayer · ${formatTND(quote.total)}`
+                      : `Confirmer · ${formatTND(quote.total)}`}
                 </span>
+                {!isSubmitting && <ArrowRight className="h-5 w-5 text-champagne" />}
               </button>
-            </div>
+            </form>
           </div>
         </section>
       )}
