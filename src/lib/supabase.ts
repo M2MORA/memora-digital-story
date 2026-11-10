@@ -28,16 +28,8 @@ export type MemoryRecord = {
   id: string;
   slug: string;
   title: string;
-  description?: string | null;
-  video_url: string;
-  photo_url?: string | null;
-  aspect_ratio?: string;
-  view_count?: number;
-  status: "active" | "draft" | "archived";
-  nfc_uid?: string | null;
-  user_id?: string | null;
-  created_at: string;
-  updated_at?: string;
+  description: string | null;
+  has_photo: boolean;
 };
 
 /**
@@ -48,10 +40,7 @@ export async function getMemoryBySlug(slug: string): Promise<MemoryRecord | null
 
   try {
     const { data, error } = await supabase
-      .from("memories")
-      .select("*")
-      .eq("slug", slug)
-      .eq("status", "active")
+      .rpc("get_memory_by_slug", { p_slug: slug })
       .maybeSingle();
 
     if (error) {
@@ -60,16 +49,8 @@ export async function getMemoryBySlug(slug: string): Promise<MemoryRecord | null
     }
 
     // Incrémenter le compteur de scans/vues de manière discrète
-    if (data?.id) {
-      void supabase.rpc("increment_memory_views", { memory_id: data.id }).then(({ error: rpcErr }) => {
-        if (rpcErr) {
-          // Fallback simple si la fonction RPC n'existe pas encore
-          void supabase
-            .from("memories")
-            .update({ view_count: (data.view_count || 0) + 1 })
-            .eq("id", data.id);
-        }
-      });
+    if (data) {
+      void supabase.rpc("increment_memory_views", { memory_id: (data as MemoryRecord).id });
     }
 
     return data as MemoryRecord | null;

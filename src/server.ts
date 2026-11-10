@@ -695,6 +695,120 @@ export async function handleProxyPutRoute(request: Request, _env: any): Promise<
   }
 }
 
+const PRIVATE_MEDIA_KEY_PREFIX =
+  "^staging\\/[a-zA-Z0-9_-]{3,64}\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const PRIVATE_MEDIA_KEY = {
+  video: new RegExp(`${PRIVATE_MEDIA_KEY_PREFIX}\\.(?:mp4|webm|mov)$`, "i"),
+  photo: new RegExp(`${PRIVATE_MEDIA_KEY_PREFIX}\\.(?:jpe?g|png|webp)$`, "i"),
+};
+
+async function signR2GetUrl(env: any, key: string): Promise<string | null> {
+  const accountId = env?.R2_ACCOUNT_ID || (typeof process !== "undefined" ? process.env?.["R2_ACCOUNT_ID"] : "") || "";
+  const accessKeyId = env?.R2_ACCESS_KEY_ID || (typeof process !== "undefined" ? process.env?.["R2_ACCESS_KEY_ID"] : "") || "";
+  const secretAccessKey = env?.R2_SECRET_ACCESS_KEY || (typeof process !== "undefined" ? process.env?.["R2_SECRET_ACCESS_KEY"] : "") || "";
+  const bucketName = env?.R2_BUCKET_NAME || (typeof process !== "undefined" ? process.env?.["R2_BUCKET_NAME"] : "") || "memora-videos";
+
+  if (!accountId || !accessKeyId || !secretAccessKey) return null;
+
+  const s3 = new S3Client({
+    region: "auto",
+    endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
+    credentials: { accessKeyId, secretAccessKey },
+  });
+
+  return getSignedUrl(s3, new GetObjectCommand({ Bucket: bucketName, Key: key }), { expiresIn: 3600 });
+}
+
+function signedMediaRedirect(signedUrl: string): Response {
+  return new Response(null, {
+    status: 302,
+    headers: {
+      Location: signedUrl,
+      "Access-Control-Allow-Origin": "*",
+      // Bien plus court que la validité du lien signé (1 h), pour ne jamais rejouer un lien expiré
+      "Cache-Control": "private, max-age=300",
+    },
+  });
+}
+
+/**
+ * Extrait la clé R2 d'un média enregistré pour un souvenir. L'origine enregistrée
+ * est ignorée, car elle peut être celle de l'admin (ex. localhost).
+ */
+function privateMediaKey(stored: string, requestOrigin: string, kind: "video" | "photo"): string | null {
+  let storedUrl: URL;
+  try {
+    storedUrl = new URL(stored, requestOrigin);
+  } catch {
+    return null;
+  }
+
+  if (
+    !["https:", "http:"].includes(storedUrl.protocol) ||
+    storedUrl.username ||
+    storedUrl.password ||
+    storedUrl.pathname !== "/api/media"
+  ) {
+    return null;
+  }
+
+  const key = storedUrl.searchParams.get("key")?.trim() ?? "";
+  return PRIVATE_MEDIA_KEY[kind].test(key) ? key : null;
+}
+
+/**
+ * Page NFC : résout un souvenir actif par son slug côté serveur puis redirige vers
+ * un lien R2 signé. La clé de stockage n'apparaît jamais dans la page.
+ */
+export async function handleMemoryMediaRoute(
+  request: Request,
+  env: any,
+  dependencies?: { supabaseAdmin?: any; signUrl?: (key: string) => Promise<string | null> },
+): Promise<Response> {
+  const unavailable = () =>
+    new Response("Souvenir introuvable ou indisponible", {
+      status: 404,
+      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+    });
+
+  const url = new URL(request.url);
+  const slug = url.searchParams.get("slug") ?? "";
+  const kind = url.searchParams.get("kind") === "photo" ? "photo" : "video";
+  if (!slug || slug.length > 160 || /[\0\r\n]/.test(slug)) return unavailable();
+
+  try {
+    const supabaseAdmin = dependencies?.supabaseAdmin ?? getSupabaseAdmin(env);
+    const { data: memory, error } = await supabaseAdmin
+      .from("memories")
+      .select("video_url, photo_url")
+      .eq("slug", slug)
+      .eq("status", "active")
+      .maybeSingle();
+
+    const stored = kind === "photo" ? memory?.photo_url : memory?.video_url;
+    if (error || !stored) return unavailable();
+
+    const key = privateMediaKey(stored, url.origin, kind);
+    if (!key) return unavailable();
+
+    const signedUrl = await (dependencies?.signUrl ?? ((k: string) => signR2GetUrl(env, k)))(key);
+    if (!signedUrl) {
+      return new Response("Service vidéo indisponible", {
+        status: 503,
+        headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+      });
+    }
+
+    return signedMediaRedirect(signedUrl);
+  } catch (error) {
+    console.error("[memory-media] Lien signé impossible:", error);
+    return new Response("Service vidéo indisponible", {
+      status: 503,
+      headers: { "content-type": "text/plain; charset=utf-8", "cache-control": "no-store" },
+    });
+  }
+}
+
 export async function handleMediaRoute(request: Request, env: any): Promise<Response> {
   const url = new URL(request.url);
   const key = url.searchParams.get("key");
@@ -705,51 +819,25 @@ export async function handleMediaRoute(request: Request, env: any): Promise<Resp
     });
   }
 
+  // Seuls les médias clients (clé non devinable) peuvent être signés
   const cleanKey = key.trim().replace(/^\/+/, "");
-  if (cleanKey.includes("..") || cleanKey.includes("\0")) {
+  if (!PRIVATE_MEDIA_KEY.video.test(cleanKey) && !PRIVATE_MEDIA_KEY.photo.test(cleanKey)) {
     return new Response(JSON.stringify({ error: "Clé non autorisée" }), {
       status: 403,
       headers: { "content-type": "application/json" },
     });
   }
 
-  const accountId = env?.R2_ACCOUNT_ID || (typeof process !== "undefined" ? process.env?.["R2_ACCOUNT_ID"] : "") || "";
-  const accessKeyId = env?.R2_ACCESS_KEY_ID || (typeof process !== "undefined" ? process.env?.["R2_ACCESS_KEY_ID"] : "") || "";
-  const secretAccessKey = env?.R2_SECRET_ACCESS_KEY || (typeof process !== "undefined" ? process.env?.["R2_SECRET_ACCESS_KEY"] : "") || "";
-  const bucketName = env?.R2_BUCKET_NAME || (typeof process !== "undefined" ? process.env?.["R2_BUCKET_NAME"] : "") || "memora-videos";
-
-  if (!accountId || !accessKeyId || !secretAccessKey) {
-    return new Response(JSON.stringify({ error: "Configuration stockage indisponible" }), {
-      status: 500,
-      headers: { "content-type": "application/json" },
-    });
-  }
-
   try {
-    const s3 = new S3Client({
-      region: "auto",
-      endpoint: `https://${accountId}.r2.cloudflarestorage.com`,
-      credentials: { accessKeyId, secretAccessKey },
-    });
+    const signedUrl = await signR2GetUrl(env, cleanKey);
+    if (!signedUrl) {
+      return new Response(JSON.stringify({ error: "Configuration stockage indisponible" }), {
+        status: 500,
+        headers: { "content-type": "application/json" },
+      });
+    }
 
-    const signedUrl = await getSignedUrl(
-      s3,
-      new GetObjectCommand({
-        Bucket: bucketName,
-        Key: cleanKey,
-      }),
-      { expiresIn: 3600 }
-    );
-
-    return new Response(null, {
-      status: 302,
-      headers: {
-        Location: signedUrl,
-        "Access-Control-Allow-Origin": "*",
-        // Bien plus court que la validité du lien signé (1 h), pour ne jamais rejouer un lien expiré
-        "Cache-Control": "private, max-age=300",
-      },
-    });
+    return signedMediaRedirect(signedUrl);
   } catch (err: any) {
     console.error("[media] Erreur génération URL présignée:", err);
     return new Response(JSON.stringify({ error: "Fichier média introuvable" }), {
@@ -795,28 +883,10 @@ function r2BodyToReadableStream(body: unknown): ReadableStream<Uint8Array> | nul
 }
 
 function memoryVideoKey(videoUrl: string, requestOrigin: string): { key: string; contentType: string } | null {
-  let storedUrl: URL;
-  try {
-    storedUrl = new URL(videoUrl, requestOrigin);
-  } catch {
-    return null;
-  }
-
   // `video_url` is an internal pointer written by the existing upload/admin flow.
   // Only this server-side value is accepted; a caller can never provide an R2 key.
-  if (
-    !["https:", "http:"].includes(storedUrl.protocol) ||
-    storedUrl.username ||
-    storedUrl.password ||
-    storedUrl.pathname !== "/api/media"
-  ) {
-    return null;
-  }
-
-  const key = storedUrl.searchParams.get("key")?.trim() ?? "";
-  const isPrivateVideoKey =
-    /^staging\/[a-zA-Z0-9_-]{3,64}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.(?:mp4|webm|mov)$/i.test(key);
-  if (!isPrivateVideoKey) return null;
+  const key = privateMediaKey(videoUrl, requestOrigin, "video");
+  if (!key) return null;
 
   const extension = key.split(".").pop()?.toLowerCase();
   const contentTypeByExtension: Record<string, string> = {
@@ -1017,6 +1087,9 @@ export default {
       }
       if (url.pathname === "/api/media" && request.method === "GET") {
         return await handleMediaRoute(request, env);
+      }
+      if (url.pathname === "/api/memory-media" && (request.method === "GET" || request.method === "HEAD")) {
+        return await handleMemoryMediaRoute(request, env);
       }
       if (url.pathname === "/api/nfc-video" && (request.method === "GET" || request.method === "HEAD")) {
         const slug = url.searchParams.get("slug") ?? "";

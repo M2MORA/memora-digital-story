@@ -113,8 +113,33 @@ export default function Dashboard({ email }: { email: string }) {
     localStorage.setItem("memora_admin_site_url", clean);
   };
 
-  const slugFor = (o: Order, itemIndex: number) =>
-    o.items.length > 1 ? `${o.order_number.toLowerCase()}-${itemIndex + 1}` : o.order_number.toLowerCase();
+  const intentFor = (o: Order, it: Record<string, unknown>, kind: "photo" | "video") => {
+    const itemId = (it["id"] || it["key"]) as string | undefined;
+    return uploadIntents
+      .filter(
+        (ui) =>
+          (ui.order_id === o.id || (o.draft_id && ui.draft_id === o.draft_id)) &&
+          (!itemId || ui.item_id === itemId) &&
+          ui.file_kind === kind
+      )
+      .sort((a, b) => {
+        const scoreA = (a.order_id === o.id ? 10 : 0) + (a.status === "consumed" ? 5 : 0);
+        const scoreB = (b.order_id === o.id ? 10 : 0) + (b.status === "consumed" ? 5 : 0);
+        return scoreB - scoreA;
+      })[0];
+  };
+
+  // Le lien NFC ne doit pas pouvoir être deviné : il reprend l'identifiant aléatoire de la
+  // vidéo. Un souvenir déjà créé avec l'ancien format garde son lien.
+  const slugFor = (o: Order, itemIndex: number) => {
+    const legacySlug =
+      o.items.length > 1 ? `${o.order_number.toLowerCase()}-${itemIndex + 1}` : o.order_number.toLowerCase();
+    if (memories.some((m) => m.slug === legacySlug)) return legacySlug;
+
+    const item = o.items[itemIndex] as Record<string, unknown> | undefined;
+    const videoIntent = item ? intentFor(o, item, "video") : undefined;
+    return videoIntent ? videoIntent.id.replace(/-/g, "") : legacySlug;
+  };
 
   // Keep the NFC URL stable; the public server route resolves it to a fresh,
   // short-lived signed R2 video URL whenever it is opened or scanned.
@@ -139,21 +164,7 @@ export default function Dashboard({ email }: { email: string }) {
       : it["videoUrl"] || it["video_url"] || it["videoPreviewUrl"]) as string | undefined;
     if (direct) return direct;
 
-    const itemId = (it["id"] || it["key"]) as string | undefined;
-    const matchingIntents = uploadIntents
-      .filter(
-        (ui) =>
-          (ui.order_id === o.id || (o.draft_id && ui.draft_id === o.draft_id)) &&
-          (!itemId || ui.item_id === itemId) &&
-          ui.file_kind === kind
-      )
-      .sort((a, b) => {
-        const scoreA = (a.order_id === o.id ? 10 : 0) + (a.status === "consumed" ? 5 : 0);
-        const scoreB = (b.order_id === o.id ? 10 : 0) + (b.status === "consumed" ? 5 : 0);
-        return scoreB - scoreA;
-      });
-
-    const intent = matchingIntents[0];
+    const intent = intentFor(o, it, kind);
     if (intent?.storage_key) {
       return `${siteUrl}/api/media?key=${encodeURIComponent(intent.storage_key)}`;
     }

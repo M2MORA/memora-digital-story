@@ -4,7 +4,6 @@ import { MessageCircle, Play, Volume2, VolumeX, X } from "lucide-react";
 import moments from "@/assets/product-moments.jpg";
 import scan from "@/assets/scan.jpg";
 import { getMemoryBySlug } from "@/lib/supabase";
-import { resolveMemoryMediaSrc } from "@/lib/memory-video";
 
 type Memory = {
   title: string;
@@ -39,11 +38,12 @@ export const Route = createFileRoute("/m/$memorySlug")({
     const record = await getMemoryBySlug(params.memorySlug);
     if (!record) throw notFound();
 
+    const mediaUrl = `/api/memory-media?slug=${encodeURIComponent(params.memorySlug)}`;
     return {
       memory: {
         title: record.title,
-        videoUrl: resolveMemoryMediaSrc(record.video_url),
-        coverPhoto: record.photo_url ? resolveMemoryMediaSrc(record.photo_url) : undefined,
+        videoUrl: mediaUrl,
+        coverPhoto: record.has_photo ? `${mediaUrl}&kind=photo` : undefined,
         message: record.description ?? "",
       },
     };
