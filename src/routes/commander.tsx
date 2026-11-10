@@ -551,6 +551,22 @@ function CommanderPage() {
       toast.error("Votre panier est vide");
       return;
     }
+    const fullName = `${customer.firstName} ${customer.lastName}`.trim();
+    if (fullName.length < 2) {
+      toast.error("Indique ton nom et prénom");
+      return;
+    }
+    // Numéro tunisien : 8 chiffres, avec ou sans l'indicatif 216 tapé par le client
+    const phoneDigits = customer.phone.replace(/\D/g, "").replace(/^216(?=\d{8}$)/, "");
+    if (!/^\d{8}$/.test(phoneDigits)) {
+      toast.error("Le téléphone doit avoir 8 chiffres, par exemple 20 123 456");
+      return;
+    }
+    const customerPhone = `+216 ${phoneDigits}`;
+    if (!shipping.city || shipping.address.trim().length < 4) {
+      toast.error("Indique ton gouvernorat et ton adresse");
+      return;
+    }
 
     setIsSubmitting(true);
     setCheckoutError(null);
@@ -641,12 +657,13 @@ function CommanderPage() {
         return finalizeOrderWithIntents({
           orderPayload: {
             order_number: newOrderNum,
-            customer_name: `${customer.firstName} ${customer.lastName}`.trim() || "Client Mémora",
+            customer_name: fullName,
             customer_email: customer.email || "client@memora.tn",
-            customer_phone: customer.phone,
+            customer_phone: customerPhone,
             shipping_address: {
               ...shipping,
-              recipient: `${customer.firstName} ${customer.lastName}`.trim(),
+              address: shipping.address.trim(),
+              recipient: fullName,
             },
             items: normalizedItems,
             promo_code: promoInput.trim() || undefined,
@@ -1469,7 +1486,7 @@ function CommanderPage() {
             <div className="border-b border-border/80 pb-6">
               <div className="inline-flex items-center gap-1.5 text-xs uppercase tracking-wider text-deep-brown font-semibold">
                 <Sparkles className="h-4 w-4 text-champagne" />
-                <span>Étape 3 · Aperçu interactif de votre MÉMORA</span>
+                <span>Étape 2 · Aperçu de votre MÉMORA</span>
               </div>
               <h2 className="mt-1 font-serif text-3xl sm:text-4xl text-charcoal">Aperçu de votre MÉMORA</h2>
               <p className="mt-1 text-sm text-muted-foreground">
@@ -1841,12 +1858,12 @@ function CommanderPage() {
                     type="tel"
                     inputMode="numeric"
                     autoComplete="tel-national"
-                    pattern="[0-9 ]{8,11}"
+                    pattern="\s*(216\s*)?(\d\s*){8}"
                     title="8 chiffres, par exemple 20 123 456"
                     placeholder="20 123 456"
                     value={customer.phone}
                     onChange={(e) =>
-                      setCustomer({ ...customer, phone: e.target.value.replace(/[^\d ]/g, "").slice(0, 11) })
+                      setCustomer({ ...customer, phone: e.target.value.replace(/[^\d ]/g, "").slice(0, 16) })
                     }
                     className="min-w-0 flex-1 bg-transparent px-4 text-base outline-hidden"
                   />

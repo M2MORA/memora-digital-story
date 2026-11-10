@@ -171,7 +171,7 @@ function Studio() {
       qty: 1,
     });
     toast.success("Votre création Mémora a été ajoutée au panier !");
-    navigate({ to: "/commander" });
+    navigate({ to: "/commander", search: { stage: "cart" } });
   };
 
   return (
