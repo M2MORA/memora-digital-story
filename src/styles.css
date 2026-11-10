@@ -208,6 +208,94 @@
   box-shadow: 0 12px 36px -6px rgba(44, 36, 32, 0.08), 0 4px 12px -2px rgba(44, 36, 32, 0.03);
 }
 
+/* Parcours de commande /commander : palette de la maquette validée */
+@theme {
+  --color-m-backdrop: #e9e1d6;
+  --color-m-linen: #f5f0e8;
+  --color-m-paper: #fbf8f3;
+  --color-m-stage: #eadfd0;
+  --color-m-blush: #efe3d8;
+  --color-m-line: #e4dacb;
+  --color-m-line-strong: #d9cbb8;
+  --color-m-dot: #cbbca8;
+  --color-m-wine: #541f32;
+  --color-m-ink: #2a1a1f;
+  --color-m-night: #1e1418;
+  --color-m-muted: #5e4c52;
+  --color-m-step: #7a6a6f;
+  --color-m-rose: #c58b83;
+  --color-m-sage: #2f6b4f;
+  --color-m-off: #dcc9c3;
+  --color-m-off-ink: #6e5a5f;
+}
+
+/* Aperçu : le téléphone s'approche de la carte puis la vidéo démarre */
+@keyframes memora-phone {
+  0% {
+    transform: translate(170px, 70px) rotate(10deg);
+    opacity: 0;
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  50%,
+  100% {
+    transform: translate(58px, 18px) rotate(-5deg);
+    opacity: 1;
+  }
+}
+
+@keyframes memora-play {
+  0%,
+  52% {
+    opacity: 0;
+  }
+
+  62%,
+  100% {
+    opacity: 1;
+  }
+}
+
+@keyframes memora-bar {
+  from {
+    width: 0;
+  }
+
+  to {
+    width: 100%;
+  }
+}
+
+@utility animate-memora-phone {
+  animation: memora-phone 4.5s cubic-bezier(0.2, 0.7, 0.2, 1) infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    transform: translate(58px, 18px) rotate(-5deg);
+  }
+}
+
+@utility animate-memora-play {
+  animation: memora-play 4.5s ease infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    opacity: 1;
+  }
+}
+
+@utility animate-memora-bar {
+  animation: memora-bar 4.5s linear infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    width: 40%;
+  }
+}
+
 @keyframes rise {
   from {
     opacity: 0;

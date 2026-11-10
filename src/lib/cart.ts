@@ -162,6 +162,15 @@ export const cart = {
     return newItem;
   },
 
+  // Met à jour une création déjà au panier (ex. photo recadrée après coup)
+  update(key: string, patch: Partial<Omit<CartItem, "key" | "productId" | "qty">>) {
+    load();
+    set({
+      ...state,
+      items: state.items.map((i) => (i.key === key ? { ...i, ...patch } : i)),
+    });
+  },
+
   remove(key: string) {
     load();
     set({ ...state, items: state.items.filter((i) => i.key !== key) });

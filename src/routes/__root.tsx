@@ -99,7 +99,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;1,300;1,400&family=Manrope:wght@300;400;500;600&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Manrope:wght@300;400;500;600;700&display=swap",
       },
     ],
   }),
@@ -125,7 +125,10 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
-  const immersive = useRouterState({ select: (s) => s.location.pathname.startsWith("/m/") });
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  // Le parcours de commande a son propre en-tête et son bouton fixé en bas
+  const isOrderFlow = pathname === "/commander";
+  const immersive = pathname.startsWith("/m/") || isOrderFlow;
 
   return (
     <QueryClientProvider client={queryClient}>
@@ -136,7 +139,7 @@ function RootComponent() {
       </main>
       {!immersive && <SiteFooter />}
       {!immersive && <WhatsAppFloat />}
-      <Toaster />
+      <Toaster position={isOrderFlow ? "top-center" : "bottom-right"} />
     </QueryClientProvider>
   );
 }
