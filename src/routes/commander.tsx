@@ -665,8 +665,9 @@ function CommanderPage() {
       forgetDraftUploads(draftId);
       clearDraftOrderNumber(draftId);
 
-      // Cleanup policy : suppression des fichiers locaux UNIQUEMENT après succès
-      await clearDraftMedia(draftId);
+      // Cleanup policy : suppression des fichiers locaux UNIQUEMENT après succès.
+      // Non attendue : effacer une grosse vidéo ne doit pas retarder la confirmation.
+      void clearDraftMedia(draftId);
       cart.clear();
 
       setCheckoutStep("confirmed");
