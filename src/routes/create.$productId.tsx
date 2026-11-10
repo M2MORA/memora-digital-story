@@ -57,7 +57,8 @@ function Studio() {
   const [photoFile, setPhotoFile] = useState<File | null>(null);
   const [photoUrl, setPhotoUrl] = useState<string>(product.images[0] ?? "");
   const [photoName, setPhotoName] = useState("photo_recto.jpg");
-  const [withFrame, setWithFrame] = useState(product.category === "grand-format");
+  // Le cadre est proposé par défaut pour les grands formats uniquement
+  const [withFrame] = useState(product.formatCode === "20x30" || product.formatCode === "30x45");
   const [isMobileModalOpen, setIsMobileModalOpen] = useState(false);
   const [previewSide, setPreviewSide] = useState<"recto" | "verso">("recto");
 
