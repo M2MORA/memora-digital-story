@@ -87,10 +87,10 @@ export function SiteFooter() {
         {cols.map((c) => (
           <div key={c.title}>
             <p className="text-[11px] uppercase tracking-[0.22em] font-semibold text-champagne">{c.title}</p>
-            <ul className="mt-5 space-y-2.5">
+            <ul className="mt-3 sm:mt-5 sm:space-y-2.5">
               {c.links.map((l) => (
                 <li key={l.label}>
-                  <Link to={l.href} className="text-xs text-ivory/70 hover:text-champagne transition-colors py-0.5 block">
+                  <Link to={l.href} className="text-xs text-ivory/70 hover:text-champagne transition-colors py-3 sm:py-0.5 block">
                     {l.label}
                   </Link>
                 </li>

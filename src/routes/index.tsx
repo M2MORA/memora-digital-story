@@ -245,7 +245,7 @@ export function Home() {
               onClick={() => {
                 setIsPriceDrawerOpen(true);
               }}
-              className="text-xs uppercase tracking-widest font-semibold text-deep-brown hover:text-charcoal underline underline-offset-6 transition-colors"
+              className="inline-flex min-h-11 items-center text-xs uppercase tracking-widest font-semibold text-deep-brown hover:text-charcoal underline underline-offset-6 transition-colors"
             >
               Voir la grille des tarifs dégressifs
             </button>
@@ -305,7 +305,7 @@ export function Home() {
                     onClick={() => {
                       setIsPriceDrawerOpen(true);
                     }}
-                    className="w-full text-center text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 py-1.5 transition-colors"
+                    className="w-full min-h-11 text-center text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 py-1.5 transition-colors"
                   >
                     Voir les tarifs dégressifs
                   </button>

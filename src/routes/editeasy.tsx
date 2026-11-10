@@ -196,7 +196,7 @@ function EditEasyPage() {
         </p>
 
         {/* Stepper Tabs */}
-        <div className="mt-10 flex items-center justify-center gap-2 sm:gap-4 border-b border-border pb-6 overflow-x-auto text-xs sm:text-sm font-medium">
+        <div className="mt-10 grid grid-cols-4 gap-1 sm:flex sm:items-center sm:justify-center sm:gap-4 border-b border-border pb-6 text-[11px] sm:text-sm font-medium">
           {[
             { step: 1, label: "1. Fichiers", icon: UploadCloud },
             { step: 2, label: "2. Musique", icon: Music },
@@ -215,7 +215,7 @@ function EditEasyPage() {
                   }
                 }}
                 disabled={currentStep === 4}
-                className={`flex items-center gap-2 rounded-full px-4 py-2 transition-all ${
+                className={`flex min-h-11 flex-col items-center justify-center gap-1 whitespace-nowrap rounded-2xl px-1 py-2 sm:flex-row sm:gap-2 sm:rounded-full sm:px-4 transition-all ${
                   active
                     ? "bg-foreground text-background shadow-xs"
                     : completed
