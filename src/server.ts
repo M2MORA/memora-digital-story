@@ -9,6 +9,7 @@ import {
   S3CompatibleR2Adapter,
   R2StorageAdapter,
   timingSafeCompare,
+  sha256Hex,
 } from "./lib/r2-backend";
 import { createClient } from "@supabase/supabase-js";
 import { S3Client, GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
@@ -178,6 +179,66 @@ function getSupabaseAdmin(env: any) {
   return createClient(url, serviceKey, {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+}
+
+const ACTIVE_INTENT_STATUSES = ["pending", "uploading", "ready"];
+const READY_INTENT_LIFETIME_MS = 24 * 60 * 60 * 1000;
+
+/**
+ * Libère le quota du panier avant une nouvelle intention : les intentions
+ * expirées ne comptent plus, et celles du même média sont remplacées.
+ * Limité au détenteur du draft_token. Un échec ici ne bloque pas l'envoi.
+ */
+async function releaseStaleUploadIntents(
+  supabaseAdmin: any,
+  params: { draftId: string; draftToken: string; itemId: string | null; fileKind: string },
+): Promise<void> {
+  try {
+    const tokenHash = await sha256Hex(params.draftToken);
+    const now = new Date().toISOString();
+
+    await supabaseAdmin
+      .from("upload_intents")
+      .update({ status: "expired", updated_at: now })
+      .eq("draft_id", params.draftId)
+      .eq("draft_token_hash", tokenHash)
+      .in("status", ACTIVE_INTENT_STATUSES)
+      .lt("expires_at", now);
+
+    if (params.itemId) {
+      await supabaseAdmin
+        .from("upload_intents")
+        .update({ status: "cancelled", updated_at: now })
+        .eq("draft_id", params.draftId)
+        .eq("draft_token_hash", tokenHash)
+        .eq("item_id", params.itemId)
+        .eq("file_kind", params.fileKind)
+        .in("status", ACTIVE_INTENT_STATUSES)
+        .is("order_id", null);
+    }
+  } catch (err) {
+    console.warn("[upload-intent] Libération des anciennes intentions impossible:", err);
+  }
+}
+
+/**
+ * Un fichier vérifié reste utilisable 24 h, le temps que le client termine sa
+ * commande. À n'appeler qu'après validation du draft_token.
+ */
+export async function extendReadyUploadIntent(supabaseAdmin: any, intentId: string): Promise<void> {
+  try {
+    await supabaseAdmin
+      .from("upload_intents")
+      .update({
+        expires_at: new Date(Date.now() + READY_INTENT_LIFETIME_MS).toISOString(),
+        updated_at: new Date().toISOString(),
+      })
+      .eq("id", intentId)
+      .eq("status", "ready")
+      .is("order_id", null);
+  } catch (err) {
+    console.warn("[upload-verify] Prolongation de l'intention impossible:", err);
+  }
 }
 
 export async function handleUploadIntentRoute(
@@ -354,6 +415,13 @@ export async function handleUploadIntentRoute(
     );
   }
 
+  await releaseStaleUploadIntents(supabaseAdmin, {
+    draftId: draft_id.trim(),
+    draftToken: draft_token.trim(),
+    itemId: cleanItemId,
+    fileKind: file_kind,
+  });
+
   // 5. Appel de la procédure stockée create_upload_intent
   let rpcData: any;
   try {
@@ -445,6 +513,10 @@ export async function handleUploadVerificationRoute(request: Request, env: any):
       draft_token: body.draft_token,
     });
 
+    if (result.success && result.status === "ready") {
+      await extendReadyUploadIntent(supabaseAdmin, body.intent_id);
+    }
+
     const status = result.success ? 200 : result.code === "INTENT_NOT_FOUND" ? 404 : 400;
     return new Response(JSON.stringify(result), {
       status,
@@ -461,7 +533,12 @@ export async function handleUploadVerificationRoute(request: Request, env: any):
 async function handleOrphanPurgeRoute(request: Request, env: any): Promise<Response> {
   try {
     // Comportement fail-closed P0 : Si PURGE_CRON_SECRET est absent ou vide -> refus 500
-    const cronSecret = env?.PURGE_CRON_SECRET;
+    // Sur Vercel, les secrets sont dans process.env et CRON_SECRET authentifie les tâches planifiées
+    const cronSecret =
+      env?.PURGE_CRON_SECRET ||
+      (typeof process !== "undefined"
+        ? process.env?.["PURGE_CRON_SECRET"] || process.env?.["CRON_SECRET"]
+        : "");
     if (!cronSecret || typeof cronSecret !== "string" || !cronSecret.trim()) {
       return new Response(
         JSON.stringify({ error: "Configuration serveur incomplète (PURGE_CRON_SECRET non configuré)" }),
@@ -930,7 +1007,8 @@ export default {
       if (url.pathname === "/api/upload/verify" && request.method === "POST") {
         return await handleUploadVerificationRoute(request, env);
       }
-      if (url.pathname === "/api/upload/purge" && request.method === "POST") {
+      // Vercel Cron appelle les routes en GET
+      if (url.pathname === "/api/upload/purge" && (request.method === "POST" || request.method === "GET")) {
         return await handleOrphanPurgeRoute(request, env);
       }
       if (url.pathname === "/api/upload/proxy-put" && (request.method === "PUT" || request.method === "POST")) {

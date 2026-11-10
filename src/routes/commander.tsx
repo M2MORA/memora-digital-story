@@ -37,7 +37,13 @@ import { toast } from "sonner";
 import { cart, useStore, CartItem } from "@/lib/cart";
 import { finalizeOrderWithIntents } from "@/lib/supabase";
 import { putCachedMedia, getCachedMedia, clearDraftMedia, getMediaCacheKey } from "@/lib/media-cache";
-import { uploadMediaWithR2Intent } from "@/lib/r2-upload-client";
+import {
+  cancelBackgroundUpload,
+  forgetDraftUploads,
+  startBackgroundUpload,
+  useBackgroundUploads,
+} from "@/lib/background-uploads";
+import { clearDraftOrderNumber, getOrCreateDraftOrderNumber } from "@/lib/draft-manager";
 import PhotoCustomizer, { type CropSettings } from "@/components/site/PhotoCustomizer";
 
 const TUNISIAN_GOVERNORATES = [
@@ -213,15 +219,12 @@ function CommanderPage() {
   const [giftCardInput, setGiftCardInput] = useState("");
   const [orderNumber, setOrderNumber] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [uploadPct, setUploadPct] = useState(0);
 
   // États détaillés du cycle d'upload et de commande R2
   type CheckoutStep =
     | "idle"
     | "preparing"
-    | "uploading_photo"
-    | "uploading_video"
-    | "verifying"
+    | "uploading_media"
     | "finalizing"
     | "confirmed"
     | "error";
@@ -229,7 +232,48 @@ function CommanderPage() {
   const [checkoutStep, setCheckoutStep] = useState<CheckoutStep>("idle");
   const [checkoutMessage, setCheckoutMessage] = useState("");
   const [checkoutError, setCheckoutError] = useState<string | null>(null);
-  const [checkoutProgressIndex, setCheckoutProgressIndex] = useState(0);
+
+  // Progression des envois en arrière-plan pour les articles du panier
+  const backgroundUploads = useBackgroundUploads();
+  const mediaUploads = backgroundUploads.filter(
+    (upload) => upload.draftId === draftId && items.some((item) => item.key === upload.itemId),
+  );
+  const uploadTotalBytes = mediaUploads.reduce((sum, upload) => sum + upload.total, 0);
+  const uploadLoadedBytes = mediaUploads.reduce(
+    (sum, upload) => sum + (upload.status === "ready" ? upload.total : upload.loaded),
+    0,
+  );
+  const uploadPercent =
+    uploadTotalBytes > 0
+      ? Math.min(100, Math.round((uploadLoadedBytes / uploadTotalBytes) * 100))
+      : 0;
+  const uploadReadyCount = mediaUploads.filter((upload) => upload.status === "ready").length;
+  const isUploadingMedia = mediaUploads.some(
+    (upload) => upload.status === "queued" || upload.status === "uploading",
+  );
+  const hasUploadError = mediaUploads.some((upload) => upload.status === "error");
+
+  // Dès que l'article est au panier, ses médias partent sans attendre la confirmation
+  useEffect(() => {
+    if (!draftId || !["cart", "delivery", "payment"].includes(funnelStage)) return;
+
+    let isCurrent = true;
+    void (async () => {
+      for (const item of items) {
+        for (const kind of ["photo", "video"] as const) {
+          const file = await getCachedMedia(getMediaCacheKey(draftId, item.key, kind));
+          if (!isCurrent) return;
+          if (file) {
+            startBackgroundUpload({ draftId, draftToken, itemId: item.key, kind, file }).catch(() => {});
+          }
+        }
+      }
+    })();
+
+    return () => {
+      isCurrent = false;
+    };
+  }, [draftId, draftToken, items, funnelStage]);
 
   // Video duration surcharge calculation
   const extraVideoMinutes =
@@ -297,6 +341,9 @@ function CommanderPage() {
     if (videoUrl.startsWith("blob:")) {
       URL.revokeObjectURL(videoUrl);
     }
+    // Le client change de vidéo : l'envoi de la précédente s'arrête immédiatement
+    cancelBackgroundUpload(draftId, currentItemKey, "video");
+
     const url = URL.createObjectURL(file);
     setVideoFile(file);
     setVideoUrl(url);
@@ -470,6 +517,20 @@ function CommanderPage() {
     );
   };
 
+  // L'envoi commence quand le client a validé sa vidéo, pas à la simple sélection
+  const handleValidateVideo = () => {
+    if (videoFile) {
+      startBackgroundUpload({
+        draftId,
+        draftToken,
+        itemId: currentItemKey,
+        kind: "video",
+        file: videoFile,
+      }).catch(() => {});
+    }
+    setFunnelStage("photo");
+  };
+
   // Final Checkout Submission — DIRECT CLOUDFLARE R2 PIPELINE
   const handleConfirmOrder = async () => {
     if (isSubmitting) return;
@@ -484,7 +545,7 @@ function CommanderPage() {
 
     setIsSubmitting(true);
     setCheckoutError(null);
-    const newOrderNum = `MEM-${Math.floor(100000 + Math.random() * 900000)}`;
+    const newOrderNum = getOrCreateDraftOrderNumber(draftId);
     setOrderNumber(newOrderNum);
 
     try {
@@ -499,8 +560,6 @@ function CommanderPage() {
       }> = [];
 
       for (const [i, it] of items.entries()) {
-        setCheckoutProgressIndex(i + 1);
-
         const photoFile = await getCachedMedia(getMediaCacheKey(draftId, it.key, "photo"));
         const videoFile = await getCachedMedia(getMediaCacheKey(draftId, it.key, "video"));
 
@@ -525,55 +584,33 @@ function CommanderPage() {
         preparedMedia.push({ item: it, photoFile, videoFile });
       }
 
-      // Steps B, C, D — Upload direct vers R2 & Vérification backend pour chaque fichier
-      const intentMappings: Array<{
-        item_id: string;
-        intent_id: string;
-        file_kind: "photo" | "video";
-      }> = [];
+      // Les fichiers déjà envoyés sont réutilisés ; seul ce qui manque est attendu
+      const resolveIntentMappings = async () => {
+        setCheckoutStep("uploading_media");
+        setCheckoutMessage("Envoi de vos fichiers...");
 
-      for (const [i, media] of preparedMedia.entries()) {
-        const { item, photoFile, videoFile } = media;
-        setCheckoutProgressIndex(i + 1);
+        const media = preparedMedia.flatMap(({ item, photoFile, videoFile }) => [
+          { item_id: item.key, file_kind: "photo" as const, file: photoFile },
+          { item_id: item.key, file_kind: "video" as const, file: videoFile },
+        ]);
 
-        // Upload Photo
-        setCheckoutStep("uploading_photo");
-        setCheckoutMessage(`Envoi direct de la photo (${i + 1}/${items.length}) vers Cloudflare R2...`);
-        const photoIntentId = await uploadMediaWithR2Intent({
-          draftId,
-          draftToken,
-          itemId: item.key,
-          fileKind: "photo",
-          file: photoFile,
-        });
-        intentMappings.push({
-          item_id: item.key,
-          intent_id: photoIntentId,
-          file_kind: "photo",
-        });
+        return Promise.all(
+          media.map(async ({ item_id, file_kind, file }) => ({
+            item_id,
+            file_kind,
+            intent_id: await startBackgroundUpload({
+              draftId,
+              draftToken,
+              itemId: item_id,
+              kind: file_kind,
+              file,
+            }),
+          })),
+        );
+      };
 
-        // Upload Video
-        setCheckoutStep("uploading_video");
-        setCheckoutMessage(`Envoi direct de la vidéo (${i + 1}/${items.length}) vers Cloudflare R2...`);
-        const videoIntentId = await uploadMediaWithR2Intent({
-          draftId,
-          draftToken,
-          itemId: item.key,
-          fileKind: "video",
-          file: videoFile,
-        });
-        intentMappings.push({
-          item_id: item.key,
-          intent_id: videoIntentId,
-          file_kind: "video",
-        });
-      }
-
-      // Step E — Finalisation atomique & idempotente de la commande
-      setCheckoutStep("finalizing");
-      setCheckoutMessage("Finalisation et enregistrement de votre commande...");
-
-      const idempotencyKey = `idem_${draftId}_${newOrderNum}`;
+      // Clé stable par panier : une nouvelle tentative est reconnue par le serveur
+      const idempotencyKey = `idem_${draftId}`;
       const normalizedItems = items.map((it) => ({
         id: it.key,
         productId: it.productId,
@@ -585,29 +622,48 @@ function CommanderPage() {
         qty: it.qty,
       }));
 
-      const finalizeResult = await finalizeOrderWithIntents({
-        orderPayload: {
-          order_number: newOrderNum,
-          customer_name: `${customer.firstName} ${customer.lastName}`.trim() || "Client Mémora",
-          customer_email: customer.email || "client@memora.tn",
-          customer_phone: customer.phone,
-          shipping_address: {
-            ...shipping,
-            recipient: `${customer.firstName} ${customer.lastName}`.trim(),
+      // Finalisation atomique & idempotente de la commande
+      const finalizeOrder = async (
+        intentMappings: Awaited<ReturnType<typeof resolveIntentMappings>>,
+      ) => {
+        setCheckoutStep("finalizing");
+        setCheckoutMessage("Enregistrement de votre commande...");
+
+        return finalizeOrderWithIntents({
+          orderPayload: {
+            order_number: newOrderNum,
+            customer_name: `${customer.firstName} ${customer.lastName}`.trim() || "Client Mémora",
+            customer_email: customer.email || "client@memora.tn",
+            customer_phone: customer.phone,
+            shipping_address: {
+              ...shipping,
+              recipient: `${customer.firstName} ${customer.lastName}`.trim(),
+            },
+            items: normalizedItems,
+            promo_code: promoInput.trim() || undefined,
+            shipping_carrier: shipping.carrier || "aramex",
           },
-          items: normalizedItems,
-          promo_code: promoInput.trim() || undefined,
-          shipping_carrier: shipping.carrier || "aramex",
-        },
-        draftId,
-        draftToken,
-        intentMappings,
-        idempotencyKey,
-      });
+          draftId,
+          draftToken,
+          intentMappings,
+          idempotencyKey,
+        });
+      };
+
+      let finalizeResult = await finalizeOrder(await resolveIntentMappings());
+
+      // Fichiers devenus trop anciens côté serveur : un seul renvoi complet
+      if (!finalizeResult.success && /expir/i.test(finalizeResult.error ?? "")) {
+        forgetDraftUploads(draftId);
+        finalizeResult = await finalizeOrder(await resolveIntentMappings());
+      }
 
       if (!finalizeResult.success) {
         throw new Error(finalizeResult.error || "Échec de finalisation de la commande");
       }
+
+      forgetDraftUploads(draftId);
+      clearDraftOrderNumber(draftId);
 
       // Cleanup policy : suppression des fichiers locaux UNIQUEMENT après succès
       await clearDraftMedia(draftId);
@@ -619,6 +675,10 @@ function CommanderPage() {
     } catch (err: any) {
       console.error("Erreur commande R2 / Finalisation:", err);
       const msg = err?.message || "Une erreur est survenue lors de l'enregistrement de votre commande.";
+      // Numéro déjà attribué à une autre commande : en tirer un nouveau au prochain essai
+      if (String(err?.message ?? "").includes("order_number")) {
+        clearDraftOrderNumber(draftId);
+      }
       setCheckoutStep("error");
       setCheckoutError(msg);
       toast.error(msg);
@@ -1081,8 +1141,11 @@ function CommanderPage() {
                     ? "Patientez pendant la vérification de la vidéo."
                     : "Ajoutez une vidéo lisible pour continuer."}
               </p>
+              <p className="text-center text-[11px] leading-relaxed text-muted-foreground">
+                En validant, votre vidéo est envoyée de façon sécurisée pour préparer votre commande. Elle est supprimée automatiquement si la commande n'est pas finalisée.
+              </p>
               <button
-                onClick={() => setFunnelStage("photo")}
+                onClick={handleValidateVideo}
                 disabled={!canContinueWithVideo}
                 className="inline-flex w-full items-center justify-center gap-2 rounded-full bg-deep-brown px-8 py-4 text-xs uppercase tracking-widest font-semibold text-ivory hover:bg-charcoal transition-all shadow-luxury min-h-[48px] disabled:cursor-not-allowed disabled:opacity-45 sm:w-auto"
               >
@@ -1617,7 +1680,10 @@ function CommanderPage() {
                                 <span>Même photo, autre vidéo</span>
                               </button>
                               <button
-                                onClick={() => cart.remove(item.key)}
+                                onClick={() => {
+                                  cancelBackgroundUpload(draftId, item.key);
+                                  cart.remove(item.key);
+                                }}
                                 className="text-muted-foreground hover:text-destructive underline transition-colors"
                               >
                                 Supprimer
@@ -2005,6 +2071,38 @@ function CommanderPage() {
               </label>
             </div>
 
+            {/* Progression des envois en arrière-plan */}
+            {!isSubmitting && isUploadingMedia && (
+              <div className="mt-6 rounded-2xl border border-champagne/40 bg-cream/60 p-5 shadow-luxury">
+                <div className="flex items-center justify-between gap-3 text-xs font-semibold text-deep-brown">
+                  <span>Envoi de vos fichiers en cours…</span>
+                  <span>{uploadPercent} %</span>
+                </div>
+                <div
+                  role="progressbar"
+                  aria-label="Progression de l'envoi de vos fichiers"
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                  aria-valuenow={uploadPercent}
+                  className="mt-2 h-1.5 overflow-hidden rounded-full bg-cream"
+                >
+                  <div
+                    className="h-full rounded-full bg-deep-brown transition-[width] duration-300"
+                    style={{ width: `${uploadPercent}%` }}
+                  />
+                </div>
+                <p className="mt-2 text-xs text-charcoal">
+                  {uploadReadyCount}/{mediaUploads.length} fichiers prêts. Vous pouvez déjà confirmer votre commande.
+                </p>
+              </div>
+            )}
+
+            {!isSubmitting && !isUploadingMedia && hasUploadError && checkoutStep !== "error" && (
+              <div className="mt-6 rounded-2xl border border-destructive/30 bg-destructive/10 p-5 text-xs text-charcoal">
+                Un fichier n'a pas pu être envoyé. Vérifiez votre connexion : il sera renvoyé lorsque vous confirmerez votre commande.
+              </div>
+            )}
+
             {/* Status Feedback and Progress Indicator */}
             {isSubmitting && (
               <div className="mt-6 rounded-2xl border border-champagne/40 bg-cream/60 p-5 shadow-luxury animate-in fade-in">
@@ -2012,11 +2110,9 @@ function CommanderPage() {
                   <RotateCw className="h-5 w-5 text-deep-brown animate-spin shrink-0" />
                   <div className="flex-1">
                     <p className="text-xs font-semibold uppercase tracking-wider text-deep-brown">
-                      {checkoutStep === "preparing" && "1/5 · Préparation des fichiers"}
-                      {checkoutStep === "uploading_photo" && `2/5 · Upload photo Cloudflare R2 (Article ${checkoutProgressIndex}/${items.length})`}
-                      {checkoutStep === "uploading_video" && `3/5 · Upload vidéo Cloudflare R2 (Article ${checkoutProgressIndex}/${items.length})`}
-                      {checkoutStep === "verifying" && "4/5 · Vérification de l'intégrité"}
-                      {checkoutStep === "finalizing" && "5/5 · Finalisation atomique"}
+                      {checkoutStep === "preparing" && "1/3 · Préparation des fichiers"}
+                      {checkoutStep === "uploading_media" && `2/3 · Envoi de vos fichiers · ${uploadPercent} %`}
+                      {checkoutStep === "finalizing" && "3/3 · Enregistrement de la commande"}
                     </p>
                     <p className="mt-0.5 text-xs text-charcoal">{checkoutMessage}</p>
                   </div>

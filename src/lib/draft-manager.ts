@@ -78,6 +78,30 @@ function safeRemoveStorage(storage: Storage | undefined, key: string): void {
 
 let inMemoryCredentials: DraftCredentials | null = null;
 
+const PREFIX_ORDER_NUMBER = "memora_order_number_v1_";
+
+/**
+ * Numéro de commande stable pour un panier : une nouvelle tentative porte le
+ * même numéro, ce qui permet au serveur de la reconnaître comme un rejeu.
+ */
+export function getOrCreateDraftOrderNumber(draftId: string): string {
+  const storage = typeof window !== "undefined" ? window.localStorage : undefined;
+  const key = `${PREFIX_ORDER_NUMBER}${draftId}`;
+  const existing = safeGetStorage(storage, key);
+  if (existing) return existing;
+
+  const orderNumber = `MEM-${Math.floor(100000 + Math.random() * 900000)}`;
+  safeSetStorage(storage, key, orderNumber);
+  return orderNumber;
+}
+
+export function clearDraftOrderNumber(draftId: string): void {
+  safeRemoveStorage(
+    typeof window !== "undefined" ? window.localStorage : undefined,
+    `${PREFIX_ORDER_NUMBER}${draftId}`,
+  );
+}
+
 /**
  * Récupère ou génère les identifiants de draft courants.
  * Garantit que la même paire (draftId, draftToken) est réutilisée de façon stable.
