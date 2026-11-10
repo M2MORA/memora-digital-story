@@ -111,6 +111,13 @@ export default function Dashboard({ email }: { email: string }) {
     return localStorage.getItem("memora_admin_site_url") || defaultEnvUrl;
   });
 
+  // « memora.tn » saisi sans https:// serait lu comme un chemin relatif à l'admin
+  const apiBase = !siteUrl
+    ? defaultEnvUrl
+    : /^https?:\/\//i.test(siteUrl)
+      ? siteUrl
+      : `https://${siteUrl}`;
+
   const handleSiteUrlChange = (newUrl: string) => {
     const clean = newUrl.trim().replace(/\/+$/, "");
     setSiteUrl(clean);
@@ -170,7 +177,7 @@ export default function Dashboard({ email }: { email: string }) {
 
     const intent = intentFor(o, it, kind);
     if (intent?.storage_key) {
-      return `${siteUrl}/api/media?key=${encodeURIComponent(intent.storage_key)}`;
+      return `${apiBase}/api/media?key=${encodeURIComponent(intent.storage_key)}`;
     }
     return undefined;
   };
@@ -359,7 +366,7 @@ export default function Dashboard({ email }: { email: string }) {
     setError("");
     try {
       // 1. Tenter via le point de terminaison sécurisé du serveur
-      const res = await fetch(`${siteUrl}/api/admin/orders?id=${encodeURIComponent(id)}`, {
+      const res = await fetch(`${apiBase}/api/admin/orders?id=${encodeURIComponent(id)}`, {
         method: "DELETE",
       });
       if (res.ok) {
@@ -681,7 +688,7 @@ export default function Dashboard({ email }: { email: string }) {
                                       </div>
 
                                       <p className="muted">
-                                        Ce lien permanent redirige directement vers la vidéo. Aucune page MÉMORA ne s’affiche et une nouvelle URL R2 est signée à chaque scan.
+                                        Ce lien permanent ouvre la vidéo du souvenir en plein écran, sans autre contenu. Il ne peut pas être deviné : ne le partagez qu’avec le client.
                                       </p>
 
                                       {/* QR Code pour programmation rapide par téléphone */}
