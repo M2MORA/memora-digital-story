@@ -16,6 +16,7 @@ import { getProduct, formatPrice } from "@/lib/products";
 import { MobileUploadModal } from "@/components/site/MobileUploadModal";
 import { getVideoSurcharge, INCLUDED_VIDEO_SECONDS, formatTND } from "@/lib/pricing";
 import { putCachedMedia, getMediaCacheKey } from "@/lib/media-cache";
+import { DEMO_VIDEO_URL } from "@/lib/demo-media";
 
 export const Route = createFileRoute("/create/$productId")({
   loader: ({ params }) => {
@@ -49,9 +50,7 @@ function Studio() {
 
   const [step, setStep] = useState<"video" | "photo">("video");
   const [videoFile, setVideoFile] = useState<File | null>(null);
-  const [videoUrl, setVideoUrl] = useState<string>(
-    "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-  );
+  const [videoUrl, setVideoUrl] = useState<string>(DEMO_VIDEO_URL);
   const [videoName, setVideoName] = useState("video_souvenir.mp4");
   const [videoDuration, setVideoDuration] = useState(120);
 

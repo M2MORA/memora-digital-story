@@ -213,7 +213,8 @@ function CommanderPage() {
   });
 
   // Step 5: Payment & Checkout pipeline states
-  const [legalConsent, setLegalConsent] = useState(true);
+  // Le client coche lui-même l'acceptation des CGV : un accord pré-coché n'est pas un consentement
+  const [legalConsent, setLegalConsent] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<"stripe" | "cod">("cod");
   const [promoInput, setPromoInput] = useState("");
   const [giftCardInput, setGiftCardInput] = useState("");
@@ -2194,7 +2195,7 @@ function CommanderPage() {
               Numéro de commande : {orderNumber}
             </p>
             <p className="mt-4 text-sm text-muted-foreground">
-              Un email de confirmation récapitulatif a été envoyé à <strong>{customer.email || "votre adresse email"}</strong>.
+              Notre équipe vous contactera par téléphone pour confirmer la livraison. Conservez votre numéro de commande.
             </p>
 
             {/* COD Reminder Badge */}

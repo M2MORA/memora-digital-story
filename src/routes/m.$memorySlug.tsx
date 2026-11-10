@@ -1,9 +1,8 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { MessageCircle, Play, Volume2, VolumeX, X } from "lucide-react";
-import moments from "@/assets/product-moments.jpg";
-import scan from "@/assets/scan.jpg";
 import { getMemoryBySlug } from "@/lib/supabase";
+import { DEMO_PHOTO_URL, DEMO_VIDEO_URL } from "@/lib/demo-media";
 
 type Memory = {
   title: string;
@@ -15,17 +14,15 @@ type Memory = {
 const DEMO_MEMORIES: Record<string, Memory> = {
   "demo-leila-and-sami": {
     title: "Leila & Sami",
-    videoUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-    coverPhoto: moments,
+    videoUrl: DEMO_VIDEO_URL,
+    coverPhoto: DEMO_PHOTO_URL,
     message:
       "Sami, je voulais garder ce souvenir vivant dans tes mains. À chaque fois que ton téléphone touchera cette photo, j'espère que tu réentendras le bruit des vagues et notre rire ce jour-là.",
   },
   "demo-famille": {
     title: "Notre Famille",
-    videoUrl:
-      "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
-    coverPhoto: scan,
+    videoUrl: DEMO_VIDEO_URL,
+    coverPhoto: DEMO_PHOTO_URL,
     message: "Parce que nos plus beaux rires ne doivent jamais disparaître dans les téléphones.",
   },
 };

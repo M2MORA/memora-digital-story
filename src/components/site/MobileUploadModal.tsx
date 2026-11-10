@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { X, Smartphone, QrCode, Copy, Check, Clock, Loader2 } from "lucide-react";
 import { toast } from "sonner";
+import { DEMO_VIDEO_URL } from "@/lib/demo-media";
 
 export function MobileUploadModal({
   isOpen,
@@ -44,7 +45,7 @@ export function MobileUploadModal({
     setTimeout(() => {
       setIsSimulatingUpload(false);
       onVideoReceived({
-        url: "https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ForBiggerBlazes.mp4",
+        url: DEMO_VIDEO_URL,
         name: "video_mobile_souvenir.mp4",
         durationSec: 15,
         isDemo: true,
