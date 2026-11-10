@@ -21,6 +21,10 @@ const fmtDate = (d: string) =>
 
 const defaultEnvUrl = String(import.meta.env["VITE_SITE_URL"] ?? "http://localhost:3000").replace(/\/+$/, "");
 
+// Adresse écrite sur les puces NFC : toujours le site public, jamais l'adresse
+// du serveur local utilisée par l'admin pour ses appels API.
+const publicSiteUrl = String(import.meta.env["VITE_PUBLIC_SITE_URL"] ?? "https://www.memora.tn").replace(/\/+$/, "");
+
 function PhotoCard10x15({
   photoUrl,
   orderNumber,
@@ -143,7 +147,7 @@ export default function Dashboard({ email }: { email: string }) {
 
   // Keep the NFC URL stable; the public server route resolves it to a fresh,
   // short-lived signed R2 video URL whenever it is opened or scanned.
-  const nfcLinkFor = (slug: string) => `${siteUrl}/m/${encodeURIComponent(slug)}`;
+  const nfcLinkFor = (slug: string) => `${publicSiteUrl}/m/${encodeURIComponent(slug)}`;
 
   const copyLink = async (slug: string) => {
     const fullUrl = nfcLinkFor(slug);
@@ -446,8 +450,8 @@ export default function Dashboard({ email }: { email: string }) {
 
         <div className="topbar-right">
           <div className="domain-config">
-            <label title="L'URL de votre site utilisée pour générer les liens NFC">
-              Domaine NFC :
+            <label title={`Serveur utilisé pour les médias et la suppression des commandes. Les liens NFC utilisent toujours ${publicSiteUrl}.`}>
+              Serveur API :
               <input
                 type="text"
                 value={siteUrl}
