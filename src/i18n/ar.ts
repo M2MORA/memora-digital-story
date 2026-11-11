@@ -323,6 +323,7 @@ export const ar: Dict = {
     checkout: "اختار التوصيل",
   },
   memory: {
+    arriving: "ذكرى في الطريق…",
     play: "شغّل الفيديو",
     unavailable: "الفيديو هذا موش متوفر توّا.",
     retry: "عاود",

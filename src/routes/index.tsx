@@ -1,9 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Check } from "lucide-react";
-import family from "@/assets/scan-v2.jpg";
-import generations from "@/assets/lifestyle-emotion-v2.jpg";
-import friends from "@/assets/product-moments-v2.jpg";
-import envelope from "@/assets/product-envelope-v2.jpg";
 import { PRODUCTS } from "@/lib/products";
 import { dictFromMatches, useT } from "@/i18n";
 import { FlipCardDemo } from "@/components/site/FlipCardDemo";
@@ -12,13 +8,15 @@ import { OccasionShowcase } from "@/components/site/OccasionShowcase";
 import { PriceTiers } from "@/components/site/PriceTiers";
 import { FaqList } from "@/components/site/FaqList";
 import { SectionTitle, buttonStyles } from "@/components/site/kit";
+import { Img } from "@/components/site/Img";
+import { IMAGES } from "@/lib/images.gen";
 
 const PRODUCT = PRODUCTS[0]!;
 const DEMO = { memorySlug: "demo-leila-and-sami" };
 const OCCASION_IMAGES = [
-  { img: family, w: 1254, h: 1254 },
-  { img: generations, w: 1122, h: 1402, pos: "50% 28%" },
-  { img: friends, w: 1536, h: 1024 },
+  { image: IMAGES.tap },
+  { image: IMAGES.generations, pos: "50% 28%" },
+  { image: IMAGES.moments },
 ];
 const HIGHLIGHTS = ["app", "phones", "pay"];
 
@@ -127,13 +125,10 @@ function Home() {
       {/* Le produit et ses prix */}
       <section aria-labelledby="produit" className="container-x py-16 md:py-28">
         <div className="grid gap-10 md:grid-cols-2 md:gap-16">
-          <img
-            src={envelope}
+          <Img
+            image={IMAGES.envelope}
             alt={h.productAlt}
-            width={1254}
-            height={1254}
-            loading="lazy"
-            decoding="async"
+            sizes="(min-width: 768px) 50vw, 100vw"
             className="aspect-square w-full rounded-[4px] object-cover shadow-paper"
           />
           <div>

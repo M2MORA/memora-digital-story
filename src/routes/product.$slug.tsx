@@ -5,6 +5,10 @@ import { getProduct } from "@/lib/products";
 import { PriceTiers } from "@/components/site/PriceTiers";
 import { buttonStyles } from "@/components/site/kit";
 import { dictFromMatches, useT } from "@/i18n";
+import { Img } from "@/components/site/Img";
+import { IMAGES } from "@/lib/images.gen";
+
+const GALLERY = [IMAGES.envelope, IMAGES.moments, IMAGES.hero];
 
 export const Route = createFileRoute("/product/$slug")({
   loader: ({ params }) => {
@@ -43,19 +47,19 @@ function ProductPage() {
     <section className="container-x grid gap-10 pb-20 pt-8 md:grid-cols-[1.15fr_1fr] md:gap-14 md:pt-14">
       <div>
         <div className="overflow-hidden rounded-[4px] bg-m-stage shadow-paper">
-          <img
-            src={product.images[img]}
+          <Img
+            key={img}
+            image={GALLERY[img] ?? IMAGES.envelope}
             alt={t.product.imageLabels[img] ?? t.product.name}
-            width={1254}
-            height={1254}
-            fetchPriority="high"
+            sizes="(min-width: 768px) 55vw, 100vw"
+            priority
             className="aspect-square w-full object-cover"
           />
         </div>
         <div className="mt-4 flex gap-3" role="group" aria-label={p.chooseImage}>
-          {product.images.map((src, i) => (
+          {GALLERY.map((image, i) => (
             <button
-              key={src}
+              key={image.src}
               type="button"
               onClick={() => setImg(i)}
               aria-label={p.imageN(i + 1, t.product.imageLabels[i] ?? t.product.name)}
@@ -64,7 +68,7 @@ function ProductPage() {
                 i === img ? "border-m-wine" : "border-transparent opacity-75 hover:opacity-100"
               }`}
             >
-              <img src={src} alt="" loading="lazy" className="h-full w-full object-cover" />
+              <Img image={image} alt="" sizes="80px" className="h-full w-full object-cover" />
             </button>
           ))}
         </div>

@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { RotateCw } from "lucide-react";
-import rectoPhoto from "@/assets/recto-family-v2.jpg";
+import { Img } from "./Img";
+import { IMAGES } from "@/lib/images.gen";
 import { useT } from "@/i18n";
 
 /** La carte MÉMORA, recto et verso : on la retourne pour lire la notice imprimée au dos */
@@ -24,13 +25,10 @@ export function FlipCardDemo() {
         >
           {/* Recto */}
           <div className="absolute inset-0 overflow-hidden rounded-[4px] border-[8px] border-m-paper bg-m-paper shadow-paper [backface-visibility:hidden]">
-            <img
-              src={rectoPhoto}
+            <Img
+              image={IMAGES.family}
               alt={t.flip.front}
-              width={560}
-              height={840}
-              loading="lazy"
-              decoding="async"
+              sizes="280px"
               className="h-full w-full object-cover"
             />
           </div>

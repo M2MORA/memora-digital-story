@@ -428,3 +428,10 @@
     transform: scaleX(1);
   }
 }
+
+/* Transition entre les pages : fondu court (neutralisé par « réduire les animations ») */
+::view-transition-old(root),
+::view-transition-new(root) {
+  animation-duration: 180ms;
+  animation-timing-function: ease-out;
+}

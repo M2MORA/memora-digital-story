@@ -1,6 +1,7 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
-import heroPhoto from "@/assets/hero-v2.jpg";
+import { Img } from "./Img";
+import { IMAGES } from "@/lib/images.gen";
 
 /** Part du défilement (en hauteurs d'écran) où le texte apparaît : de 4 % à 40 % */
 const START = 0.04;
@@ -63,12 +64,11 @@ export function HeroReveal({
       style={{ "--reveal": 0 } as CSSProperties}
     >
       <div className="sticky top-0 flex h-svh items-end overflow-hidden md:items-center">
-        <img
-          src={heroPhoto}
+        <Img
+          image={IMAGES.hero}
           alt={alt}
-          width={1672}
-          height={941}
-          fetchPriority="high"
+          sizes="100vw"
+          priority
           // En arabe, la photo est retournée pour que la zone sombre soit du côté du texte
           className="absolute inset-0 h-full w-full object-cover object-[72%_center] md:object-center rtl:-scale-x-100"
         />

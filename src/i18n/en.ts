@@ -330,6 +330,7 @@ export const en: Dict = {
     checkout: "Choose delivery",
   },
   memory: {
+    arriving: "A memory is on its way…",
     play: "Play the video",
     unavailable: "This video isn't available right now.",
     retry: "Try again",

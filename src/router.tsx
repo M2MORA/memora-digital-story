@@ -9,6 +9,8 @@ export const getRouter = () => {
     routeTree,
     context: { queryClient },
     scrollRestoration: true,
+    // Fondu court entre les pages (navigateurs compatibles ; sinon, navigation normale)
+    defaultViewTransition: true,
     defaultPreloadStaleTime: 0,
   });
 

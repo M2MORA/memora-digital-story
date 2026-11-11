@@ -3,6 +3,7 @@ import { Copy, Minus, Plus, Trash2 } from "lucide-react";
 import { cart, useStore } from "@/lib/cart";
 import { getUnitPrice } from "@/lib/pricing";
 import { buttonStyles } from "@/components/site/kit";
+import { useHydrated } from "@/hooks/use-hydrated";
 import { dictFromMatches, useT } from "@/i18n";
 import hero from "@/assets/hero-v2.jpg";
 
@@ -26,6 +27,7 @@ function CartPage() {
   const c = t.cart;
   const navigate = useNavigate();
   const { items } = useStore();
+  const hydrated = useHydrated();
   const quote = cart.getQuote();
 
   return (
@@ -42,7 +44,9 @@ function CartPage() {
         )}
       </div>
 
-      {items.length === 0 ? (
+      {!hydrated ? (
+        <CartSkeleton />
+      ) : items.length === 0 ? (
         <div className="py-20 text-center">
           <p className="font-serif text-[28px] text-m-ink">{c.emptyTitle}</p>
           <p className="mt-2 text-[17px] text-m-muted">{c.emptyLead}</p>
@@ -200,5 +204,29 @@ function CartPage() {
         </div>
       )}
     </section>
+  );
+}
+
+/** Formes grises aux dimensions d'un article et du total, le temps de lire le panier */
+function CartSkeleton() {
+  return (
+    <div className="mt-8 grid gap-8 lg:grid-cols-[1.6fr_1fr]" aria-hidden="true">
+      <div className="space-y-4">
+        {[0, 1].map((i) => (
+          <div
+            key={i}
+            className="flex gap-4 rounded-[20px] border border-m-line bg-m-paper p-4 sm:p-5"
+          >
+            <div className="h-28 w-[84px] shrink-0 animate-pulse rounded-[3px] bg-m-blush" />
+            <div className="flex-1 space-y-3 pt-1">
+              <div className="h-5 w-2/3 animate-pulse rounded bg-m-blush" />
+              <div className="h-4 w-1/2 animate-pulse rounded bg-m-blush" />
+              <div className="mt-6 h-11 w-36 animate-pulse rounded-full bg-m-blush" />
+            </div>
+          </div>
+        ))}
+      </div>
+      <div className="h-64 animate-pulse rounded-[20px] border border-m-line bg-m-paper" />
+    </div>
   );
 }

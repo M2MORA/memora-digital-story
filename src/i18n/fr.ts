@@ -330,6 +330,7 @@ export const fr = {
     checkout: "Choisir la livraison",
   },
   memory: {
+    arriving: "Un souvenir arrive…",
     play: "Lancer la vidéo",
     unavailable: "Cette vidéo n'est pas disponible pour le moment.",
     retry: "Réessayer",

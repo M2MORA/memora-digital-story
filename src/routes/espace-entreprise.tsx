@@ -1,10 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useState, type FormEvent } from "react";
 import { Check } from "lucide-react";
-import scan from "@/assets/scan-v2.jpg";
 import { mailtoLink, whatsappLink } from "@/lib/contact";
 import { Field, PageHero, SectionTitle, SelectField, buttonStyles } from "@/components/site/kit";
 import { dictFromMatches, useT } from "@/i18n";
+import { Img } from "@/components/site/Img";
+import { IMAGES } from "@/lib/images.gen";
 
 export const Route = createFileRoute("/espace-entreprise")({
   head: ({ matches }) => {
@@ -68,13 +69,10 @@ function EspaceEntreprisePage() {
               ))}
             </ul>
           </div>
-          <img
-            src={scan}
+          <Img
+            image={IMAGES.tap}
             alt={b.imageAlt}
-            width={1254}
-            height={1254}
-            loading="lazy"
-            decoding="async"
+            sizes="(min-width: 768px) 50vw, 100vw"
             className="aspect-square w-full rounded-[4px] object-cover"
           />
         </div>

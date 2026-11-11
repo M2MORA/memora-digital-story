@@ -16,6 +16,7 @@ import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { WhatsAppFloat } from "@/components/site/WhatsAppFloat";
 import { MobileOrderBar, MobileOrderBarSpacer } from "@/components/site/MobileOrderBar";
+import { RouteProgress } from "@/components/site/RouteProgress";
 import { buttonStyles } from "@/components/site/kit";
 import { LangProvider, dictFor, dirOf, effectiveLang, readLang, useT, type Lang } from "@/i18n";
 import { Toaster } from "@/components/ui/sonner";
@@ -70,42 +71,55 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   );
 }
 
+/** Image de partage générée par scripts/optimize-images.mjs (URL absolue exigée par WhatsApp) */
+const SHARE_IMAGE = "https://www.memora.tn/og/memora.jpg";
+const OG_LOCALE: Record<Lang, string> = { fr: "fr_TN", en: "en_US", ar: "ar_TN" };
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   // Langue choisie (cookie), relue à chaque navigation et après un changement de langue
   loader: (): { lang: Lang } => ({ lang: readLang() }),
-  head: () => ({
-    meta: [
-      { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "MÉMORA — Les instants passent. Les souvenirs restent." },
-      {
-        name: "description",
-        content:
-          "Une photo imprimée avec une puce NFC invisible : posez un téléphone dessus et votre vidéo se lance, sans application. Fabriqué en Tunisie.",
-      },
-      { name: "theme-color", content: "#F5F0E8" },
-      { property: "og:site_name", content: "MÉMORA" },
-      { property: "og:type", content: "website" },
-      { name: "twitter:card", content: "summary_large_image" },
-    ],
-    links: [
-      {
-        rel: "stylesheet",
-        href: appCss,
-      },
-      { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
-      { rel: "icon", href: "/favicon.ico", sizes: "any" },
-      { rel: "icon", href: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
-      { rel: "icon", href: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
-      { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Manrope:wght@400;500;600;700&family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap",
-      },
-    ],
-  }),
+  head: ({ loaderData }) => {
+    const lang = loaderData?.lang ?? "fr";
+    const t = dictFor(lang);
+    return {
+      meta: [
+        { charSet: "utf-8" },
+        { name: "viewport", content: "width=device-width, initial-scale=1" },
+        { title: t.home.metaTitle },
+        { name: "description", content: t.home.lead },
+        { name: "theme-color", content: "#F5F0E8" },
+        // Aperçu quand le lien est partagé (WhatsApp, Facebook, Messenger…)
+        { property: "og:site_name", content: "MÉMORA" },
+        { property: "og:type", content: "website" },
+        { property: "og:title", content: t.home.metaTitle },
+        { property: "og:description", content: t.home.lead },
+        { property: "og:image", content: SHARE_IMAGE },
+        { property: "og:image:width", content: "1200" },
+        { property: "og:image:height", content: "630" },
+        { property: "og:image:alt", content: t.home.heroAlt },
+        { property: "og:locale", content: OG_LOCALE[lang] },
+        { name: "twitter:card", content: "summary_large_image" },
+        { name: "twitter:image", content: SHARE_IMAGE },
+      ],
+      links: [
+        {
+          rel: "stylesheet",
+          href: appCss,
+        },
+        { rel: "icon", href: "/favicon.svg", type: "image/svg+xml" },
+        { rel: "icon", href: "/favicon.ico", sizes: "any" },
+        { rel: "icon", href: "/favicon-32x32.png", type: "image/png", sizes: "32x32" },
+        { rel: "icon", href: "/favicon-16x16.png", type: "image/png", sizes: "16x16" },
+        { rel: "apple-touch-icon", href: "/apple-touch-icon.png", sizes: "180x180" },
+        { rel: "preconnect", href: "https://fonts.googleapis.com" },
+        { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
+        {
+          rel: "stylesheet",
+          href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Manrope:wght@400;500;600;700&family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap",
+        },
+      ],
+    };
+  },
   shellComponent: RootShell,
   component: RootComponent,
   notFoundComponent: NotFoundComponent,
@@ -147,6 +161,7 @@ function RootComponent() {
   return (
     <LangProvider lang={lang}>
       <QueryClientProvider client={queryClient}>
+        <RouteProgress />
         {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
         {!immersive && (
           <a

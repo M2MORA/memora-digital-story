@@ -1,8 +1,8 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import lifestyle from "@/assets/lifestyle-emotion-v2.jpg";
-import envelope from "@/assets/product-envelope-v2.jpg";
 import { PageHero, buttonStyles } from "@/components/site/kit";
 import { dictFromMatches, useT } from "@/i18n";
+import { Img } from "@/components/site/Img";
+import { IMAGES } from "@/lib/images.gen";
 
 export const Route = createFileRoute("/our-story")({
   head: ({ matches }) => {
@@ -21,13 +21,11 @@ function Story() {
     <>
       <PageHero title={s.title} intro={s.lead} />
       <div className="container-x">
-        <img
-          src={lifestyle}
+        <Img
+          image={IMAGES.generations}
           alt={s.imageAlt}
-          width={1122}
-          height={1402}
-          loading="lazy"
-          decoding="async"
+          sizes="100vw"
+          objectPosition="50% 35%"
           className="h-[55vh] min-h-[320px] w-full rounded-[4px] object-cover object-[50%_35%]"
         />
       </div>
@@ -52,13 +50,10 @@ function Story() {
             {t.common.create}
           </Link>
         </div>
-        <img
-          src={envelope}
+        <Img
+          image={IMAGES.envelope}
           alt={s.envelopeAlt}
-          width={1254}
-          height={1254}
-          loading="lazy"
-          decoding="async"
+          sizes="(min-width: 768px) 50vw, 100vw"
           className="aspect-square w-full object-cover"
         />
       </section>

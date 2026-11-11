@@ -4,6 +4,7 @@ import { MessageCircle, Play, Volume2, VolumeX, X } from "lucide-react";
 import { getMemoryBySlug } from "@/lib/supabase";
 import { DEMO_PHOTO_URL, DEMO_VIDEO_URL } from "@/lib/demo-media";
 import { useT } from "@/i18n";
+import { MemoryLoading } from "@/components/site/MemoryLoading";
 
 type Memory = {
   title: string;
@@ -30,6 +31,12 @@ const DEMO_MEMORIES: Record<string, Memory> = {
 };
 
 export const Route = createFileRoute("/m/$memorySlug")({
+  // Page privée (noindex) : rendue dans le navigateur. Le serveur envoie tout de
+  // suite l'écran d'attente MÉMORA au lieu d'attendre Supabase avant de répondre.
+  ssr: false,
+  pendingComponent: () => <MemoryLoading />,
+  pendingMs: 0,
+  pendingMinMs: 400,
   loader: async ({ params }): Promise<{ memory: Memory }> => {
     const demo = DEMO_MEMORIES[params.memorySlug];
     if (demo) return { memory: demo };
@@ -84,6 +91,8 @@ function MemoryPlaybackPage() {
   const [isPaused, setIsPaused] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [isMessageOpen, setIsMessageOpen] = useState(false);
+  // L'écran MÉMORA reste affiché tant que la vidéo ne peut pas encore jouer
+  const [isReady, setIsReady] = useState(false);
 
   // React ne pose pas toujours l'attribut muted côté serveur, et iOS l'exige pour démarrer seul
   useEffect(() => {
@@ -131,11 +140,15 @@ function MemoryPlaybackPage() {
         playsInline
         preload="auto"
         onClick={togglePlayback}
+        onCanPlay={() => setIsReady(true)}
+        onPlaying={() => setIsReady(true)}
         onPlay={() => setIsPaused(false)}
         onPause={() => setIsPaused(true)}
         onError={() => setHasError(true)}
         className="h-full w-full object-contain"
       />
+
+      <MemoryLoading hidden={isReady || hasError} />
 
       {isPaused && !hasError && (
         <button

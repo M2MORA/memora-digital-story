@@ -1,9 +1,10 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Check } from "lucide-react";
-import tap from "@/assets/scan-v2.jpg";
 import { FlipCardDemo } from "@/components/site/FlipCardDemo";
 import { PageHero, SectionTitle, buttonStyles } from "@/components/site/kit";
 import { dictFromMatches, useT } from "@/i18n";
+import { Img } from "@/components/site/Img";
+import { IMAGES } from "@/lib/images.gen";
 
 export const Route = createFileRoute("/how-it-works")({
   head: ({ matches }) => {
@@ -68,13 +69,10 @@ function How() {
 
       <section aria-labelledby="compatibilite" className="bg-m-blush">
         <div className="container-x grid items-center gap-10 py-16 md:grid-cols-2 md:py-24">
-          <img
-            src={tap}
+          <Img
+            image={IMAGES.tap}
             alt={h.phonesAlt}
-            width={1254}
-            height={1254}
-            loading="lazy"
-            decoding="async"
+            sizes="(min-width: 768px) 50vw, 100vw"
             className="aspect-square w-full rounded-[4px] object-cover"
           />
           <div>

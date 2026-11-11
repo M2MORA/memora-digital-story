@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
+import type { OptimizedImage } from "@/lib/images.gen";
+import { Img } from "./Img";
 
 const DELAY_MS = 4500;
 
-export type Occasion = { label: string; img: string; w: number; h: number; pos?: string };
+export type Occasion = { label: string; image: OptimizedImage; pos?: string };
 
 /**
  * « Pour qui ? » : une grande photo qui change toute seule (fondu), avec la
@@ -93,15 +95,12 @@ export function OccasionShowcase({
 
       <div className="relative order-1 aspect-[4/3] overflow-hidden rounded-[4px] bg-m-stage shadow-paper md:order-2">
         {items.map((o, i) => (
-          <img
-            key={o.img}
-            src={o.img}
+          <Img
+            key={o.label}
+            image={o.image}
             alt=""
-            width={o.w}
-            height={o.h}
-            loading="lazy"
-            decoding="async"
-            {...(o.pos ? { style: { objectPosition: o.pos } } : {})}
+            sizes="(min-width: 768px) 60vw, 100vw"
+            {...(o.pos ? { objectPosition: o.pos } : {})}
             className={cn(
               "absolute inset-0 h-full w-full object-cover transition-[opacity,transform] duration-[1200ms] ease-out",
               i === active ? "scale-100 opacity-100" : "scale-[1.04] opacity-0",
