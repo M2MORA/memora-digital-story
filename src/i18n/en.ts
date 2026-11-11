@@ -38,7 +38,7 @@ export const en: Dict = {
     menu: "Menu",
   },
   footer: {
-    tagline: "Moments pass. Memories stay.",
+    tagline: "Some moments deserve forever.",
     order: "Order",
     discover: "Discover",
     help: "Help",
@@ -101,9 +101,10 @@ export const en: Dict = {
     noApp: "No app needed",
   },
   home: {
-    metaTitle: "MÉMORA — Moments pass. Memories stay.",
+    metaTitle: "MÉMORA — Some moments deserve forever.",
     heroAlt: "A MÉMORA photo next to a phone showing the same scene",
-    title: "Moments pass. Memories stay.",
+    title: "Some moments deserve forever.",
+    tagline: "Turn memories into something you can hold.",
     lead: "A printed photo. A phone held over it. Your video comes alive.",
     priceLine: (p: string) => `${p}, paid on delivery anywhere in Tunisia.`,
     stepsTitle: "Three steps.",
@@ -250,7 +251,7 @@ export const en: Dict = {
       ["A simple idea", "A memory you can hold, and replay with one gesture."],
       ["Your videos stay yours", "No subscription, no ads, never published."],
     ],
-    quote: "“Moments pass. Memories stay.”",
+    quote: "“Some moments deserve forever.”",
     envelopeAlt: "A MÉMORA photo in its envelope",
   },
   contact: {

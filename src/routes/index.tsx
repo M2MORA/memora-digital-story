@@ -51,6 +51,9 @@ function Home() {
           <h1 className="font-serif text-[44px] leading-[1.02] sm:text-[60px] lg:text-[72px]">
             {h.title}
           </h1>
+          <p className="mt-4 font-serif text-[22px] italic leading-snug text-m-linen/90 sm:text-[26px]">
+            {h.tagline}
+          </p>
           <p className="mt-5 max-w-[30rem] text-[17px] leading-relaxed text-m-linen/85 sm:text-lg">
             {h.lead}
           </p>

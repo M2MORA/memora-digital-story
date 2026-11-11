@@ -38,7 +38,7 @@ export const fr = {
     menu: "Menu",
   },
   footer: {
-    tagline: "Les instants passent. Les souvenirs restent.",
+    tagline: "Certains instants méritent l'éternité.",
     order: "Commander",
     discover: "Découvrir",
     help: "Aide",
@@ -101,9 +101,10 @@ export const fr = {
     noApp: "Aucune application",
   },
   home: {
-    metaTitle: "MÉMORA — Les instants passent. Les souvenirs restent.",
+    metaTitle: "MÉMORA — Certains instants méritent l'éternité.",
     heroAlt: "Une photo MÉMORA posée à côté d'un téléphone qui montre la même scène",
-    title: "Les instants passent. Les souvenirs restent.",
+    title: "Certains instants méritent l'éternité.",
+    tagline: "Vos souvenirs, enfin entre vos mains.",
     lead: "Une photo imprimée. Un téléphone posé dessus. Votre vidéo prend vie.",
     priceLine: (p: string) => `${p}, payé à la livraison partout en Tunisie.`,
     stepsTitle: "Trois gestes.",
@@ -250,7 +251,7 @@ export const fr = {
       ["Une idée simple", "Un souvenir qu'on tient dans la main, et qu'on réécoute d'un geste."],
       ["Vos vidéos restent à vous", "Sans abonnement, sans publicité, jamais publiées."],
     ] as [string, string][],
-    quote: "« Les instants passent. Les souvenirs restent. »",
+    quote: "« Certains instants méritent l'éternité. »",
     envelopeAlt: "Une photo MÉMORA dans son enveloppe",
   },
   contact: {
