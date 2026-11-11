@@ -94,7 +94,7 @@ export default function Dashboard({ email }: { email: string }) {
         )}
 
         {tab === "memories" && <MemoryList data={data} />}
-        {tab === "settings" && <Settings data={data} email={email} />}
+        {tab === "settings" && <Settings email={email} />}
       </main>
 
       <nav className="bottom-nav" aria-label="Navigation">

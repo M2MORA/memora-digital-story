@@ -28,7 +28,7 @@ export const mediaPath = (storageKey: string) => `/api/media?key=${encodeURIComp
 
 /**
  * Un souvenir peut contenir une adresse complète enregistrée depuis un autre poste
- * (ex. http://localhost:8080/api/media?key=…, ou memora.tn/api/media?… sans https).
+ * (ex. une ancienne adresse de test, ou memora.tn/api/media?… sans https).
  * Pour l'affichage, on garde seulement la clé et on la sert depuis le serveur actuel.
  * Toute autre adresse (data:, stockage public Supabase…) est rendue telle quelle.
  */

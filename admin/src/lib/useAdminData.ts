@@ -14,10 +14,9 @@ export type UploadIntent = {
   status?: string;
 };
 
-const defaultEnvUrl = String(import.meta.env["VITE_SITE_URL"] ?? "http://localhost:3000").replace(/\/+$/, "");
-
-// Adresse écrite sur les puces NFC : toujours le site public, jamais l'adresse
-// du serveur local utilisée par l'admin pour ses appels API.
+// Le site public : adresse écrite sur les puces NFC, et serveur appelé par l'admin
+// (médias, suppression). Toujours en https://www.memora.tn : memora.tn redirige vers www,
+// et le navigateur bloque une suppression redirigée.
 export const publicSiteUrl = String(import.meta.env["VITE_PUBLIC_SITE_URL"] ?? "https://www.memora.tn").replace(/\/+$/, "");
 
 // Le lien NFC reste stable ; la route publique le résout en URL vidéo R2 signée à chaque scan.
@@ -37,38 +36,7 @@ export function useAdminData() {
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
   const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
 
-  // URL de base configurable (médias + suppression des commandes)
-  const [siteUrl, setSiteUrl] = useState(() => {
-    try {
-      return localStorage.getItem("memora_admin_site_url") || defaultEnvUrl;
-    } catch {
-      return defaultEnvUrl;
-    }
-  });
-
-  // « memora.tn » saisi sans https:// serait lu comme un chemin relatif à l'admin
-  const apiBase = (() => {
-    const raw = !siteUrl ? defaultEnvUrl : /^https?:\/\//i.test(siteUrl) ? siteUrl : `https://${siteUrl}`;
-    try {
-      const api = new URL(raw);
-      const site = new URL(publicSiteUrl);
-      // memora.tn redirige vers www.memora.tn, et le navigateur bloque une suppression redirigée
-      if (site.hostname === `www.${api.hostname}`) return site.origin;
-      return api.origin;
-    } catch {
-      return raw;
-    }
-  })();
-
-  const handleSiteUrlChange = (newUrl: string) => {
-    const clean = newUrl.trim().replace(/\/+$/, "");
-    setSiteUrl(clean);
-    try {
-      localStorage.setItem("memora_admin_site_url", clean);
-    } catch {
-      // stockage indisponible : la valeur reste pour cette session
-    }
-  };
+  const apiBase = publicSiteUrl;
 
   const intentFor = (o: Order, it: Record<string, unknown>, kind: "photo" | "video") => {
     const itemId = (it["id"] || it["key"]) as string | undefined;
@@ -408,8 +376,6 @@ export function useAdminData() {
     memoryMediaUrl,
     copiedSlug,
     downloadingUrl,
-    siteUrl,
-    handleSiteUrlChange,
     slugFor,
     resolveMedia,
     copyLink,
