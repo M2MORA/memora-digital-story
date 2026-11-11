@@ -2,6 +2,7 @@ import { Link, useRouterState } from "@tanstack/react-router";
 import { Menu, ShoppingBag, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useStore } from "@/lib/cart";
+import { useHeroPassed } from "@/hooks/use-hero-passed";
 import { PRODUCTS } from "@/lib/products";
 import { cn } from "@/lib/utils";
 import { useT } from "@/i18n";
@@ -25,19 +26,13 @@ export function SiteHeader() {
   const t = useT();
   const { items } = useStore();
   const [open, setOpen] = useState(false);
-  const [scrolled, setScrolled] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const count = items.reduce((n, i) => n + i.qty, 0);
 
-  // Sur l'accueil, l'en-tête est transparent par-dessus la photo plein écran,
-  // puis redevient opaque dès qu'on fait défiler. Il reste toujours visible.
-  useEffect(() => {
-    const onScroll = () => setScrolled(window.scrollY > 40);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
-  }, []);
-  const overlay = pathname === "/" && !scrolled && !open;
+  // Sur l'accueil, l'en-tête reste transparent tant que la photo du hero est à
+  // l'écran, puis devient opaque. Il reste toujours visible.
+  const heroPassed = useHeroPassed();
+  const overlay = pathname === "/" && !heroPassed && !open;
 
   // Le menu se ferme à chaque changement de page et avec Échap
   useEffect(() => setOpen(false), [pathname]);

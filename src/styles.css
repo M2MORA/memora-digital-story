@@ -389,3 +389,14 @@
 :root[lang="ar"] :is(h1, h2, h3) {
   line-height: 1.35;
 }
+
+/* « Pour qui ? » : barre qui se remplit jusqu'à la photo suivante */
+@keyframes occasion-progress {
+  from {
+    transform: scaleX(0);
+  }
+
+  to {
+    transform: scaleX(1);
+  }
+}

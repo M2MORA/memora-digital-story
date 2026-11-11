@@ -3,12 +3,24 @@ import { MessageCircle } from "lucide-react";
 import { whatsappLink } from "@/lib/contact";
 import { PRODUCTS } from "@/lib/products";
 import { useT } from "@/i18n";
+import { useHeroPassed } from "@/hooks/use-hero-passed";
+import { cn } from "@/lib/utils";
 
-/** Barre fixée en bas sur mobile : l'action principale reste toujours à portée de pouce */
+/**
+ * Barre fixée en bas sur mobile : l'action principale reste à portée de pouce.
+ * Sur l'accueil, elle attend que la photo du hero soit passée pour apparaître.
+ */
 export function MobileOrderBar() {
   const t = useT();
+  const shown = useHeroPassed({ immediateElsewhere: true });
   return (
-    <div className="fixed inset-x-0 bottom-0 z-40 border-t border-m-line bg-m-linen/95 px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 backdrop-blur-sm md:hidden">
+    <div
+      inert={!shown}
+      className={cn(
+        "fixed inset-x-0 bottom-0 z-40 border-t border-m-line bg-m-linen/95 px-4 pb-[calc(12px+env(safe-area-inset-bottom))] pt-3 backdrop-blur-sm transition-transform duration-300 ease-out md:hidden",
+        shown ? "translate-y-0" : "translate-y-full",
+      )}
+    >
       <div className="flex items-center gap-3">
         <Link
           to="/commander"
