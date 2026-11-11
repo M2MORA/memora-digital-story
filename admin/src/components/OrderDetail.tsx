@@ -90,6 +90,7 @@ export default function OrderDetail({
       {o.items.map((it, i) => {
         const slug = slugFor(o, i);
         const memory = memories.find((m) => m.slug === slug);
+        const linkOff = memory && memory.status !== "active";
         const nfcLink = nfcLinkFor(slug);
         const videoUrl = resolveMedia(o, it, "video", i);
         const photoUrl = resolveMedia(o, it, "photo", i);
@@ -134,6 +135,8 @@ export default function OrderDetail({
                     <a className="link" href={photoUrl} target="_blank" rel="noreferrer">Plein écran</a>
                   </div>
                 </>
+              ) : data.mediaUnavailable ? (
+                <p className="no-media error-note">Fichiers des clients non chargés. Appuie sur ⟳ pour réessayer.</p>
               ) : (
                 <p className="no-media">Pas de photo reçue (photo par défaut).</p>
               )}
@@ -144,7 +147,13 @@ export default function OrderDetail({
               <h3><span className="step-num">2</span> Puce NFC</h3>
               {memory ? (
                 <>
-                  <p className="ok-badge">✅ Lien prêt</p>
+                  {linkOff ? (
+                    <p className="no-media error-note">
+                      Lien désactivé ({memory.status === "archived" ? "archivé" : "brouillon"}) : la vidéo ne s'ouvre pas. Réactive-le dans Souvenirs.
+                    </p>
+                  ) : (
+                    <p className="ok-badge">✅ Lien prêt</p>
+                  )}
                   <code className="nfc-url">{nfcLink}</code>
                   <button
                     type="button"
@@ -172,7 +181,13 @@ export default function OrderDetail({
                   >
                     ✨ Créer le lien NFC
                   </button>
-                  {!videoUrl && <p className="error-note">Vidéo du client pas encore reçue.</p>}
+                  {!videoUrl && (
+                    <p className="error-note">
+                      {data.mediaUnavailable
+                        ? "Fichiers des clients non chargés. Appuie sur ⟳ pour réessayer."
+                        : "Vidéo du client pas encore reçue."}
+                    </p>
+                  )}
                 </>
               )}
             </div>

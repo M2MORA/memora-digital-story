@@ -51,6 +51,19 @@ describe("Médias d'un souvenir par slug", () => {
     expect(signUrl).toHaveBeenCalledWith(videoKey);
   });
 
+  it("accepte l'adresse relative enregistrée par l'admin (/api/media?key=…)", async () => {
+    const { supabaseAdmin } = memoryRow({
+      video_url: `/api/media?key=${encodeURIComponent(videoKey)}`,
+      photo_url: null,
+    });
+    const signUrl = vi.fn(async () => "https://r2.example.com/signed");
+
+    const res = await handleMemoryMediaRoute(request("slug=abc"), {}, { supabaseAdmin, signUrl });
+
+    expect(res.status).toBe(302);
+    expect(signUrl).toHaveBeenCalledWith(videoKey);
+  });
+
   it("sert la photo sur demande", async () => {
     const { supabaseAdmin } = memoryRow({ video_url: stored(videoKey), photo_url: stored(photoKey) });
     const signUrl = vi.fn(async () => "https://r2.example.com/photo");
