@@ -1,0 +1,89 @@
+import { useState } from "react";
+import type { Memory } from "../lib/supabase";
+import { getFilename } from "../lib/format";
+import { nfcLinkFor, type AdminData } from "../lib/useAdminData";
+
+export default function MemoryList({ data }: { data: AdminData }) {
+  const { memories, copiedSlug, downloadingUrl } = data;
+  const [search, setSearch] = useState("");
+  const q = search.trim().toLowerCase();
+  const shown = memories.filter((m) => !q || `${m.title} ${m.slug}`.toLowerCase().includes(q));
+
+  return (
+    <section className="list-pane">
+      <input
+        className="search"
+        type="search"
+        placeholder="Chercher un souvenir…"
+        value={search}
+        onChange={(e) => setSearch(e.target.value)}
+      />
+
+      {shown.length === 0 ? (
+        <p className="empty">Aucun souvenir.</p>
+      ) : (
+        <ul className="memory-list">
+          {shown.map((m) => {
+            const link = nfcLinkFor(m.slug);
+            return (
+              <li key={m.id} className="block memory">
+                <div className="memory-top">
+                  {m.photo_url ? (
+                    <img className="thumb" src={m.photo_url} alt="" />
+                  ) : (
+                    <span className="thumb placeholder" aria-hidden>✨</span>
+                  )}
+                  <div className="memory-info">
+                    <strong>{m.title}</strong>
+                    <span className="muted">👁 {m.view_count ?? 0} scan{(m.view_count ?? 0) > 1 ? "s" : ""}</span>
+                    <a className="link small" href={link} target="_blank" rel="noreferrer">Ouvrir le lien</a>
+                  </div>
+                  <select
+                    className={`pill mem-${m.status}`}
+                    value={m.status}
+                    aria-label="Statut du souvenir"
+                    onChange={(e) => data.setMemoryStatus(m.id, e.target.value as Memory["status"])}
+                  >
+                    <option value="active">Actif</option>
+                    <option value="draft">Brouillon</option>
+                    <option value="archived">Archivé</option>
+                  </select>
+                </div>
+
+                <div className="memory-actions">
+                  <button
+                    type="button"
+                    className={`btn ${copiedSlug === m.slug ? "copied" : "primary"}`}
+                    onClick={() => data.copyLink(m.slug)}
+                  >
+                    {copiedSlug === m.slug ? "✓ Copié" : "📋 Copier"}
+                  </button>
+                  <button
+                    type="button"
+                    className="btn"
+                    disabled={downloadingUrl === m.video_url}
+                    onClick={() => data.downloadMedia(m.video_url, getFilename(m.video_url, `memora-video-${m.slug}`, "mp4"))}
+                  >
+                    {downloadingUrl === m.video_url ? "⏳" : "⬇ Vidéo"}
+                  </button>
+                  {m.photo_url && (
+                    <button
+                      type="button"
+                      className="btn"
+                      disabled={downloadingUrl === m.photo_url}
+                      onClick={() =>
+                        data.downloadPhoto10x15(m.photo_url!, getFilename(m.photo_url!, `memora-photo-${m.slug}`, "jpg"))
+                      }
+                    >
+                      {downloadingUrl === m.photo_url ? "⏳" : "⬇ Photo"}
+                    </button>
+                  )}
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
