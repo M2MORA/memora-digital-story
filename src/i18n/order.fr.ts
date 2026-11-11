@@ -147,7 +147,12 @@ export const orderFr = {
   },
   frame: {
     title: "Une image de ta vidéo",
-    sub: "Fais glisser, on capture",
+    sub: "Choisis le moment, puis ajuste si besoin",
+    loading: "Chargement de la vidéo…",
+    pick: "Les moments de ta vidéo",
+    thumb: (t: string) => `Image à ${t}`,
+    lowRes:
+      "Ta vidéo est en basse définition : l'image risque d'être un peu floue une fois imprimée. Une photo de ta galerie sera plus nette.",
     notReady: "La vidéo n'est pas encore prête. Réessaie dans un instant.",
     failed: "Cette image n'a pas pu être capturée. Choisis plutôt une photo de ta galerie.",
     unreadable: "Cette vidéo ne peut pas être lue ici. Choisis plutôt une photo de ta galerie.",

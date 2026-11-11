@@ -145,7 +145,12 @@ export const orderEn: typeof orderFr = {
   },
   frame: {
     title: "A still from your video",
-    sub: "Slide, and we capture it",
+    sub: "Pick a moment, then fine-tune if needed",
+    loading: "Loading the video…",
+    pick: "Moments from your video",
+    thumb: (t: string) => `Still at ${t}`,
+    lowRes:
+      "Your video is low resolution: the still may look a little blurry once printed. A photo from your gallery will be sharper.",
     notReady: "The video isn't ready yet. Try again in a moment.",
     failed: "This still couldn't be captured. Choose a photo from your gallery instead.",
     unreadable: "This video can't be played here. Choose a photo from your gallery instead.",
