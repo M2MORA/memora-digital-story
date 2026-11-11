@@ -277,7 +277,7 @@
 /* Aperçu : le téléphone s'approche de la carte puis la vidéo démarre */
 @keyframes memora-phone {
   0% {
-    transform: translate(170px, 70px) rotate(10deg);
+    transform: translate(190px, 70px) rotate(10deg);
     opacity: 0;
   }
 
@@ -285,9 +285,10 @@
     opacity: 1;
   }
 
+  /* Décalé à droite : le téléphone ne cache qu'un tiers de la carte */
   50%,
   100% {
-    transform: translate(58px, 18px) rotate(-5deg);
+    transform: translate(84px, 18px) rotate(-5deg);
     opacity: 1;
   }
 }
@@ -319,7 +320,34 @@
 
   @media (prefers-reduced-motion: reduce) {
     animation: none;
-    transform: translate(58px, 18px) rotate(-5deg);
+    transform: translate(84px, 18px) rotate(-5deg);
+  }
+}
+
+/* Carte à l'horizontale : le téléphone se pose sur le coin bas-droit de la carte */
+@keyframes memora-phone-wide {
+  0% {
+    transform: translate(200px, 100px) rotate(10deg);
+    opacity: 0;
+  }
+
+  20% {
+    opacity: 1;
+  }
+
+  50%,
+  100% {
+    transform: translate(110px, 22px) rotate(-5deg);
+    opacity: 1;
+  }
+}
+
+@utility animate-memora-phone-wide {
+  animation: memora-phone-wide 4.5s cubic-bezier(0.2, 0.7, 0.2, 1) infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    transform: translate(110px, 22px) rotate(-5deg);
   }
 }
 
