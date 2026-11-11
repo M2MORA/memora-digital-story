@@ -1,5 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase, type Order, type OrderStatus, type Memory } from "./supabase";
+import { computeStats, deleteOrderViaApi, displayMediaUrl, mediaPath } from "./rules";
+import { qrDataUrl } from "./qr";
 
 export type UploadIntent = {
   id: string;
@@ -21,8 +23,7 @@ export const publicSiteUrl = String(import.meta.env["VITE_PUBLIC_SITE_URL"] ?? "
 // Le lien NFC reste stable ; la route publique le résout en URL vidéo R2 signée à chaque scan.
 export const nfcLinkFor = (slug: string) => `${publicSiteUrl}/m/${encodeURIComponent(slug)}`;
 
-export const qrCodeFor = (link: string) =>
-  `https://api.qrserver.com/v1/create-qr-code/?size=160x160&data=${encodeURIComponent(link)}`;
+export const qrCodeFor = (link: string) => qrDataUrl(link);
 
 export function useAdminData() {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -30,6 +31,9 @@ export function useAdminData() {
   const [uploadIntents, setUploadIntents] = useState<UploadIntent[]>([]);
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
+  // Vrai si la liste des fichiers clients n'a pas pu être chargée : « pas de photo »
+  // ne doit alors pas être affiché comme un fait.
+  const [mediaUnavailable, setMediaUnavailable] = useState(false);
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
   const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
 
@@ -104,19 +108,29 @@ export function useAdminData() {
     const idx = itemIndex !== undefined ? itemIndex : o.items.indexOf(it);
     const slug = slugFor(o, idx >= 0 ? idx : 0);
     const existingMemory = memories.find((m) => m.slug === slug);
-    if (kind === "photo" && existingMemory?.photo_url) return existingMemory.photo_url;
-    if (kind === "video" && existingMemory?.video_url) return existingMemory.video_url;
+    if (kind === "photo" && existingMemory?.photo_url) return displayMediaUrl(existingMemory.photo_url, apiBase);
+    if (kind === "video" && existingMemory?.video_url) return displayMediaUrl(existingMemory.video_url, apiBase);
 
     const direct = (kind === "photo"
       ? it["photoUrl"] || it["photo_url"] || it["photoPreviewUrl"] || it["photo"] || it["previewUrl"]
       : it["videoUrl"] || it["video_url"] || it["videoPreviewUrl"]) as string | undefined;
-    if (direct) return direct;
+    if (direct) return displayMediaUrl(direct, apiBase);
 
     const intent = intentFor(o, it, kind);
     if (intent?.storage_key) {
-      return `${apiBase}/api/media?key=${encodeURIComponent(intent.storage_key)}`;
+      return `${apiBase}${mediaPath(intent.storage_key)}`;
     }
     return undefined;
+  };
+
+  /**
+   * Adresse à enregistrer dans un souvenir : relative (/api/media?key=…), pour qu'elle
+   * reste lisible depuis n'importe quel poste. La page NFC publique l'accepte telle quelle.
+   */
+  const storedMediaFor = (o: Order, it: Record<string, unknown>, kind: "photo" | "video", itemIndex: number) => {
+    const intent = intentFor(o, it, kind);
+    if (intent?.storage_key) return mediaPath(intent.storage_key);
+    return resolveMedia(o, it, kind, itemIndex);
   };
 
   const downloadMedia = async (url: string, filename: string) => {
@@ -241,11 +255,19 @@ export function useAdminData() {
       supabase.from("memories").select("*").order("created_at", { ascending: false }),
       supabase.from("upload_intents").select("*"),
     ]);
-    if (o.error) setError(o.error.message);
+    const problems: string[] = [];
+    if (o.error) problems.push(`Commandes non chargées : ${o.error.message}`);
     else setOrders(o.data as Order[]);
-    if (m.error) setError(m.error.message);
+    if (m.error) problems.push(`Souvenirs non chargés : ${m.error.message}`);
     else setMemories(m.data as Memory[]);
-    if (!u.error && u.data) setUploadIntents(u.data as UploadIntent[]);
+    if (u.error) {
+      problems.push(`Fichiers des clients non chargés : ${u.error.message}`);
+      setMediaUnavailable(true);
+    } else {
+      setUploadIntents((u.data ?? []) as UploadIntent[]);
+      setMediaUnavailable(false);
+    }
+    if (problems.length) setError(problems.join(" · "));
     setLoading(false);
   }, []);
 
@@ -267,9 +289,34 @@ export function useAdminData() {
       if (!confirmPaid) return;
     }
 
+    const activeLinks = memories.filter((m) => m.order_id === id && m.status === "active");
+    if (status === "cancelled" && currentOrder?.status !== "cancelled") {
+      const linkNote = activeLinks.length
+        ? `\n\nSon lien NFC sera désactivé : la vidéo ne s'ouvrira plus. Tu pourras le réactiver dans Souvenirs.`
+        : "";
+      if (!window.confirm(`Annuler la commande #${currentOrder?.order_number || ""} ?${linkNote}`)) return;
+    }
+
     const { error } = await supabase.from("orders").update({ status }).eq("id", id);
     if (error) return setError(error.message);
     setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+
+    // Une commande annulée ne doit plus diffuser la vidéo du client.
+    if (status === "cancelled" && activeLinks.length) {
+      const { data: archived, error: memError } = await supabase
+        .from("memories")
+        .update({ status: "archived" })
+        .eq("order_id", id)
+        .eq("status", "active")
+        .select("id");
+      if (memError) {
+        return setError(
+          `Commande annulée, mais son lien NFC est toujours actif (${memError.message}). Archive-le dans Souvenirs.`,
+        );
+      }
+      const ids = new Set((archived ?? []).map((r: { id: string }) => r.id));
+      setMemories((prev) => prev.map((x) => (ids.has(x.id) ? { ...x, status: "archived" } : x)));
+    }
   };
 
   const deleteOrder = async (id: string, orderNumber: string): Promise<boolean> => {
@@ -288,31 +335,17 @@ export function useAdminData() {
     }
     setError("");
     try {
-      // 1. Tenter via le point de terminaison sécurisé du serveur
       const {
         data: { session },
       } = await supabase.auth.getSession();
       if (!session) throw new Error("Session expirée, veuillez vous reconnecter.");
 
-      const res = await fetch(`${apiBase}/api/admin/orders?id=${encodeURIComponent(id)}`, {
-        method: "DELETE",
-        headers: { Authorization: `Bearer ${session.access_token}` },
-      });
-      if (res.ok) {
-        setOrders((prev) => prev.filter((o) => o.id !== id));
-        return true;
-      }
-      const data = await res.json().catch(() => null);
-      if (data?.error) {
-        throw new Error(data.error);
-      }
-      // 2. Repli direct Supabase si l'API serveur n'est pas joignable
-      const { error: delError } = await supabase.from("orders").delete().eq("id", id);
-      if (delError) throw delError;
+      await deleteOrderViaApi({ apiBase, accessToken: session.access_token, orderId: id });
       setOrders((prev) => prev.filter((o) => o.id !== id));
       return true;
-    } catch (err: any) {
-      setError(`Échec de la suppression de la commande #${orderNumber}: ${err.message || err}`);
+    } catch (err: unknown) {
+      const message = err instanceof Error ? err.message : String(err);
+      setError(`Échec de la suppression de la commande #${orderNumber} : ${message}`);
       return false;
     }
   };
@@ -327,8 +360,8 @@ export function useAdminData() {
     const it = o.items[itemIndex];
     if (!it) return;
     const slug = slugFor(o, itemIndex);
-    const videoUrl = resolveMedia(o, it, "video", itemIndex);
-    const photoUrl = resolveMedia(o, it, "photo", itemIndex);
+    const videoUrl = storedMediaFor(o, it, "video", itemIndex);
+    const photoUrl = storedMediaFor(o, it, "photo", itemIndex);
 
     if (!videoUrl) {
       alert("Attention : la vidéo de ce tirage n'a pas été reçue.");
@@ -360,15 +393,10 @@ export function useAdminData() {
     await copyLink(slug);
   };
 
-  const stats = useMemo(() => {
-    const valid = orders.filter((o) => o.status !== "cancelled");
-    return {
-      count: orders.length,
-      todo: orders.filter((o) => o.status !== "delivered" && o.status !== "cancelled").length,
-      revenue: valid.reduce((s, o) => s + Number(o.total), 0),
-      views: memories.reduce((s, m) => s + (m.view_count ?? 0), 0),
-    };
-  }, [orders, memories]);
+  const stats = useMemo(() => computeStats(orders, memories), [orders, memories]);
+
+  /** Adresse d'affichage d'un média enregistré dans un souvenir (liste Souvenirs). */
+  const memoryMediaUrl = (stored: string | null | undefined) => displayMediaUrl(stored, apiBase);
 
   return {
     orders,
@@ -376,6 +404,8 @@ export function useAdminData() {
     error,
     setError,
     loading,
+    mediaUnavailable,
+    memoryMediaUrl,
     copiedSlug,
     downloadingUrl,
     siteUrl,

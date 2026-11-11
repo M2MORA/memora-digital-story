@@ -25,11 +25,13 @@ export default function MemoryList({ data }: { data: AdminData }) {
         <ul className="memory-list">
           {shown.map((m) => {
             const link = nfcLinkFor(m.slug);
+            const photoUrl = data.memoryMediaUrl(m.photo_url);
+            const videoUrl = data.memoryMediaUrl(m.video_url) ?? m.video_url;
             return (
               <li key={m.id} className="block memory">
                 <div className="memory-top">
-                  {m.photo_url ? (
-                    <img className="thumb" src={m.photo_url} alt="" />
+                  {photoUrl ? (
+                    <img className="thumb" src={photoUrl} alt="" loading="lazy" />
                   ) : (
                     <span className="thumb placeholder" aria-hidden>✨</span>
                   )}
@@ -61,21 +63,21 @@ export default function MemoryList({ data }: { data: AdminData }) {
                   <button
                     type="button"
                     className="btn"
-                    disabled={downloadingUrl === m.video_url}
-                    onClick={() => data.downloadMedia(m.video_url, getFilename(m.video_url, `memora-video-${m.slug}`, "mp4"))}
+                    disabled={downloadingUrl === videoUrl}
+                    onClick={() => data.downloadMedia(videoUrl, getFilename(videoUrl, `memora-video-${m.slug}`, "mp4"))}
                   >
-                    {downloadingUrl === m.video_url ? "⏳" : "⬇ Vidéo"}
+                    {downloadingUrl === videoUrl ? "⏳" : "⬇ Vidéo"}
                   </button>
-                  {m.photo_url && (
+                  {photoUrl && (
                     <button
                       type="button"
                       className="btn"
-                      disabled={downloadingUrl === m.photo_url}
+                      disabled={downloadingUrl === photoUrl}
                       onClick={() =>
-                        data.downloadPhoto10x15(m.photo_url!, getFilename(m.photo_url!, `memora-photo-${m.slug}`, "jpg"))
+                        data.downloadPhoto10x15(photoUrl, getFilename(photoUrl, `memora-photo-${m.slug}`, "jpg"))
                       }
                     >
-                      {downloadingUrl === m.photo_url ? "⏳" : "⬇ Photo"}
+                      {downloadingUrl === photoUrl ? "⏳" : "⬇ Photo"}
                     </button>
                   )}
                 </div>

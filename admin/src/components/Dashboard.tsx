@@ -74,8 +74,8 @@ export default function Dashboard({ email }: { email: string }) {
             {!openOrderData && (
               <div className="stats">
                 <div className="stat"><span>À faire</span><strong className="highlight">{data.stats.todo}</strong></div>
-                <div className="stat"><span>Commandes</span><strong>{data.stats.count}</strong></div>
-                <div className="stat"><span>Chiffre</span><strong>{fmt(data.stats.revenue)}</strong></div>
+                <div className="stat"><span>Encaissé</span><strong>{fmt(data.stats.collected)}</strong></div>
+                <div className="stat"><span>À encaisser</span><strong>{fmt(data.stats.toCollect)}</strong></div>
                 <div className="stat"><span>Scans NFC</span><strong>{data.stats.views}</strong></div>
               </div>
             )}
