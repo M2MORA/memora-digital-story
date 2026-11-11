@@ -62,14 +62,31 @@ export function buildJpegPdf(jpeg: Uint8Array, imgW: number, imgH: number, pageW
   return out;
 }
 
-function loadImage(url: string): Promise<HTMLImageElement> {
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    img.crossOrigin = "anonymous";
-    img.onload = () => resolve(img);
-    img.onerror = () => reject(new Error("La photo n'a pas pu être chargée."));
-    img.src = url;
-  });
+/**
+ * Charge la photo pour la dessiner sur un canvas. Les octets sont relus sans cache :
+ * l'aperçu affiché à l'écran est en cache sans en-têtes CORS, et le réutiliser
+ * bloquerait la lecture des pixels. L'image vient ensuite d'une adresse blob: locale.
+ */
+async function loadImage(url: string): Promise<HTMLImageElement> {
+  let blob: Blob;
+  try {
+    const res = await fetch(url, { cache: "no-store" });
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    blob = await res.blob();
+  } catch {
+    throw new Error("La photo n'a pas pu être chargée.");
+  }
+  const local = URL.createObjectURL(blob);
+  try {
+    return await new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.onload = () => resolve(img);
+      img.onerror = () => reject(new Error("Le fichier reçu n'est pas une image lisible."));
+      img.src = local;
+    });
+  } finally {
+    setTimeout(() => URL.revokeObjectURL(local), 0);
+  }
 }
 
 function saveBlob(blob: Blob, filename: string) {
