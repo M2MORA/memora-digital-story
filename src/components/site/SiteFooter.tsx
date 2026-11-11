@@ -17,7 +17,6 @@ function columns(t: Dict): { title: string; links: FooterLink[] }[] {
           params: { slug: PRODUCTS[0]!.slug },
           label: t.footer.productPrices,
         },
-        { to: "/editeasy", label: t.footer.editor },
         { to: "/cart", label: t.footer.myCart },
       ],
     },

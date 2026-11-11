@@ -44,7 +44,6 @@ export const fr = {
     help: "Aide",
     legal: "Mentions",
     productPrices: "Le produit et les prix",
-    editor: "Montage vidéo gratuit",
     myCart: "Mon panier",
     faq: "Questions fréquentes",
     shipping: "Livraison",
@@ -213,11 +212,6 @@ export const fr = {
             id: "length",
             q: "Quelle durée ?",
             a: `${INCL} minutes incluses. Puis ${money(SURCHARGE_TND_PER_MIN)} la minute, jusqu'à ${MAX} minutes.`,
-          },
-          {
-            id: "edit",
-            q: "Pas de vidéo prête ?",
-            a: "Notre montage gratuit assemble vos photos et extraits en musique.",
           },
           { id: "files", q: "Quels fichiers ?", a: "MP4, MOV (iPhone) et WebM." },
           {

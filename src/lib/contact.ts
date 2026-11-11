@@ -1,10 +1,8 @@
 /**
  * Coordonnées publiques de MÉMORA, en un seul endroit.
- *
- * À FAIRE avant le lancement : remplacer WHATSAPP_NUMBER par le vrai numéro
- * (format international sans « + », ex. 216XXXXXXXX).
+ * WHATSAPP_NUMBER : format international sans « + » (216 puis les 8 chiffres).
  */
-export const WHATSAPP_NUMBER = "21698000000";
+export const WHATSAPP_NUMBER = "21627379370";
 export const CONTACT_EMAIL = "bonjour@memora.tn";
 export const INSTAGRAM_URL = "https://instagram.com/memora.tn";
 

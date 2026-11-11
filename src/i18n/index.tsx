@@ -19,7 +19,7 @@ const DICTS: Record<Lang, Dict> = { fr, en, ar };
 const COOKIE = "memora_lang";
 
 /** Pages pas encore traduites : elles restent en français, de gauche à droite */
-const FRENCH_ONLY = ["/editeasy", "/create"];
+const FRENCH_ONLY = ["/create"];
 
 export function parseLang(value: string | null | undefined): Lang {
   return value === "en" || value === "ar" ? value : "fr";

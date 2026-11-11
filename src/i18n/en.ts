@@ -44,7 +44,6 @@ export const en: Dict = {
     help: "Help",
     legal: "Legal",
     productPrices: "Product and prices",
-    editor: "Free video editor",
     myCart: "My cart",
     faq: "FAQ",
     shipping: "Delivery",
@@ -213,11 +212,6 @@ export const en: Dict = {
             id: "length",
             q: "How long?",
             a: `${INCL} minutes included. Then ${money(SURCHARGE_TND_PER_MIN)} per minute, up to ${MAX} minutes.`,
-          },
-          {
-            id: "edit",
-            q: "No video ready?",
-            a: "Our free editor turns your photos and clips into a film with music.",
           },
           { id: "files", q: "Which files?", a: "MP4, MOV (iPhone) and WebM." },
           {
