@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase, type Order, type OrderStatus, type Memory } from "./supabase";
 import { computeStats, deleteOrderViaApi, displayMediaUrl, mediaPath } from "./rules";
 import { qrDataUrl } from "./qr";
+import { downloadPhotoPdf as downloadPdf, printPhoto } from "./print";
 
 export type UploadIntent = {
   id: string;
@@ -101,115 +102,20 @@ export function useAdminData() {
     return resolveMedia(o, it, kind, itemIndex);
   };
 
-  const downloadMedia = async (url: string, filename: string) => {
+  /** Photo prête à imprimer : PDF 10 × 15 cm, 300 dpi. */
+  const downloadPhotoPdf = async (url: string, filename: string) => {
     if (!url) return;
     setDownloadingUrl(url);
-
     try {
-      if (url.startsWith("data:")) {
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = filename;
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        return;
+      await downloadPdf(url, filename);
+    } catch {
+      // Le stockage refuse la lecture des pixels (pas de règle CORS) : impression 10 × 15
+      // du navigateur, où l'on peut imprimer directement ou « Enregistrer au format PDF ».
+      try {
+        await printPhoto(url);
+      } catch (err) {
+        setError(`Photo non imprimable : ${err instanceof Error ? err.message : String(err)}`);
       }
-
-      // Téléchargement par blob pour forcer le téléchargement local sans blocage Cross-Origin
-      const res = await fetch(url, { mode: "cors" });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const blobUrl = window.URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = blobUrl;
-      a.download = filename;
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-      setTimeout(() => window.URL.revokeObjectURL(blobUrl), 2000);
-    } catch (err) {
-      console.warn("Échec du téléchargement direct blob, repli Supabase/navigateur:", err);
-      // Pour Supabase Storage, ?download force l'en-tête Content-Disposition: attachment
-      const downloadUrl = url.includes("supabase.co/storage/v1/object/public")
-        ? `${url}${url.includes("?") ? "&" : "?"}download=${encodeURIComponent(filename)}`
-        : url;
-
-      const a = document.createElement("a");
-      a.href = downloadUrl;
-      a.download = filename;
-      a.target = "_blank";
-      a.rel = "noreferrer";
-      document.body.appendChild(a);
-      a.click();
-      document.body.removeChild(a);
-    } finally {
-      setDownloadingUrl(null);
-    }
-  };
-
-  const downloadPhoto10x15 = async (url: string, filename: string) => {
-    if (!url) return;
-    setDownloadingUrl(url);
-
-    try {
-      // Préparation du tirage photo au ratio standard 10x15 cm à 300 DPI
-      const img = new Image();
-      img.crossOrigin = "anonymous";
-
-      await new Promise<void>((resolve, reject) => {
-        img.onload = () => resolve();
-        img.onerror = () => reject(new Error("Image load failed"));
-        img.src = url;
-      });
-
-      const isLandscape = img.naturalWidth > img.naturalHeight;
-      // Standard tirage laboratoire 10x15 cm à 300 DPI = 1200 x 1800 px (ou 1800 x 1200 px)
-      const targetW = isLandscape ? 1800 : 1200;
-      const targetH = isLandscape ? 1200 : 1800;
-
-      const canvas = document.createElement("canvas");
-      canvas.width = targetW;
-      canvas.height = targetH;
-      const ctx = canvas.getContext("2d");
-
-      if (ctx) {
-        ctx.imageSmoothingEnabled = true;
-        ctx.imageSmoothingQuality = "high";
-
-        // Cadrage photo proportionnel centré sans déformation
-        const scale = Math.max(targetW / img.naturalWidth, targetH / img.naturalHeight);
-        const scaledW = img.naturalWidth * scale;
-        const scaledH = img.naturalHeight * scale;
-        const offsetX = (targetW - scaledW) / 2;
-        const offsetY = (targetH - scaledH) / 2;
-
-        ctx.fillStyle = "#ffffff";
-        ctx.fillRect(0, 0, targetW, targetH);
-        ctx.drawImage(img, offsetX, offsetY, scaledW, scaledH);
-
-        const blob = await new Promise<Blob | null>((resolve) =>
-          canvas.toBlob((b) => resolve(b), "image/jpeg", 0.96),
-        );
-
-        if (blob) {
-          const blobUrl = window.URL.createObjectURL(blob);
-          const a = document.createElement("a");
-          a.href = blobUrl;
-          const cleanName = filename.replace(/\.[a-zA-Z0-9]+$/, "");
-          a.download = `${cleanName}-10x15.jpg`;
-          document.body.appendChild(a);
-          a.click();
-          document.body.removeChild(a);
-          setTimeout(() => window.URL.revokeObjectURL(blobUrl), 2000);
-          return;
-        }
-      }
-      // Repli si échec canvas
-      await downloadMedia(url, filename);
-    } catch (err) {
-      console.warn("Échec du calibrage canvas 10x15, téléchargement direct:", err);
-      await downloadMedia(url, filename);
     } finally {
       setDownloadingUrl(null);
     }
@@ -379,8 +285,7 @@ export function useAdminData() {
     slugFor,
     resolveMedia,
     copyLink,
-    downloadMedia,
-    downloadPhoto10x15,
+    downloadPhotoPdf,
     load,
     updateStatus,
     deleteOrder,

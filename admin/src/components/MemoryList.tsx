@@ -1,6 +1,6 @@
 import { useState } from "react";
+import { Check, Copy, Download, ExternalLink, Eye, Nfc, Search } from "lucide-react";
 import type { Memory } from "../lib/supabase";
-import { getFilename } from "../lib/format";
 import { nfcLinkFor, type AdminData } from "../lib/useAdminData";
 
 export default function MemoryList({ data }: { data: AdminData }) {
@@ -10,38 +10,43 @@ export default function MemoryList({ data }: { data: AdminData }) {
   const shown = memories.filter((m) => !q || `${m.title} ${m.slug}`.toLowerCase().includes(q));
 
   return (
-    <section className="list-pane">
-      <input
-        className="search"
-        type="search"
-        placeholder="Chercher un souvenir…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
+    <section className="list-pane wide" aria-label="Souvenirs">
+      <label className="search">
+        <Search size={18} aria-hidden />
+        <span className="sr-only">Chercher un souvenir</span>
+        <input type="search" placeholder="Titre ou lien" value={search} onChange={(e) => setSearch(e.target.value)} />
+      </label>
 
       {shown.length === 0 ? (
-        <p className="empty">Aucun souvenir.</p>
+        <p className="empty">
+          {memories.length === 0
+            ? "Aucun souvenir. Un souvenir est créé depuis une commande, avec « Créer le lien NFC »."
+            : "Aucun souvenir ne correspond à la recherche."}
+        </p>
       ) : (
-        <ul className="memory-list">
+        <ul className="cards">
           {shown.map((m) => {
             const link = nfcLinkFor(m.slug);
             const photoUrl = data.memoryMediaUrl(m.photo_url);
-            const videoUrl = data.memoryMediaUrl(m.video_url) ?? m.video_url;
+            const views = m.view_count ?? 0;
             return (
-              <li key={m.id} className="block memory">
-                <div className="memory-top">
+              <li key={m.id} className="card">
+                <div className="card-top">
                   {photoUrl ? (
                     <img className="thumb" src={photoUrl} alt="" loading="lazy" />
                   ) : (
-                    <span className="thumb placeholder" aria-hidden>✨</span>
+                    <span className="thumb empty-thumb" aria-hidden>
+                      <Nfc size={20} />
+                    </span>
                   )}
-                  <div className="memory-info">
+                  <div className="card-info">
                     <strong>{m.title}</strong>
-                    <span className="muted">👁 {m.view_count ?? 0} scan{(m.view_count ?? 0) > 1 ? "s" : ""}</span>
-                    <a className="link small" href={link} target="_blank" rel="noreferrer">Ouvrir le lien</a>
+                    <span className="muted">
+                      <Eye size={14} aria-hidden /> {views} scan{views > 1 ? "s" : ""}
+                    </span>
                   </div>
                   <select
-                    className={`pill mem-${m.status}`}
+                    className={`status-select m-${m.status}`}
                     value={m.status}
                     aria-label="Statut du souvenir"
                     onChange={(e) => data.setMemoryStatus(m.id, e.target.value as Memory["status"])}
@@ -52,34 +57,29 @@ export default function MemoryList({ data }: { data: AdminData }) {
                   </select>
                 </div>
 
-                <div className="memory-actions">
+                <div className="actions-row">
                   <button
                     type="button"
-                    className={`btn ${copiedSlug === m.slug ? "copied" : "primary"}`}
+                    className={`btn ${copiedSlug === m.slug ? "success" : ""}`}
                     onClick={() => data.copyLink(m.slug)}
                   >
-                    {copiedSlug === m.slug ? "✓ Copié" : "📋 Copier"}
-                  </button>
-                  <button
-                    type="button"
-                    className="btn"
-                    disabled={downloadingUrl === videoUrl}
-                    onClick={() => data.downloadMedia(videoUrl, getFilename(videoUrl, `memora-video-${m.slug}`, "mp4"))}
-                  >
-                    {downloadingUrl === videoUrl ? "⏳" : "⬇ Vidéo"}
+                    {copiedSlug === m.slug ? <Check size={16} aria-hidden /> : <Copy size={16} aria-hidden />}
+                    {copiedSlug === m.slug ? "Copié" : "Copier le lien"}
                   </button>
                   {photoUrl && (
                     <button
                       type="button"
                       className="btn"
                       disabled={downloadingUrl === photoUrl}
-                      onClick={() =>
-                        data.downloadPhoto10x15(photoUrl, getFilename(photoUrl, `memora-photo-${m.slug}`, "jpg"))
-                      }
+                      onClick={() => data.downloadPhotoPdf(photoUrl, `memora-${m.slug}-10x15.pdf`)}
                     >
-                      {downloadingUrl === photoUrl ? "⏳" : "⬇ Photo"}
+                      <Download size={16} aria-hidden />
+                      {downloadingUrl === photoUrl ? "PDF…" : "PDF 10×15"}
                     </button>
                   )}
+                  <a className="btn icon-only" href={link} target="_blank" rel="noreferrer" aria-label="Ouvrir le lien" title="Ouvrir le lien">
+                    <ExternalLink size={16} aria-hidden />
+                  </a>
                 </div>
               </li>
             );

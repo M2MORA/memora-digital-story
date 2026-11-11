@@ -23,8 +23,8 @@ export default function App() {
   if (!isAdmin(session.user)) {
     return (
       <div className="login-wrap">
-        <div className="card login-card">
-          <h1 className="brand">MÉMORA</h1>
+        <div className="login-card">
+          <h1 className="wordmark">MÉMORA</h1>
           <p className="error">
             Ce compte ({session.user.email}) n'a pas le rôle administrateur.
           </p>

@@ -1,20 +1,25 @@
+import { LogOut } from "lucide-react";
 import { supabase } from "../lib/supabase";
 import { publicSiteUrl } from "../lib/useAdminData";
 
 export default function Settings({ email }: { email: string }) {
   return (
-    <section className="list-pane settings">
-      <div className="block">
-        <h3>Compte</h3>
-        <p className="muted">Connecté : {email}</p>
-        <button type="button" className="btn big" onClick={() => supabase.auth.signOut()}>
-          Se déconnecter
+    <section className="settings">
+      <div className="panel">
+        <h3 className="panel-title">Compte</h3>
+        <dl className="facts">
+          <div><dt>Connecté</dt><dd>{email}</dd></div>
+        </dl>
+        <button type="button" className="btn" onClick={() => supabase.auth.signOut()}>
+          <LogOut size={16} aria-hidden /> Se déconnecter
         </button>
       </div>
 
-      <div className="block">
-        <h3>Site</h3>
-        <p className="muted">Médias et liens NFC : {publicSiteUrl}</p>
+      <div className="panel">
+        <h3 className="panel-title">Site</h3>
+        <dl className="facts">
+          <div><dt>Médias et liens NFC</dt><dd>{publicSiteUrl}</dd></div>
+        </dl>
       </div>
     </section>
   );

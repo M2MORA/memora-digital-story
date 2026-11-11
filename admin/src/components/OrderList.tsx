@@ -1,15 +1,19 @@
 import { useState } from "react";
+import { ChevronRight, Search } from "lucide-react";
 import { STATUSES, type Order, type OrderStatus } from "../lib/supabase";
-import { fmt, fmtDate, statusLabel } from "../lib/format";
+import { fmt, fmtDate } from "../lib/format";
+import StatusBadge from "./StatusBadge";
 
 type Filter = OrderStatus | "all";
 
 export default function OrderList({
   orders,
+  loading,
   selectedId,
   onOpen,
 }: {
   orders: Order[];
+  loading: boolean;
   selectedId: string | null;
   onOpen: (id: string) => void;
 }) {
@@ -20,65 +24,72 @@ export default function OrderList({
   const shown = orders.filter(
     (o) =>
       (filter === "all" || o.status === filter) &&
-      (!q ||
-        `${o.order_number} ${o.customer_name} ${o.customer_email} ${o.customer_phone ?? ""}`
-          .toLowerCase()
-          .includes(q)),
+      (!q || `${o.order_number} ${o.customer_name} ${o.customer_phone ?? ""}`.toLowerCase().includes(q)),
   );
 
   const countOf = (f: Filter) => (f === "all" ? orders.length : orders.filter((o) => o.status === f).length);
   const chips: { value: Filter; label: string }[] = [{ value: "all", label: "Toutes" }, ...STATUSES];
 
   return (
-    <section className="list-pane">
-      <input
-        className="search"
-        type="search"
-        placeholder="Chercher : n°, nom, téléphone…"
-        value={search}
-        onChange={(e) => setSearch(e.target.value)}
-      />
+    <section className="list-pane" aria-label="Liste des commandes">
+      <label className="search">
+        <Search size={18} aria-hidden />
+        <span className="sr-only">Chercher une commande</span>
+        <input
+          type="search"
+          placeholder="N°, nom ou téléphone"
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+        />
+      </label>
 
-      <div className="chips" role="tablist" aria-label="Filtrer par statut">
+      <div className="segments" aria-label="Filtrer par statut">
         {chips.map((c) => (
           <button
             key={c.value}
             type="button"
-            role="tab"
-            aria-selected={filter === c.value}
-            className={`chip ${filter === c.value ? "active" : ""}`}
+            aria-pressed={filter === c.value}
+            className={`segment ${filter === c.value ? "active" : ""}`}
             onClick={() => setFilter(c.value)}
           >
-            {c.label} <span className="chip-count">{countOf(c.value)}</span>
+            {c.label}
+            <span className="segment-count">{countOf(c.value)}</span>
           </button>
         ))}
       </div>
 
-      {shown.length === 0 ? (
-        <p className="empty">Aucune commande.</p>
+      {loading && orders.length === 0 ? (
+        <ul className="rows" aria-busy="true">
+          {[0, 1, 2, 3].map((i) => (
+            <li key={i} className="row skeleton" />
+          ))}
+        </ul>
+      ) : shown.length === 0 ? (
+        <p className="empty">
+          {orders.length === 0
+            ? "Aucune commande pour l'instant. Les nouvelles commandes du site apparaissent ici."
+            : "Aucune commande ne correspond. Change le filtre ou la recherche."}
+        </p>
       ) : (
-        <ul className="order-list">
+        <ul className="rows">
           {shown.map((o) => (
             <li key={o.id}>
               <button
                 type="button"
-                className={`order-row ${selectedId === o.id ? "selected" : ""}`}
+                className={`row ${selectedId === o.id ? "selected" : ""}`}
                 onClick={() => onOpen(o.id)}
               >
-                <span className="order-row-main">
-                  <span className="order-row-top">
-                    <strong>{o.customer_name}</strong>
-                    <span className="order-row-total">{fmt(o.total, o.currency)}</span>
-                  </span>
-                  <span className="order-row-sub">
-                    #{o.order_number} · {fmtDate(o.created_at)} · {o.items.length} article{o.items.length > 1 ? "s" : ""}
-                  </span>
-                  <span className={`pill ${o.status}`}>
-                    {o.status === "paid" && "🔒 "}
-                    {statusLabel(o.status)}
+                <span className="row-main">
+                  <span className="row-title">{o.customer_name}</span>
+                  <span className="row-sub">
+                    {o.order_number} · {fmtDate(o.created_at)}
                   </span>
                 </span>
-                <span className="chevron" aria-hidden>›</span>
+                <span className="row-side">
+                  <span className="row-amount">{fmt(o.total, o.currency)}</span>
+                  <StatusBadge status={o.status} />
+                </span>
+                <ChevronRight size={18} className="row-chevron" aria-hidden />
               </button>
             </li>
           ))}

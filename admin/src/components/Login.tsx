@@ -18,8 +18,8 @@ export default function Login() {
 
   return (
     <main className="login-wrap">
-      <form className="card login-card" onSubmit={submit}>
-        <h1 className="brand">MÉMORA</h1>
+      <form className="login-card" onSubmit={submit}>
+        <h1 className="wordmark">MÉMORA</h1>
         <p className="muted">Espace administration</p>
         <label>
           Email
