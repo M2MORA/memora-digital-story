@@ -5,13 +5,15 @@
 @custom-variant dark (&:is(.dark *));
 
 /*
- * Design system definition.
+ * Design system definition — direction « Le Verso ».
  *
- * The @theme inline block maps CSS custom properties to Tailwind utility
- * classes (e.g. --color-primary -> bg-primary, text-primary).
+ * One palette for the whole site: the wine & linen palette validated for the
+ * order flow (/commander). The @theme inline block maps CSS custom properties
+ * to Tailwind utility classes (e.g. --color-primary -> bg-primary).
  *
- * The :root and .dark blocks define the actual color values using oklch.
- * All colors MUST use oklch format.
+ * The legacy names (ivory, cream, sand, taupe, deep-brown, charcoal,
+ * champagne…) are kept as aliases so older screens follow the new palette;
+ * new code should use the semantic names or the m-* palette below.
  *
  * To add a new semantic color:
  * 1. Add the variable to :root (light value) and .dark (dark value)
@@ -61,8 +63,9 @@
   --color-emerald-deep: var(--emerald-deep);
   --color-rose-poudre: var(--rose-poudre);
   --color-rose-poudre-deep: var(--rose-poudre-deep);
-  --font-serif: "Cormorant Garamond", ui-serif, Georgia, serif;
-  --font-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  /* Passent par des variables pour que l'arabe puisse changer de police */
+  --font-serif: var(--app-serif);
+  --font-sans: var(--app-sans);
   --color-sidebar: var(--sidebar);
   --color-sidebar-foreground: var(--sidebar-foreground);
   --color-sidebar-primary: var(--sidebar-primary);
@@ -74,36 +77,51 @@
 }
 
 :root {
-  --radius: 0.75rem;
-  --ivory: oklch(0.975 0.006 82);
-  --cream: oklch(0.94 0.014 78);
-  --sand: oklch(0.85 0.032 75);
-  --taupe: oklch(0.64 0.025 68);
-  --deep-brown: oklch(0.28 0.025 50);
-  --charcoal: oklch(0.20 0.008 80);
-  --champagne: oklch(0.78 0.075 82);
-  --emerald-deep: oklch(0.46 0.11 155);
-  --rose-poudre: oklch(0.93 0.03 25);
-  --rose-poudre-deep: oklch(0.75 0.05 25);
-  --background: var(--ivory);
-  --foreground: var(--charcoal);
-  --card: oklch(0.995 0.002 85);
-  --card-foreground: var(--charcoal);
-  --popover: oklch(0.995 0.002 85);
-  --popover-foreground: var(--charcoal);
-  --primary: var(--deep-brown);
-  --primary-foreground: var(--ivory);
-  --secondary: var(--cream);
-  --secondary-foreground: var(--charcoal);
-  --muted: var(--cream);
-  --muted-foreground: oklch(0.48 0.02 65);
-  --accent: var(--sand);
-  --accent-foreground: var(--charcoal);
-  --destructive: oklch(0.55 0.18 30);
-  --destructive-foreground: oklch(0.98 0 0);
-  --border: oklch(0.88 0.018 78);
-  --input: oklch(0.88 0.018 78);
-  --ring: var(--champagne);
+  --app-serif: "Cormorant Garamond", ui-serif, Georgia, serif;
+  --app-sans: "Manrope", ui-sans-serif, system-ui, sans-serif;
+  --radius: 1rem;
+  /* Palette « Le Verso » */
+  --linen: #f5f0e8;
+  --paper: #fbf8f3;
+  --blush: #efe3d8;
+  --line: #e4dacb;
+  --line-strong: #d9cbb8;
+  --wine: #541f32;
+  --ink: #2a1a1f;
+  --night: #1e1418;
+  --ink-muted: #5e4c52;
+  --rose: #c58b83;
+  --sage: #2f6b4f;
+  /* Legacy aliases, mapped onto the palette above */
+  --ivory: var(--linen);
+  --cream: var(--blush);
+  --sand: var(--line-strong);
+  --taupe: #7a6a6f;
+  --deep-brown: var(--wine);
+  --charcoal: var(--ink);
+  --champagne: var(--rose);
+  --emerald-deep: var(--sage);
+  --rose-poudre: var(--blush);
+  --rose-poudre-deep: var(--rose);
+  --background: var(--linen);
+  --foreground: var(--ink);
+  --card: var(--paper);
+  --card-foreground: var(--ink);
+  --popover: var(--paper);
+  --popover-foreground: var(--ink);
+  --primary: var(--wine);
+  --primary-foreground: var(--linen);
+  --secondary: var(--blush);
+  --secondary-foreground: var(--ink);
+  --muted: var(--blush);
+  --muted-foreground: var(--ink-muted);
+  --accent: var(--blush);
+  --accent-foreground: var(--ink);
+  --destructive: #a3322b;
+  --destructive-foreground: #ffffff;
+  --border: var(--line);
+  --input: var(--line-strong);
+  --ring: var(--wine);
   --chart-1: var(--deep-brown);
   --chart-2: var(--taupe);
   --chart-3: var(--sand);
@@ -117,6 +135,7 @@
   --sidebar-accent-foreground: var(--charcoal);
   --sidebar-border: var(--border);
   --sidebar-ring: var(--taupe);
+  --shadow-paper: 0 10px 28px -10px rgba(42, 26, 31, 0.22), 0 2px 6px -2px rgba(42, 26, 31, 0.08);
 }
 
 .dark {
@@ -159,28 +178,50 @@
   h5,
   h6 {
     font-family: var(--font-serif);
-    font-weight: 400;
-    letter-spacing: -0.015em;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    text-wrap: balance;
   }
 
   ::selection {
-    background: oklch(0.88 0.05 80);
-    color: var(--charcoal);
+    background: var(--blush);
+    color: var(--ink);
+  }
+
+  /* Focus visible partout au clavier, jamais à la souris */
+  :where(a, button, input, select, textarea, summary, [tabindex]):focus-visible {
+    outline: 2px solid var(--wine);
+    outline-offset: 3px;
+    border-radius: 6px;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.01ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.01ms !important;
+      scroll-behavior: auto !important;
+    }
   }
 }
 
+/* Petit titre de rubrique, en casse normale (utilisé avec parcimonie) */
 @utility eyebrow {
   font-family: var(--font-sans);
-  font-size: 0.6875rem;
-  letter-spacing: 0.24em;
-  text-transform: uppercase;
+  font-size: 0.875rem;
   font-weight: 600;
-  color: var(--muted-foreground);
+  color: var(--wine);
+}
+
+@utility shadow-paper {
+  box-shadow: var(--shadow-paper);
 }
 
 @utility container-x {
   width: 100%;
-  max-width: 88rem;
+  max-width: 75rem;
   margin-inline: auto;
   padding-inline: 1.25rem;
 
@@ -201,11 +242,15 @@
 }
 
 @utility shadow-luxury {
-  box-shadow: 0 4px 20px -2px rgba(44, 36, 32, 0.05), 0 2px 6px -1px rgba(44, 36, 32, 0.02);
+  box-shadow:
+    0 4px 20px -2px rgba(44, 36, 32, 0.05),
+    0 2px 6px -1px rgba(44, 36, 32, 0.02);
 }
 
 @utility shadow-luxury-lg {
-  box-shadow: 0 12px 36px -6px rgba(44, 36, 32, 0.08), 0 4px 12px -2px rgba(44, 36, 32, 0.03);
+  box-shadow:
+    0 12px 36px -6px rgba(44, 36, 32, 0.08),
+    0 4px 12px -2px rgba(44, 36, 32, 0.03);
 }
 
 /* Parcours de commande /commander : palette de la maquette validée */
@@ -324,4 +369,23 @@
 
 @utility animate-slow-zoom {
   animation: slow-zoom 9s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/*
+ * Arabe : polices dédiées (le mot MÉMORA garde sa police latine grâce au repli),
+ * pas d'espacement entre les lettres (il casse les liaisons) et des lignes plus
+ * hautes. Hors @layer, pour passer devant les utilitaires leading-* / tracking-*.
+ */
+:root[lang="ar"] {
+  --app-serif: "Amiri", "Cormorant Garamond", serif;
+  --app-sans: "IBM Plex Sans Arabic", "Manrope", system-ui, sans-serif;
+}
+
+/* Le logo MÉMORA (classe .keep-tracking) garde son espacement */
+:root[lang="ar"] :is(h1, h2, h3, h4, [class*="tracking-"]):not(.keep-tracking) {
+  letter-spacing: 0;
+}
+
+:root[lang="ar"] :is(h1, h2, h3) {
+  line-height: 1.35;
 }

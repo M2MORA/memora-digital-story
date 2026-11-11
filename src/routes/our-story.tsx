@@ -1,86 +1,66 @@
-import { createFileRoute } from "@tanstack/react-router";
-import product from "@/assets/product-envelope-v2.jpg";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import lifestyle from "@/assets/lifestyle-emotion-v2.jpg";
-import { PageHero } from "@/components/site/ProductCard";
+import envelope from "@/assets/product-envelope-v2.jpg";
+import { PageHero, buttonStyles } from "@/components/site/kit";
+import { dictFromMatches, useT } from "@/i18n";
 
 export const Route = createFileRoute("/our-story")({
-  head: () => ({
-    meta: [
-      { title: "Notre Histoire — MÉMORA" },
-      {
-        name: "description",
-        content:
-          "L'histoire de MÉMORA : deux passionnés, une conviction simple. Faire revivre vos plus beaux souvenirs d'un simple contact.",
-      },
-      { property: "og:title", content: "Notre Histoire — MÉMORA" },
-      { property: "og:description", content: "Né en Méditerranée. Conçu pour traverser les générations." },
-    ],
-  }),
+  head: ({ matches }) => {
+    const t = dictFromMatches(matches);
+    return {
+      meta: [{ title: `${t.nav.story} — MÉMORA` }, { name: "description", content: t.story.title }],
+    };
+  },
   component: Story,
 });
 
-const CHAPTERS = [
-  [
-    "Le commencement",
-    "Tout est né autour d'une table à Tunis, deux amis faisant défiler des milliers de photos et de vidéos oubliées au fond de leurs smartphones que personne n'avait regardées depuis des années.",
-  ],
-  [
-    "Pourquoi MÉMORA existe",
-    "Nos téléphones retiennent tout sans rien garder près du cœur. Nous voulions un souvenir que l'on puisse toucher, tenir entre ses mains, poser sur sa table de chevet — et réécouter d'un simple effleurement.",
-  ],
-  [
-    "Notre philosophie",
-    "Moins d'objets, mais de véritables trésors. Chaque tirage photo est pensé pour durer toute une vie, avec une puce NFC invisible et une notice élégante imprimée au verso pour que chacun sache l'utiliser.",
-  ],
-  [
-    "Notre engagement",
-    "Nous protégeons vos souvenirs avec une infrastructure sécurisée et un respect absolu de votre vie privée. Vos vidéos sont accessibles à vie sans abonnement ni publicité.",
-  ],
-  [
-    "Artisanat & Technologie",
-    "Nos créations marient le savoir-faire des maîtres imprimeurs sur papier photo d'art 300g/m² et l'innovation invisible du NFC sans application.",
-  ],
-  [
-    "Notre ambition",
-    "De la Méditerranée au monde entier : offrir à chaque famille le pouvoir de faire revivre ses plus grands moments d'émotion.",
-  ],
-];
-
 function Story() {
+  const t = useT();
+  const s = t.story;
   return (
     <>
-      <PageHero
-        eyebrow="Make Memories Last"
-        title="Parce que certains instants sont éternels."
-        intro="Vos plus belles photos méritent mieux qu'un écran. MÉMORA transforme vos moments les plus précieux en souvenirs physiques et émotionnels que l'on garde près du cœur."
-      />
-      <div className="container-x pb-8">
-        <div className="overflow-hidden rounded-3xl border border-sand/20 shadow-luxury-lg">
-          <img src={lifestyle} alt="Deux générations partagent un souvenir photo" loading="lazy" className="h-[50vh] sm:h-[60vh] w-full object-cover" />
-        </div>
+      <PageHero title={s.title} intro={s.lead} />
+      <div className="container-x">
+        <img
+          src={lifestyle}
+          alt={s.imageAlt}
+          width={1122}
+          height={1402}
+          loading="lazy"
+          decoding="async"
+          className="h-[55vh] min-h-[320px] w-full rounded-[4px] object-cover object-[50%_35%]"
+        />
       </div>
-      <section className="container-x py-20 sm:py-24">
-        {CHAPTERS.map(([t, d], i) => (
-          <div key={t} className="grid gap-6 border-t border-sand/20 py-12 md:grid-cols-[6rem_1fr_1.4fr] items-baseline">
-            <span className="font-serif text-3xl text-sand font-bold">0{i + 1}</span>
-            <h2 className="text-2xl sm:text-3xl font-serif text-charcoal">{t}</h2>
-            <p className="text-base leading-relaxed text-muted-foreground">{d}</p>
-          </div>
+
+      <article className="container-x max-w-3xl space-y-12 py-16 md:py-24">
+        {s.chapters.map(([title, text]) => (
+          <section key={title}>
+            <h2 className="font-serif text-[30px] leading-tight text-m-ink sm:text-[36px]">
+              {title}
+            </h2>
+            <p className="mt-3 text-[18px] leading-[1.7] text-m-muted">{text}</p>
+          </section>
         ))}
-      </section>
-      <section className="grid md:grid-cols-2 border-t border-sand/20">
-        <div className="flex flex-col justify-center bg-cream/70 p-12 md:p-20">
-          <p className="font-serif text-3xl sm:text-4xl italic leading-snug text-charcoal">
-            « Les instants passent. Les souvenirs restent. »
+      </article>
+
+      <section className="grid border-t border-m-line md:grid-cols-2">
+        <div className="flex flex-col justify-center bg-m-blush px-6 py-14 md:px-16">
+          <p className="font-serif text-[32px] italic leading-snug text-m-ink sm:text-[40px]">
+            {s.quote}
           </p>
-          <p className="mt-3 text-sm font-serif italic text-deep-brown">
-            Un instant capturé. Une émotion préservée.
-          </p>
-          <p className="mt-4 text-xs uppercase tracking-[0.2em] text-deep-brown font-semibold">
-            MÉMORA · Make Memories Last
-          </p>
+          <Link to="/commander" className={buttonStyles({ className: "mt-8 self-start" })}>
+            {t.common.create}
+          </Link>
         </div>
-        <img src={product} alt="Tirage MÉMORA dans son enveloppe d'art" loading="lazy" className="aspect-square w-full object-cover" />
+        <img
+          src={envelope}
+          alt={s.envelopeAlt}
+          width={1254}
+          height={1254}
+          loading="lazy"
+          decoding="async"
+          className="aspect-square w-full object-cover"
+        />
       </section>
     </>
   );

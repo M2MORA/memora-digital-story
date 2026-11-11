@@ -7,6 +7,7 @@ import {
   type PhotoCrop,
   type Size,
 } from "@/lib/photo-crop";
+import { useT } from "@/i18n";
 import { BottomSheet, CroppedPhoto, OrderCta } from "./OrderChrome";
 
 // Cadre de recadrage (ratio exact de la carte 15 × 10)
@@ -28,16 +29,12 @@ export function CropSheet({
   onChange: (update: (current: PhotoCrop) => PhotoCrop) => void;
   onClose: () => void;
 }) {
+  const c = useT().order.crop;
   const box = CROP_BOX[crop.orientation];
   const zoomPercent = Math.round(crop.zoom * 100);
 
   return (
-    <BottomSheet
-      titleId="crop-title"
-      title="Recadre ta photo"
-      subtitle="Format de la carte 15 × 10 cm"
-      onClose={onClose}
-    >
+    <BottomSheet titleId="crop-title" title={c.title} subtitle={c.sub} onClose={onClose}>
       <div className="flex h-[250px] items-center justify-center overflow-hidden rounded-[18px] bg-m-night">
         <CroppedPhoto
           photoUrl={photoUrl}
@@ -49,11 +46,11 @@ export function CropSheet({
         />
       </div>
 
-      <div className="flex gap-2.5" role="group" aria-label="Orientation de la carte">
+      <div className="flex gap-2.5" role="group" aria-label={c.orientation}>
         {(
           [
-            ["landscape", "Paysage"],
-            ["portrait", "Portrait"],
+            ["landscape", c.landscape],
+            ["portrait", c.portrait],
           ] as const
         ).map(([value, label]) => (
           <button
@@ -74,7 +71,7 @@ export function CropSheet({
 
       <div>
         <label htmlFor="crop-zoom" className="mb-1.5 block text-sm font-medium text-m-muted">
-          Zoom : {zoomPercent} %
+          {c.zoom(zoomPercent)}
         </label>
         <input
           id="crop-zoom"
@@ -91,7 +88,7 @@ export function CropSheet({
         />
       </div>
 
-      <OrderCta label="Valider le cadrage" onClick={onClose} showArrow={false} />
+      <OrderCta label={c.validate} onClick={onClose} showArrow={false} />
     </BottomSheet>
   );
 }

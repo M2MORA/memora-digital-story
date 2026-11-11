@@ -1,109 +1,116 @@
 import { Link } from "@tanstack/react-router";
-import { ShieldCheck, Truck, Smartphone, Heart } from "lucide-react";
+import { CONTACT_EMAIL, INSTAGRAM_URL, whatsappLink } from "@/lib/contact";
+import { PRODUCTS } from "@/lib/products";
+import { useT, type Dict } from "@/i18n";
+import { LangSwitch } from "./LangSwitch";
 
-export function SiteFooter() {
-  const cols = [
+type FooterLink = { label: string; to: string; params?: Record<string, string> };
+
+function columns(t: Dict): { title: string; links: FooterLink[] }[] {
+  return [
     {
-      title: "Commander",
+      title: t.footer.order,
       links: [
-        { href: "/shop", label: "La Boutique complète" },
-        { href: "/commander", label: "Créer un tirage photo NFC" },
-        { href: "/product/memora-magnet", label: "Mémora Magnet" },
-        { href: "/editeasy", label: "Montage automatique gratuit" },
-        { href: "/cart", label: "Mon Panier" },
+        { to: "/commander", label: t.common.create },
+        {
+          to: "/product/$slug",
+          params: { slug: PRODUCTS[0]!.slug },
+          label: t.footer.productPrices,
+        },
+        { to: "/editeasy", label: t.footer.editor },
+        { to: "/cart", label: t.footer.myCart },
       ],
     },
     {
-      title: "Entreprises & Démo",
+      title: t.footer.discover,
       links: [
-        { href: "/espace-entreprise", label: "Espace Entreprises (B2B)" },
-        { href: "/m/demo-leila-and-sami", label: "Voir la démo NFC" },
-        { href: "/gift-finder", label: "Trouver un cadeau" },
-        { href: "/digital-memories", label: "L'Expérience NFC" },
+        { to: "/how-it-works", label: t.nav.how },
+        { to: "/m/$memorySlug", params: { memorySlug: "demo-leila-and-sami" }, label: t.nav.demo },
+        { to: "/our-story", label: t.nav.story },
+        { to: "/espace-entreprise", label: t.nav.business },
       ],
     },
     {
-      title: "MÉMORA",
+      title: t.footer.help,
       links: [
-        { href: "/how-it-works", label: "Comment ça marche" },
-        { href: "/our-story", label: "Notre histoire" },
-        { href: "/faq", label: "Foire aux questions" },
-        { href: "/contact", label: "Nous contacter" },
+        { to: "/faq", label: t.footer.faq },
+        { to: "/contact", label: t.nav.contact },
+        { to: "/shipping-policy", label: t.footer.shipping },
+        { to: "/refund-policy", label: t.footer.refund },
       ],
     },
     {
-      title: "Informations Légales",
+      title: t.footer.legal,
       links: [
-        { href: "/privacy-policy", label: "Politique de confidentialité" },
-        { href: "/terms", label: "Conditions Générales (CGV)" },
-        { href: "/shipping-policy", label: "Livraison & Expédition" },
-        { href: "/refund-policy", label: "Garantie & Retours" },
+        { to: "/terms", label: t.footer.terms },
+        { to: "/privacy-policy", label: t.footer.privacy },
       ],
     },
   ];
+}
 
+const LINK =
+  "inline-flex min-h-11 items-center text-[15px] text-m-linen/75 transition-colors hover:text-m-linen md:min-h-9";
+
+export function SiteFooter() {
+  const t = useT();
   return (
-    <footer className="bg-charcoal text-ivory border-t border-deep-brown/40">
-      {/* Reassurance Bar */}
-      <div className="border-b border-ivory/10 py-12">
-        <div className="container-x grid gap-6 sm:grid-cols-3 text-center sm:text-left">
-          <div className="flex items-center justify-center sm:justify-start gap-4 rounded-xl p-4 bg-ivory/[0.03] border border-ivory/8">
-            <Smartphone className="h-6 w-6 text-champagne shrink-0" strokeWidth={1.5} />
-            <div>
-              <p className="text-sm font-semibold tracking-wide text-ivory">100% Sans Application</p>
-              <p className="text-xs text-taupe mt-0.5">Compatible nativement avec iPhone et Android</p>
-            </div>
-          </div>
-          <div className="flex items-center justify-center sm:justify-start gap-4 rounded-xl p-4 bg-ivory/[0.03] border border-ivory/8">
-            <Truck className="h-6 w-6 text-champagne shrink-0" strokeWidth={1.5} />
-            <div>
-              <p className="text-sm font-semibold tracking-wide text-ivory">Livraison Partout en Tunisie</p>
-              <p className="text-xs text-taupe mt-0.5">Paiement à la livraison · Offerte dès 250 DT</p>
-            </div>
-          </div>
-          <div className="flex items-center justify-center sm:justify-start gap-4 rounded-xl p-4 bg-ivory/[0.03] border border-ivory/8">
-            <ShieldCheck className="h-6 w-6 text-champagne shrink-0" strokeWidth={1.5} />
-            <div>
-              <p className="text-sm font-semibold tracking-wide text-ivory">Garantie & Hébergement à Vie</p>
-              <p className="text-xs text-taupe mt-0.5">Vidéos protégées sans abonnement récurrent</p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Main Links */}
-      <div className="container-x grid gap-12 py-16 md:grid-cols-[1.4fr_1fr_1fr_1fr_1fr]">
+    <footer className="bg-m-night text-m-linen">
+      <div className="container-x grid gap-12 py-16 md:grid-cols-[1.3fr_repeat(4,1fr)] md:gap-8">
         <div>
-          <p className="font-serif text-3xl tracking-[0.25em] text-ivory">MÉMORA</p>
-          <p className="mt-2 text-[10px] uppercase tracking-[0.24em] text-champagne font-medium">Make Memories Last</p>
-          <p className="mt-3 max-w-xs font-serif text-lg italic text-ivory/90 leading-relaxed">
-            Les instants passent. Les souvenirs restent.
+          <p className="keep-tracking font-serif text-[28px] font-semibold tracking-[0.18em]">
+            MÉMORA
           </p>
-          <p className="mt-4 text-xs text-taupe leading-relaxed max-w-xs">
-            Vos photos méritent mieux qu'un écran. Des souvenirs physiques à toucher et conserver pour toujours.
+          <p className="mt-3 max-w-xs font-serif text-[20px] italic leading-snug text-m-linen/85">
+            {t.footer.tagline}
           </p>
+          <ul className="mt-6 space-y-1 text-[15px]">
+            <li>
+              <a href={`mailto:${CONTACT_EMAIL}`} className={LINK} dir="ltr">
+                {CONTACT_EMAIL}
+              </a>
+            </li>
+            <li>
+              <a href={whatsappLink()} target="_blank" rel="noopener noreferrer" className={LINK}>
+                WhatsApp
+              </a>
+            </li>
+            <li>
+              <a href={INSTAGRAM_URL} target="_blank" rel="noopener noreferrer" className={LINK}>
+                Instagram
+              </a>
+            </li>
+          </ul>
+          <LangSwitch tone="light" className="-ms-2 mt-6" />
         </div>
 
-        {cols.map((c) => (
-          <div key={c.title}>
-            <p className="text-[11px] uppercase tracking-[0.22em] font-semibold text-champagne">{c.title}</p>
-            <ul className="mt-3 sm:mt-5 sm:space-y-2.5">
-              {c.links.map((l) => (
-                <li key={l.label}>
-                  <Link to={l.href} className="text-xs text-ivory/70 hover:text-champagne transition-colors py-3 sm:py-0.5 block">
-                    {l.label}
-                  </Link>
+        {columns(t).map((col) => (
+          <nav key={col.title} aria-label={col.title}>
+            <p className="text-sm font-semibold text-m-rose">{col.title}</p>
+            <ul className="mt-3">
+              {col.links.map((l) => (
+                <li key={l.to}>
+                  {l.params ? (
+                    <Link to={l.to} params={l.params} className={LINK}>
+                      {l.label}
+                    </Link>
+                  ) : (
+                    <Link to={l.to} className={LINK}>
+                      {l.label}
+                    </Link>
+                  )}
                 </li>
               ))}
             </ul>
-          </div>
+          </nav>
         ))}
       </div>
 
-      {/* Bottom Legal */}
-      <div className="container-x flex flex-col justify-between items-center gap-3 border-t border-ivory/10 py-6 text-xs text-taupe md:flex-row">
-        <span>© {new Date().getFullYear()} MÉMORA. Fait avec passion en Tunisie 🇹🇳 · Tous droits réservés.</span>
-        <span>Paiement sécurisé · Prix TTC en Dinars tunisiens (DT)</span>
+      <div className="container-x flex flex-col gap-2 border-t border-m-linen/10 py-6 text-sm text-m-linen/60 md:flex-row md:justify-between">
+        <p>
+          © {new Date().getFullYear()} MÉMORA. {t.footer.made}
+        </p>
+        <p>{t.footer.prices}</p>
       </div>
     </footer>
   );

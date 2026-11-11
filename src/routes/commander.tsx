@@ -29,11 +29,11 @@ import {
 import { clearDraftOrderNumber, getOrCreateDraftOrderNumber } from "@/lib/draft-manager";
 import {
   type Format,
-  formatTND,
   FREE_SHIPPING_THRESHOLD_TND,
   getVideoSurcharge,
   INCLUDED_VIDEO_SECONDS,
   MAX_VIDEO_SECONDS,
+  SURCHARGE_TND_PER_MIN,
 } from "@/lib/pricing";
 import {
   defaultCrop,
@@ -52,6 +52,8 @@ import {
 import { CropSheet } from "@/components/order/CropSheet";
 import { FrameSheet } from "@/components/order/FrameSheet";
 import { TapPreview } from "@/components/order/TapPreview";
+import { whatsappLink } from "@/lib/contact";
+import { dictFromMatches, useT } from "@/i18n";
 import hero from "@/assets/hero-v2.jpg";
 
 const TUNISIAN_GOVERNORATES = [
@@ -81,8 +83,6 @@ const TUNISIAN_GOVERNORATES = [
   "Zaghouan",
 ];
 
-const WHATSAPP_URL =
-  "https://wa.me/21698000000?text=Bonjour,%20je%20souhaite%20commander%20un%20tirage%20M%C3%A9mora%20et%20vous%20envoyer%20ma%20vid%C3%A9o%20et%20ma%20photo.";
 const VIDEO_ACCEPT = ".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm";
 const PHOTO_ACCEPT = "image/jpeg,image/png,image/webp";
 
@@ -131,7 +131,7 @@ const SUB = "mt-2 text-[15px] leading-relaxed text-m-muted";
 const CHIP =
   "h-10 rounded-full bg-m-paper px-[18px] text-[15px] font-semibold text-m-ink transition-colors hover:bg-m-blush";
 const OPTION =
-  "flex min-h-[100px] w-full cursor-pointer items-center gap-4 rounded-[22px] border border-m-line bg-m-paper p-[18px] text-left text-m-ink transition-colors hover:border-m-rose focus-within:outline focus-within:outline-2 focus-within:outline-m-wine disabled:cursor-not-allowed disabled:opacity-50";
+  "flex min-h-[100px] w-full cursor-pointer items-center gap-4 rounded-[22px] border border-m-line bg-m-paper p-[18px] text-start text-m-ink transition-colors hover:border-m-rose focus-within:outline focus-within:outline-2 focus-within:outline-m-wine disabled:cursor-not-allowed disabled:opacity-50";
 const OPTION_ICON =
   "flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl bg-m-blush text-m-wine";
 const FIELD_LABEL = "mb-1.5 block text-[13px] font-bold tracking-[0.06em] text-m-muted";
@@ -207,20 +207,23 @@ export const Route = createFileRoute("/commander")({
       videoReady: typeof rawVideoReady === "string" ? rawVideoReady : undefined,
     };
   },
-  head: () => ({
-    meta: [
-      { title: "Commander votre Mémora — Photo Connectée NFC" },
-      {
-        name: "description",
-        content:
-          "Crée ton MÉMORA en 4 étapes : ta vidéo, ta photo, ton panier, la livraison. Paiement à la livraison partout en Tunisie, sans application.",
-      },
-    ],
-  }),
+  head: ({ matches }) => {
+    const o = dictFromMatches(matches).order;
+    return {
+      meta: [
+        { title: `${o.metaTitle} — MÉMORA` },
+        { name: "description", content: o.metaDescription },
+      ],
+    };
+  },
   component: CommanderPage,
 });
 
 function CommanderPage() {
+  const t = useT();
+  const o = t.order;
+  const money = t.money;
+  const whatsappUrl = whatsappLink(o.whatsappMessage);
   const search = Route.useSearch();
   const { items, promoCode, draftId, draftToken } = useStore();
   const isNarrow = useIsNarrowScreen();
@@ -342,28 +345,26 @@ function CommanderPage() {
     input.value = "";
 
     const rejectFile = (message: string) => {
-      setVideoError(
-        videoStatus === "ready" ? `${message} Ta vidéo précédente reste choisie.` : message,
-      );
+      setVideoError(videoStatus === "ready" ? `${message} ${o.video.keepPrevious}` : message);
       toast.error(message);
     };
 
     const ext = file.name.split(".").pop()?.toLowerCase() || "";
     if (!["mp4", "mov", "webm"].includes(ext)) {
-      rejectFile("Format non supporté : choisis une vidéo MP4, MOV ou WebM.");
+      rejectFile(o.video.errors.format);
       return;
     }
     const mimeType = file.type.trim().toLowerCase();
     if (mimeType && !mimeType.startsWith("video/") && mimeType !== "application/octet-stream") {
-      rejectFile("Ce fichier n'est pas une vidéo.");
+      rejectFile(o.video.errors.notVideo);
       return;
     }
     if (file.size > 5 * 1024 * 1024 * 1024) {
-      rejectFile("La vidéo dépasse la taille maximale de 5 Go.");
+      rejectFile(o.video.errors.tooBig);
       return;
     }
     if (file.size <= 0) {
-      rejectFile("Ce fichier vidéo est vide.");
+      rejectFile(o.video.errors.empty);
       return;
     }
 
@@ -382,9 +383,7 @@ function CommanderPage() {
     try {
       await putCachedMedia(getMediaCacheKey(draftId, currentItemKey, "video"), file);
     } catch {
-      setVideoError(
-        "La vidéo est chargée, mais n'a pas pu être gardée sur cet appareil. Garde cette page ouverte jusqu'à la fin de la commande.",
-      );
+      setVideoError(o.video.errors.notSaved);
     }
   };
 
@@ -424,7 +423,7 @@ function CommanderPage() {
       setPhotoThumbUrl("");
     } catch {
       URL.revokeObjectURL(url);
-      toast.error("Cette photo ne peut pas être lue. Choisis-en une autre (JPG, PNG ou WEBP).");
+      toast.error(o.photo.errors.unreadable);
     }
   };
 
@@ -439,15 +438,15 @@ function CommanderPage() {
       !["jpg", "jpeg", "png", "webp"].includes(ext) ||
       (file.type && !file.type.startsWith("image/"))
     ) {
-      toast.error("Format non supporté : choisis une photo JPG, PNG ou WEBP.");
+      toast.error(o.photo.errors.format);
       return;
     }
     if (file.size > 25 * 1024 * 1024) {
-      toast.error("La photo dépasse la taille maximale de 25 Mo.");
+      toast.error(o.photo.errors.tooBig);
       return;
     }
     if (file.size <= 0) {
-      toast.error("Ce fichier photo est vide.");
+      toast.error(o.photo.errors.empty);
       return;
     }
     await applyPhotoFile(file);
@@ -488,7 +487,7 @@ function CommanderPage() {
       }
       setStage("preview");
     } catch (err) {
-      toast.error(err instanceof Error ? err.message : "La photo n'a pas pu être préparée.");
+      toast.error(err instanceof Error ? err.message : o.photo.errors.prepare);
     } finally {
       setIsPreparingPhoto(false);
     }
@@ -544,21 +543,21 @@ function CommanderPage() {
   const handleConfirmOrder = async () => {
     if (isSubmitting) return;
     if (items.length === 0) {
-      toast.error("Ton panier est vide");
+      toast.error(o.delivery.errors.empty);
       return;
     }
     const fullName = customer.name.trim();
     if (fullName.length < 2) {
-      toast.error("Indique ton nom et prénom");
+      toast.error(o.delivery.errors.name);
       return;
     }
     if (!/^\d{8}$/.test(phoneDigits)) {
-      toast.error("Le téléphone doit avoir 8 chiffres, par exemple 20 123 456");
+      toast.error(o.delivery.errors.phone);
       return;
     }
     const customerPhone = `+216 ${phoneDigits}`;
     if (!shipping.city || shipping.address.trim().length < 4) {
-      toast.error("Indique ton gouvernorat et ton adresse");
+      toast.error(o.delivery.errors.address);
       return;
     }
 
@@ -570,7 +569,7 @@ function CommanderPage() {
     try {
       // Étape A — Récupération des médias depuis IndexedDB pour chaque article
       setCheckoutStep("preparing");
-      setCheckoutMessage("Vérification des fichiers sur ton appareil…");
+      setCheckoutMessage(o.delivery.msgPreparing);
 
       const preparedMedia: Array<{ item: CartItem; photoFile: File; videoFile: File }> = [];
 
@@ -579,8 +578,7 @@ function CommanderPage() {
         const itemVideoFile = await getCachedMedia(getMediaCacheKey(draftId, it.key, "video"));
 
         if (!photoFile || !itemVideoFile) {
-          const what = !photoFile ? "La photo" : "La vidéo";
-          const errMsg = `${what} du MÉMORA n° ${i + 1} n'est plus sur cet appareil. Supprime-le du panier puis recrée-le.`;
+          const errMsg = o.delivery.errors.missing(!photoFile ? "photo" : "video", i + 1);
           setCheckoutStep("error");
           setCheckoutError(errMsg);
           toast.error(errMsg);
@@ -594,7 +592,7 @@ function CommanderPage() {
       // Les fichiers déjà envoyés sont réutilisés ; seul ce qui manque est attendu
       const resolveIntentMappings = async () => {
         setCheckoutStep("uploading_media");
-        setCheckoutMessage("Envoi de tes fichiers…");
+        setCheckoutMessage(o.delivery.msgUploading);
 
         const media = preparedMedia.flatMap(({ item, photoFile, videoFile: itemVideoFile }) => [
           { item_id: item.key, file_kind: "photo" as const, file: photoFile },
@@ -634,7 +632,7 @@ function CommanderPage() {
         intentMappings: Awaited<ReturnType<typeof resolveIntentMappings>>,
       ) => {
         setCheckoutStep("finalizing");
-        setCheckoutMessage("Enregistrement de ta commande…");
+        setCheckoutMessage(o.delivery.msgSaving);
 
         return finalizeOrderWithIntents({
           orderPayload: {
@@ -670,7 +668,7 @@ function CommanderPage() {
       }
 
       if (!finalizeResult.success) {
-        throw new Error(finalizeResult.error || "Échec de finalisation de la commande");
+        throw new Error(finalizeResult.error || o.delivery.errors.generic);
       }
 
       // Le total vient du serveur (recalculé), avant de vider le panier
@@ -697,8 +695,8 @@ function CommanderPage() {
       const isNetworkError =
         err instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(rawMessage);
       const msg = isNetworkError
-        ? "Connexion impossible. Vérifie ta connexion internet puis réessaie : rien n'a été perdu."
-        : rawMessage || "Une erreur est survenue pendant l'enregistrement de ta commande.";
+        ? o.delivery.errors.network
+        : rawMessage || o.delivery.errors.generic;
       // Numéro déjà attribué à une autre commande : en tirer un nouveau au prochain essai
       if (rawMessage.includes("order_number")) {
         clearDraftOrderNumber(draftId);
@@ -726,14 +724,14 @@ function CommanderPage() {
   switch (stage) {
     case "video":
       cta = {
-        label: "Suivant · Ta photo",
+        label: o.cta.toPhoto,
         onClick: handleValidateVideo,
         disabled: videoStatus !== "ready",
       };
       break;
     case "photo":
       cta = {
-        label: "Valider la photo",
+        label: o.cta.validatePhoto,
         onClick: () => void handleValidatePhoto(),
         disabled: !photoUrl || !crop,
         busy: isPreparingPhoto,
@@ -741,14 +739,14 @@ function CommanderPage() {
       break;
     case "preview":
       cta = {
-        label: "Ajouter au panier",
+        label: o.cta.addToCart,
         onClick: handleAddToCart,
         disabled: !photoThumbUrl || videoStatus !== "ready",
       };
       break;
     case "cart":
       cta = {
-        label: "Suivant · Livraison",
+        label: o.cta.toDelivery,
         onClick: () => setStage("delivery"),
         disabled: count === 0,
       };
@@ -756,10 +754,10 @@ function CommanderPage() {
     case "delivery":
       cta = {
         label: isSubmitting
-          ? "Envoi en cours…"
+          ? o.cta.sending
           : count === 0
-            ? "Confirmer"
-            : `${checkoutStep === "error" ? "Réessayer" : "Confirmer"} · ${formatTND(quote.total)}`,
+            ? o.cta.confirm
+            : `${checkoutStep === "error" ? o.cta.retry : o.cta.confirm} · ${money(quote.total)}`,
         type: "submit",
         form: "delivery-form",
         disabled: !formOk || count === 0,
@@ -767,7 +765,7 @@ function CommanderPage() {
       };
       break;
     default:
-      cta = { label: "Créer un autre MÉMORA", onClick: startNewMemora };
+      cta = { label: o.cta.another, onClick: startNewMemora };
   }
 
   return (
@@ -785,8 +783,8 @@ function CommanderPage() {
           {stage === "video" && (
             <div className="flex flex-col gap-4">
               <div>
-                <h1 className={H1}>Ta vidéo</h1>
-                <p className={SUB}>Elle s'ouvre quand on approche un téléphone de la carte.</p>
+                <h1 className={H1}>{o.video.title}</h1>
+                <p className={SUB}>{o.video.sub}</p>
               </div>
 
               {videoUrl ? (
@@ -806,34 +804,28 @@ function CommanderPage() {
                         const duration = e.currentTarget.duration;
                         if (!Number.isFinite(duration) || duration <= 0) {
                           setVideoStatus("error");
-                          setVideoError(
-                            "La durée de cette vidéo n'a pas pu être vérifiée. Choisis un autre fichier.",
-                          );
+                          setVideoError(o.video.errors.duration);
                           return;
                         }
                         const rounded = Math.ceil(duration);
                         setVideoDuration(rounded);
                         if (rounded > MAX_VIDEO_SECONDS) {
                           setVideoStatus("error");
-                          setVideoError(
-                            "Cette vidéo dépasse 30 minutes. Choisis une vidéo plus courte.",
-                          );
+                          setVideoError(o.video.errors.tooLong(MAX_VIDEO_SECONDS / 60));
                           return;
                         }
                         setVideoStatus("ready");
                       }}
                       onError={() => {
                         setVideoStatus("error");
-                        setVideoError(
-                          "Impossible de lire cette vidéo. Essaie un autre fichier (MP4, MOV ou WebM).",
-                        );
+                        setVideoError(o.video.errors.unreadable);
                       }}
                     />
                     {videoStatus === "ready" && !isVideoPlaying && (
                       <button
                         type="button"
                         onClick={toggleVideo}
-                        aria-label="Lire la vidéo"
+                        aria-label={o.video.play}
                         className="absolute flex h-16 w-16 items-center justify-center rounded-full bg-m-linen/90 text-m-wine"
                       >
                         <Play className="ml-1 h-[26px] w-[26px] fill-current" />
@@ -846,14 +838,14 @@ function CommanderPage() {
                       />
                     )}
                     {videoStatus === "ready" && !isVideoPlaying && (
-                      <span className="absolute bottom-4 left-4 text-[13px] font-semibold tabular-nums text-m-linen">
+                      <span className="absolute bottom-4 start-4 text-[13px] font-semibold tabular-nums text-m-linen">
                         {formatClock(videoDuration)}
                       </span>
                     )}
                     <label
-                      className={`${CHIP} absolute bottom-2.5 right-3 flex cursor-pointer items-center focus-within:outline focus-within:outline-2 focus-within:outline-m-linen`}
+                      className={`${CHIP} absolute bottom-2.5 end-3 flex cursor-pointer items-center focus-within:outline focus-within:outline-2 focus-within:outline-m-linen`}
                     >
-                      Remplacer
+                      {o.video.replace}
                       <input
                         type="file"
                         accept={VIDEO_ACCEPT}
@@ -866,16 +858,19 @@ function CommanderPage() {
                   <div role="status" className="flex flex-col gap-2">
                     {videoStatus === "ready" && (
                       <p className="flex items-center gap-2 text-sm font-semibold text-m-sage">
-                        <Check className="h-[18px] w-[18px]" strokeWidth={2.6} /> Vidéo prête
+                        <Check className="h-[18px] w-[18px]" strokeWidth={2.6} /> {o.video.ready}
                       </p>
                     )}
                     {videoStatus === "loading" && (
-                      <p className="text-sm text-m-muted">Vérification de la vidéo…</p>
+                      <p className="text-sm text-m-muted">{o.video.checking}</p>
                     )}
                     {videoStatus === "ready" && videoDuration > INCLUDED_VIDEO_SECONDS && (
                       <p className="text-sm text-m-muted">
-                        Ta vidéo dépasse 8 minutes : +{formatTND(videoSurcharge)} (1,50 DT par
-                        minute en plus).
+                        {o.video.surcharge(
+                          money(videoSurcharge),
+                          money(SURCHARGE_TND_PER_MIN),
+                          INCLUDED_VIDEO_SECONDS / 60,
+                        )}
                       </p>
                     )}
                   </div>
@@ -894,8 +889,8 @@ function CommanderPage() {
                     <span className="flex h-[72px] w-[72px] items-center justify-center rounded-full bg-m-wine text-m-linen">
                       <Plus className="h-[30px] w-[30px]" strokeWidth={2.4} />
                     </span>
-                    <span className="text-lg font-bold">Choisir une vidéo</span>
-                    <span className="text-sm text-m-muted">Depuis ta galerie, en un tap</span>
+                    <span className="text-lg font-bold">{o.video.choose}</span>
+                    <span className="text-sm text-m-muted">{o.video.chooseHint}</span>
                     <input
                       type="file"
                       accept={VIDEO_ACCEPT}
@@ -912,14 +907,14 @@ function CommanderPage() {
                     </p>
                   )}
                   <p className="text-center text-sm text-m-muted">
-                    Ta vidéo est sur un PC ?{" "}
+                    {o.video.onPc}{" "}
                     <a
-                      href={WHATSAPP_URL}
+                      href={whatsappUrl}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="font-bold text-m-wine underline-offset-2 hover:underline"
                     >
-                      Envoie-la sur WhatsApp
+                      {o.video.sendWhatsapp}
                     </a>
                   </p>
                 </>
@@ -931,8 +926,8 @@ function CommanderPage() {
           {stage === "photo" && (
             <div className="flex flex-col gap-4">
               <div>
-                <h1 className={H1}>Ta photo</h1>
-                <p className={SUB}>Celle qui sera imprimée sur la carte.</p>
+                <h1 className={H1}>{o.photo.title}</h1>
+                <p className={SUB}>{o.photo.sub}</p>
               </div>
 
               {photoUrl && crop && photoNatural ? (
@@ -946,10 +941,10 @@ function CommanderPage() {
                   />
                   <div className="flex gap-2.5 self-stretch justify-end">
                     <button type="button" className={CHIP} onClick={() => setSheet("crop")}>
-                      Recadrer
+                      {o.photo.crop}
                     </button>
                     <button type="button" className={CHIP} onClick={clearPhoto}>
-                      Remplacer
+                      {o.photo.replace}
                     </button>
                   </div>
                 </div>
@@ -960,8 +955,8 @@ function CommanderPage() {
                       <Images className="h-[26px] w-[26px]" strokeWidth={1.8} />
                     </span>
                     <span>
-                      <span className="block text-[17px] font-bold">Depuis ta galerie</span>
-                      <span className="text-sm text-m-muted">Choisis une photo</span>
+                      <span className="block text-[17px] font-bold">{o.photo.gallery}</span>
+                      <span className="text-sm text-m-muted">{o.photo.galleryHint}</span>
                     </span>
                     <input
                       type="file"
@@ -980,8 +975,8 @@ function CommanderPage() {
                       <Clapperboard className="h-[26px] w-[26px]" strokeWidth={1.8} />
                     </span>
                     <span>
-                      <span className="block text-[17px] font-bold">Une image de ta vidéo</span>
-                      <span className="text-sm text-m-muted">Fais glisser, on capture</span>
+                      <span className="block text-[17px] font-bold">{o.photo.fromVideo}</span>
+                      <span className="text-sm text-m-muted">{o.photo.fromVideoHint}</span>
                     </span>
                   </button>
                 </>
@@ -993,8 +988,8 @@ function CommanderPage() {
           {stage === "preview" && (
             <div className="flex flex-col gap-4">
               <div className="text-center">
-                <p className="text-xs font-bold tracking-[0.16em] text-[#8a5a55]">APERÇU</p>
-                <h1 className={`${H1} mt-1.5`}>Voilà ton MÉMORA</h1>
+                <p className="text-sm font-bold text-[#8a5a55]">{o.preview.eyebrow}</p>
+                <h1 className={`${H1} mt-1.5`}>{o.preview.title}</h1>
               </div>
               <TapPreview
                 photoUrl={photoThumbUrl}
@@ -1002,7 +997,7 @@ function CommanderPage() {
                 videoUrl={videoUrl}
               />
               <p className="text-center text-[15px] leading-relaxed text-m-muted">
-                On approche le téléphone de la carte, et ta vidéo se lance. Sans application.
+                {o.preview.text}
               </p>
             </div>
           )}
@@ -1010,10 +1005,8 @@ function CommanderPage() {
           {/* ============ 3 · PANIER ============ */}
           {stage === "cart" && (
             <div className="flex flex-col gap-4">
-              <h1 className={H1}>Ton panier</h1>
-              {count === 0 && (
-                <p className="text-[15px] text-m-muted">Ton panier est vide pour l'instant.</p>
-              )}
+              <h1 className={H1}>{o.cart.title}</h1>
+              {count === 0 && <p className="text-[15px] text-m-muted">{o.cart.empty}</p>}
               <div className="grid grid-cols-2 gap-3">
                 {items.map((item, index) => (
                   <div
@@ -1023,7 +1016,7 @@ function CommanderPage() {
                     <div className="flex h-[120px] items-center justify-center bg-m-stage">
                       <img
                         src={item.photoPreviewUrl || hero}
-                        alt={`MÉMORA n° ${index + 1}`}
+                        alt={o.cart.itemAlt(index + 1)}
                         className="max-h-[92px] max-w-[120px] rounded-[4px] object-cover shadow-[0_8px_18px_rgba(42,26,31,0.15)]"
                       />
                     </div>
@@ -1031,11 +1024,7 @@ function CommanderPage() {
                       <button
                         type="button"
                         className={QTY_BUTTON}
-                        aria-label={
-                          item.qty === 1
-                            ? `Supprimer le MÉMORA n° ${index + 1}`
-                            : "Retirer un exemplaire"
-                        }
+                        aria-label={item.qty === 1 ? o.cart.removeItem(index + 1) : o.cart.less}
                         onClick={() =>
                           item.qty === 1
                             ? removeItem(item.key)
@@ -1050,14 +1039,14 @@ function CommanderPage() {
                       </button>
                       <span
                         className="text-[17px] font-bold tabular-nums"
-                        aria-label={`Quantité : ${item.qty}`}
+                        aria-label={o.cart.qty(item.qty)}
                       >
                         {item.qty}
                       </span>
                       <button
                         type="button"
                         className={QTY_BUTTON}
-                        aria-label="Ajouter un exemplaire"
+                        aria-label={o.cart.more}
                         onClick={() => cart.setQty(item.key, item.qty + 1)}
                       >
                         <Plus className="h-[18px] w-[18px]" />
@@ -1073,7 +1062,7 @@ function CommanderPage() {
                   <span className="flex h-[52px] w-[52px] items-center justify-center rounded-full bg-m-wine text-m-linen">
                     <Plus className="h-[22px] w-[22px]" strokeWidth={2.4} />
                   </span>
-                  Nouveau MÉMORA
+                  {o.cart.newOne}
                 </button>
               </div>
 
@@ -1081,8 +1070,8 @@ function CommanderPage() {
                 <div className={BOX}>
                   <p className="text-sm text-m-muted">
                     {quote.isFreeShipping
-                      ? "Livraison offerte"
-                      : `Encore ${formatTND(remainingForFreeShipping)} pour la livraison offerte`}
+                      ? o.cart.freeShipping
+                      : o.cart.remaining(money(remainingForFreeShipping))}
                   </p>
                   <div className="my-3 h-1.5 overflow-hidden rounded-full bg-m-line">
                     <i
@@ -1091,8 +1080,8 @@ function CommanderPage() {
                     />
                   </div>
                   <div className="flex items-baseline justify-between">
-                    <b className="text-[28px]">{formatTND(merchandiseTotal)}</b>
-                    <span className="text-sm text-m-muted">{count} MÉMORA</span>
+                    <b className="text-[28px]">{money(merchandiseTotal)}</b>
+                    <span className="text-sm text-m-muted">{o.cart.count(count)}</span>
                   </div>
                 </div>
               )}
@@ -1103,16 +1092,14 @@ function CommanderPage() {
           {stage === "delivery" &&
             (count === 0 ? (
               <div className="flex flex-col gap-4">
-                <h1 className={H1}>On livre où ?</h1>
-                <p className="text-[15px] text-m-muted">
-                  Ton panier est vide : crée d'abord ton MÉMORA.
-                </p>
+                <h1 className={H1}>{o.delivery.title}</h1>
+                <p className="text-[15px] text-m-muted">{o.delivery.empty}</p>
                 <button
                   type="button"
                   onClick={startNewMemora}
                   className={`${CHIP} self-start border border-m-line`}
                 >
-                  Créer mon MÉMORA
+                  {o.delivery.create}
                 </button>
               </div>
             ) : (
@@ -1125,20 +1112,20 @@ function CommanderPage() {
                 className="flex flex-col gap-4"
               >
                 <div>
-                  <h1 className={H1}>On livre où ?</h1>
-                  <p className={SUB}>Tu paies à la livraison. On t'appelle pour confirmer.</p>
+                  <h1 className={H1}>{o.delivery.title}</h1>
+                  <p className={SUB}>{o.delivery.sub}</p>
                 </div>
 
                 <div>
                   <label htmlFor="cmd-name" className={FIELD_LABEL}>
-                    NOM ET PRÉNOM
+                    {o.delivery.name}
                   </label>
                   <input
                     id="cmd-name"
                     required
                     minLength={2}
                     autoComplete="name"
-                    placeholder="Sarra Ben Ali"
+                    placeholder={o.delivery.namePlaceholder}
                     value={customer.name}
                     onChange={(e) => setCustomer({ ...customer, name: e.target.value })}
                     className={FIELD}
@@ -1147,9 +1134,12 @@ function CommanderPage() {
 
                 <div>
                   <label htmlFor="cmd-phone" className={FIELD_LABEL}>
-                    TÉLÉPHONE
+                    {o.delivery.phone}
                   </label>
-                  <div className="flex h-[54px] overflow-hidden rounded-2xl border border-m-line-strong bg-m-paper focus-within:outline focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-m-wine">
+                  <div
+                    dir="ltr"
+                    className="flex h-[54px] overflow-hidden rounded-2xl border border-m-line-strong bg-m-paper focus-within:outline focus-within:outline-2 focus-within:outline-offset-1 focus-within:outline-m-wine"
+                  >
                     <span className="flex items-center border-r border-m-line pl-4 pr-3 text-[17px] font-semibold text-m-muted">
                       +216
                     </span>
@@ -1160,7 +1150,7 @@ function CommanderPage() {
                       inputMode="numeric"
                       autoComplete="tel-national"
                       pattern="\s*(216\s*)?(\d\s*){8}"
-                      title="8 chiffres, par exemple 20 123 456"
+                      title={o.delivery.phoneHint}
                       placeholder="20 123 456"
                       value={customer.phone}
                       onChange={(e) =>
@@ -1176,7 +1166,7 @@ function CommanderPage() {
 
                 <div>
                   <label htmlFor="cmd-gov" className={FIELD_LABEL}>
-                    GOUVERNORAT
+                    {o.delivery.governorate}
                   </label>
                   <div className="relative">
                     <select
@@ -1184,17 +1174,17 @@ function CommanderPage() {
                       required
                       value={shipping.city}
                       onChange={(e) => setShipping({ ...shipping, city: e.target.value })}
-                      className={`${FIELD} pr-11 ${shipping.city ? "" : "text-m-step"}`}
+                      className={`${FIELD} pe-11 ${shipping.city ? "" : "text-m-step"}`}
                     >
-                      <option value="">Choisir…</option>
-                      {TUNISIAN_GOVERNORATES.map((g) => (
+                      <option value="">{o.delivery.choose}</option>
+                      {TUNISIAN_GOVERNORATES.map((g, i) => (
                         <option key={g} value={g}>
-                          {g}
+                          {o.governorates?.[i] ?? g}
                         </option>
                       ))}
                     </select>
                     <ChevronDown
-                      className="pointer-events-none absolute right-4 top-1/2 h-5 w-5 -translate-y-1/2 text-m-muted"
+                      className="pointer-events-none absolute end-4 top-1/2 h-5 w-5 -translate-y-1/2 text-m-muted"
                       aria-hidden="true"
                     />
                   </div>
@@ -1202,14 +1192,14 @@ function CommanderPage() {
 
                 <div>
                   <label htmlFor="cmd-address" className={FIELD_LABEL}>
-                    ADRESSE
+                    {o.delivery.address}
                   </label>
                   <input
                     id="cmd-address"
                     required
                     minLength={4}
                     autoComplete="street-address"
-                    placeholder="Rue, quartier, ville"
+                    placeholder={o.delivery.addressPlaceholder}
                     value={shipping.address}
                     onChange={(e) => setShipping({ ...shipping, address: e.target.value })}
                     className={FIELD}
@@ -1218,40 +1208,38 @@ function CommanderPage() {
 
                 <div className={`${BOX} text-[15px]`}>
                   <div className="flex justify-between py-1">
-                    <span className="text-m-muted">{count} MÉMORA</span>
+                    <span className="text-m-muted">{o.cart.count(count)}</span>
                     <span>
-                      {formatTND(
-                        quote.itemsSubtotal + quote.framesSubtotal + quote.videoSurcharges,
-                      )}
+                      {money(quote.itemsSubtotal + quote.framesSubtotal + quote.videoSurcharges)}
                     </span>
                   </div>
                   {quote.discount > 0 && (
                     <div className="flex justify-between py-1">
-                      <span className="text-m-muted">Réduction</span>
-                      <span>-{formatTND(quote.discount)}</span>
+                      <span className="text-m-muted">{o.delivery.discount}</span>
+                      <span>-{money(quote.discount)}</span>
                     </div>
                   )}
                   <div className="flex justify-between py-1">
-                    <span className="text-m-muted">Livraison</span>
+                    <span className="text-m-muted">{o.delivery.shipping}</span>
                     <span>
-                      {quote.shippingCost > 0 ? formatTND(quote.shippingCost) : "Offerte"}
+                      {quote.shippingCost > 0 ? money(quote.shippingCost) : o.delivery.free}
                     </span>
                   </div>
                   <div className="mt-1.5 flex justify-between border-t border-m-line pt-2.5 text-[17px] font-bold">
-                    <span>Total à payer</span>
-                    <span>{formatTND(quote.total)}</span>
+                    <span>{o.delivery.total}</span>
+                    <span>{money(quote.total)}</span>
                   </div>
                 </div>
 
                 <p className="text-center text-[13px] leading-relaxed text-m-muted">
-                  En confirmant, tu acceptes les{" "}
+                  {o.delivery.termsBefore}{" "}
                   <a
                     href="/terms"
                     target="_blank"
                     rel="noreferrer"
                     className="font-semibold text-m-wine underline underline-offset-2"
                   >
-                    conditions générales de vente
+                    {o.delivery.termsLink}
                   </a>
                   .
                 </p>
@@ -1259,12 +1247,12 @@ function CommanderPage() {
                 {!isSubmitting && isUploadingMedia && (
                   <div className={BOX}>
                     <div className="flex items-center justify-between gap-3 text-[13px] font-semibold text-m-wine">
-                      <span>Envoi de tes fichiers…</span>
+                      <span>{o.delivery.uploading}</span>
                       <span className="tabular-nums">{uploadPercent} %</span>
                     </div>
                     <div
                       role="progressbar"
-                      aria-label="Progression de l'envoi de tes fichiers"
+                      aria-label={o.delivery.uploadingLabel}
                       aria-valuemin={0}
                       aria-valuemax={100}
                       aria-valuenow={uploadPercent}
@@ -1275,9 +1263,7 @@ function CommanderPage() {
                         style={{ width: `${uploadPercent}%` }}
                       />
                     </div>
-                    <p className="mt-2 text-[13px] text-m-muted">
-                      Tu peux déjà confirmer ta commande.
-                    </p>
+                    <p className="mt-2 text-[13px] text-m-muted">{o.delivery.canConfirm}</p>
                   </div>
                 )}
 
@@ -1286,8 +1272,7 @@ function CommanderPage() {
                   hasUploadError &&
                   checkoutStep !== "error" && (
                     <p className="rounded-2xl border border-destructive/30 bg-destructive/10 p-3 text-[13px] text-m-ink">
-                      Un fichier n'a pas pu être envoyé. Vérifie ta connexion : il sera renvoyé
-                      quand tu confirmeras.
+                      {o.delivery.uploadError}
                     </p>
                   )}
 
@@ -1296,10 +1281,9 @@ function CommanderPage() {
                     <Loader2 className="h-5 w-5 shrink-0 animate-spin text-m-wine" />
                     <div>
                       <p className="text-[13px] font-bold text-m-wine">
-                        {checkoutStep === "preparing" && "1/3 · Préparation des fichiers"}
-                        {checkoutStep === "uploading_media" &&
-                          `2/3 · Envoi de tes fichiers · ${uploadPercent} %`}
-                        {checkoutStep === "finalizing" && "3/3 · Enregistrement de la commande"}
+                        {checkoutStep === "preparing" && o.delivery.step1}
+                        {checkoutStep === "uploading_media" && o.delivery.step2(uploadPercent)}
+                        {checkoutStep === "finalizing" && o.delivery.step3}
                       </p>
                       <p className="text-[13px] text-m-muted">{checkoutMessage}</p>
                     </div>
@@ -1311,7 +1295,7 @@ function CommanderPage() {
                     role="alert"
                     className="rounded-2xl border border-destructive/30 bg-destructive/10 p-4 text-[13px] text-m-ink"
                   >
-                    <p className="font-bold text-destructive">La commande n'est pas passée</p>
+                    <p className="font-bold text-destructive">{o.delivery.failed}</p>
                     <p className="mt-1 leading-relaxed">{checkoutError}</p>
                   </div>
                 )}
@@ -1324,19 +1308,22 @@ function CommanderPage() {
               <span className="flex h-[88px] w-[88px] items-center justify-center rounded-full bg-m-wine text-m-linen">
                 <Check className="h-10 w-10" strokeWidth={2.6} />
               </span>
-              <h1 className={H1}>Merci{confirmed?.firstName ? ` ${confirmed.firstName}` : ""} !</h1>
+              <h1 className={H1}>{o.done.thanks(confirmed?.firstName)}</h1>
               <p className="max-w-[300px] text-[15px] leading-relaxed text-m-muted">
-                Ta commande est reçue.{" "}
+                {o.done.received}{" "}
+                {/* Le numéro reste lisible de gauche à droite au milieu d'une phrase en arabe */}
                 {confirmed
-                  ? `On t'appelle au +216 ${formatPhone(confirmed.phone)} pour la confirmer.`
-                  : "On t'appelle pour la confirmer."}
+                  ? o.done.call(`\u2066+216 ${formatPhone(confirmed.phone)}\u2069`)
+                  : o.done.callNoPhone}
               </p>
               {confirmed && (
                 <div className={`${BOX} text-[15px]`}>
-                  Total à payer à la livraison : <b>{formatTND(confirmed.total)}</b>
+                  {o.done.total} <b>{money(confirmed.total)}</b>
                 </div>
               )}
-              {orderNumber && <p className="text-sm text-m-muted">Commande n° {orderNumber}</p>}
+              {orderNumber && (
+                <p className="text-sm text-m-muted">{o.done.orderNumber(orderNumber)}</p>
+              )}
             </div>
           )}
         </div>

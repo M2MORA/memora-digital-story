@@ -1,19 +1,19 @@
-﻿export function LegalPage({ title, sections }: { title: string; sections: [string, string][] }) {
+﻿import { useT, type Dict } from "@/i18n";
+
+/** Page légale traduite : `page` désigne la rubrique dans le dictionnaire */
+export function LegalPage({ page }: { page: keyof Dict["legal"] }) {
+  const { title, sections } = useT().legal[page];
   return (
-    <section className="container-x max-w-3xl pb-32 pt-36">
-      <p className="eyebrow">Informations Légales</p>
-      <h1 className="mt-4 font-serif text-4xl sm:text-6xl">{title}</h1>
-      <div className="mt-6 inline-flex items-center gap-2 rounded-full bg-cream border border-border px-3.5 py-1 text-xs text-muted-foreground">
-        <span>Conforme à la loi tunisienne sur la protection des données personnelles</span>
-      </div>
-      <div className="mt-12 space-y-10 divide-y divide-border">
+    <article className="container-x max-w-3xl pb-24 pt-12 md:pt-20">
+      <h1 className="font-serif text-[40px] leading-[1.05] text-m-ink sm:text-[52px]">{title}</h1>
+      <div className="mt-10 divide-y divide-m-line border-y border-m-line">
         {sections.map(([h, p]) => (
-          <div key={h} className="pt-8 first:pt-0">
-            <h2 className="font-serif text-2xl text-charcoal">{h}</h2>
-            <p className="mt-3 text-sm sm:text-base leading-relaxed text-muted-foreground">{p}</p>
-          </div>
+          <section key={h} className="py-8">
+            <h2 className="font-serif text-[26px] leading-tight text-m-ink">{h}</h2>
+            <p className="mt-3 max-w-[65ch] text-[17px] leading-relaxed text-m-muted">{p}</p>
+          </section>
         ))}
       </div>
-    </section>
+    </article>
   );
 }

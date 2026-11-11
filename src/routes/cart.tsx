@@ -1,203 +1,202 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Plus, Minus, Trash2, Copy, Sparkles, ArrowRight, Truck } from "lucide-react";
+import { Copy, Minus, Plus, Trash2 } from "lucide-react";
 import { cart, useStore } from "@/lib/cart";
-import { formatTND, FREE_SHIPPING_THRESHOLD_TND, getUnitPrice, getVideoSurcharge } from "@/lib/pricing";
+import { getUnitPrice } from "@/lib/pricing";
+import { buttonStyles } from "@/components/site/kit";
+import { dictFromMatches, useT } from "@/i18n";
 import hero from "@/assets/hero-v2.jpg";
 
 export const Route = createFileRoute("/cart")({
-  head: () => ({
+  head: ({ matches }) => ({
     meta: [
-      { title: "Votre Panier — MÉMORA" },
-      { name: "description", content: "Vérifiez vos créations Mémora avant de finaliser la commande." },
+      { title: `${dictFromMatches(matches).cart.title} — MÉMORA` },
       { name: "robots", content: "noindex" },
     ],
   }),
   component: CartPage,
 });
 
+const QTY_BUTTON =
+  "flex h-11 w-11 items-center justify-center rounded-full border border-m-line bg-m-linen text-m-ink transition-colors hover:bg-m-blush";
+const ITEM_ACTION =
+  "inline-flex min-h-11 items-center gap-1.5 text-[15px] text-m-muted transition-colors hover:text-m-ink";
+
 function CartPage() {
+  const t = useT();
+  const c = t.cart;
   const navigate = useNavigate();
-  const { items, promoCode } = useStore();
+  const { items } = useStore();
   const quote = cart.getQuote();
 
   return (
-    <section className="container-x min-h-[75vh] pb-28 pt-36 max-w-5xl">
-      <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 border-b border-sand/20 pb-6">
-        <div>
-          <p className="eyebrow text-deep-brown font-semibold tracking-[0.2em]">Make Memories Last</p>
-          <h1 className="font-serif text-4xl sm:text-5xl text-charcoal tracking-tight mt-1">Mon Panier</h1>
-        </div>
-        <Link
-          to="/commander"
-          className="inline-flex items-center gap-2 rounded-full border border-sand/40 bg-sand/15 px-4 py-2 text-xs uppercase tracking-wider text-charcoal hover:bg-sand/30 transition-all shrink-0 font-medium"
-        >
-          <Plus className="h-4 w-4" />
-          <span>Créer un autre tirage</span>
-        </Link>
+    <section className="container-x max-w-5xl pb-20 pt-10 md:pt-16">
+      <div className="flex flex-wrap items-end justify-between gap-4 border-b border-m-line pb-6">
+        <h1 className="font-serif text-[40px] leading-tight text-m-ink sm:text-[52px]">
+          {c.title}
+        </h1>
+        {items.length > 0 && (
+          <Link to="/commander" className={buttonStyles({ variant: "secondary", size: "md" })}>
+            <Plus className="h-4 w-4" aria-hidden="true" />
+            {c.add}
+          </Link>
+        )}
       </div>
 
       {items.length === 0 ? (
-        <div className="py-24 text-center">
-          <div className="mx-auto w-16 h-16 rounded-full bg-sand/20 border border-sand/30 flex items-center justify-center mb-4 text-deep-brown">
-            <Sparkles className="h-7 w-7" />
-          </div>
-          <p className="text-xl font-serif text-charcoal">Votre panier est encore vide</p>
-          <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
-            Vos plus beaux souvenirs méritent mieux qu'un écran éphémère. Transformez vos instants précieux en tirages scellés pour toujours.
-          </p>
-          <Link
-            to="/commander"
-            className="mt-8 inline-block rounded-full bg-primary px-8 py-3.5 text-xs uppercase tracking-widest text-primary-foreground hover:bg-charcoal transition-all shadow-luxury hover:shadow-luxury-lg font-semibold"
-          >
-            Découvrir les supports &amp; Créer
+        <div className="py-20 text-center">
+          <p className="font-serif text-[28px] text-m-ink">{c.emptyTitle}</p>
+          <p className="mt-2 text-[17px] text-m-muted">{c.emptyLead}</p>
+          <Link to="/commander" className={buttonStyles({ className: "mt-8" })}>
+            {t.common.create}
           </Link>
         </div>
       ) : (
-        <div className="mt-10 grid gap-8 lg:grid-cols-[1.6fr_1fr]">
-          {/* Items */}
-          <div className="space-y-5">
+        <div className="mt-8 grid gap-8 lg:grid-cols-[1.6fr_1fr]">
+          <ul className="space-y-4">
             {items.map((item) => {
               const unitPrice = getUnitPrice(item.format, quote.totalQuantity);
-              const durationExtra = getVideoSurcharge(item.videoDurationSec, item.qty);
-
+              const minutes = Math.max(1, Math.round(item.videoDurationSec / 60));
               return (
-                <div
+                <li
                   key={item.key}
-                  className="rounded-2xl border border-sand/20 bg-card p-6 shadow-luxury hover:shadow-luxury-lg transition-all"
+                  className="rounded-[20px] border border-m-line bg-m-paper p-4 sm:p-5"
                 >
-                  <div className="flex gap-5">
+                  <div className="flex gap-4">
                     <img
                       src={item.photoPreviewUrl || hero}
-                      alt="Photo tirage"
-                      className="h-28 w-24 rounded-xl object-cover border border-sand/20 shrink-0 shadow-xs"
+                      alt=""
+                      className="h-28 w-[84px] shrink-0 rounded-[3px] object-cover shadow-paper"
                     />
-                    <div className="flex-1">
-                      <div className="flex items-start justify-between">
-                        <div>
-                          <h3 className="font-serif text-xl sm:text-2xl text-charcoal">
-                            Mémora Simple (Enveloppe & Carte)
-                          </h3>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            Vidéo : {item.videoName || "video_souvenir.mp4"} ({Math.floor(item.videoDurationSec / 60)}m)
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h2 className="font-serif text-[22px] leading-tight text-m-ink">
+                            {t.product.name}
+                          </h2>
+                          <p className="mt-1 truncate text-[15px] text-m-muted">
+                            {c.video(item.videoName || c.yourVideo, minutes)}
                           </p>
                           {item.cardMessage && (
-                            <p className="mt-1 text-xs text-muted-foreground italic font-serif">
-                              Message carte : « {item.cardMessage} »
+                            <p className="mt-1 font-serif text-[17px] italic text-m-muted">
+                              « {item.cardMessage} »
                             </p>
                           )}
                         </div>
-                        <div className="text-right">
-                          <p className="font-serif text-2xl text-charcoal">{formatTND(unitPrice * item.qty)}</p>
-                          <p className="text-[11px] text-muted-foreground">{formatTND(unitPrice)} /u</p>
+                        <div className="shrink-0 text-end">
+                          <p className="font-serif text-[22px] font-semibold text-m-ink">
+                            {t.money(unitPrice * item.qty)}
+                          </p>
+                          <p className="text-sm text-m-step">
+                            {t.money(unitPrice)} {c.each}
+                          </p>
                         </div>
                       </div>
 
-                      {/* Quantity Controls & Tools */}
-                      <div className="mt-5 flex flex-wrap items-center justify-between gap-3 border-t border-sand/15 pt-4 text-xs">
-                        <div className="flex items-center gap-3">
-                          <span className="text-muted-foreground">Quantité :</span>
-                          <div className="flex items-center rounded-full border border-sand/30 bg-muted/30 px-1 py-0.5 shadow-2xs">
-                            <button
-                              onClick={() => cart.setQty(item.key, item.qty - 1)}
-                              className="p-1.5 hover:bg-sand/30 rounded-full transition-colors"
-                              aria-label="Diminuer la quantité"
-                            >
-                              <Minus className="h-3 w-3" />
-                            </button>
-                            <span className="px-3 font-semibold text-charcoal">{item.qty}</span>
-                            <button
-                              onClick={() => cart.setQty(item.key, item.qty + 1)}
-                              className="p-1.5 hover:bg-sand/30 rounded-full transition-colors"
-                              aria-label="Augmenter la quantité"
-                            >
-                              <Plus className="h-3 w-3" />
-                            </button>
-                          </div>
+                      <div className="mt-4 flex flex-wrap items-center justify-between gap-3 border-t border-m-line pt-3">
+                        <div className="flex items-center gap-2" role="group" aria-label={c.qty}>
+                          <button
+                            type="button"
+                            onClick={() => cart.setQty(item.key, item.qty - 1)}
+                            className={QTY_BUTTON}
+                            aria-label={c.less}
+                          >
+                            <Minus className="h-4 w-4" />
+                          </button>
+                          <span
+                            className="min-w-8 text-center text-[17px] font-semibold text-m-ink"
+                            aria-live="polite"
+                          >
+                            {item.qty}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => cart.setQty(item.key, item.qty + 1)}
+                            className={QTY_BUTTON}
+                            aria-label={c.more}
+                          >
+                            <Plus className="h-4 w-4" />
+                          </button>
                         </div>
-
                         <div className="flex items-center gap-4">
                           <button
+                            type="button"
                             onClick={() => cart.duplicate(item.key, "same_photo_new_video")}
-                            className="inline-flex items-center gap-1.5 text-muted-foreground hover:text-deep-brown transition-colors"
+                            className={ITEM_ACTION}
                           >
-                            <Copy className="h-3.5 w-3.5" />
-                            <span>Dupliquer</span>
+                            <Copy className="h-4 w-4" aria-hidden="true" />
+                            {c.duplicate}
                           </button>
                           <button
+                            type="button"
                             onClick={() => cart.remove(item.key)}
-                            className="inline-flex items-center gap-1 text-muted-foreground hover:text-destructive transition-colors"
+                            className={`${ITEM_ACTION} hover:text-destructive`}
                           >
-                            <Trash2 className="h-3.5 w-3.5" />
-                            <span>Supprimer</span>
+                            <Trash2 className="h-4 w-4" aria-hidden="true" />
+                            {c.remove}
                           </button>
                         </div>
                       </div>
                     </div>
                   </div>
-                </div>
+                </li>
               );
             })}
-          </div>
+          </ul>
 
-          {/* Checkout summary */}
-          <div className="h-fit rounded-3xl border border-sand/30 bg-linear-to-b from-cream via-cream/60 to-ivory p-6 sm:p-8 shadow-luxury">
-            <h3 className="font-serif text-2xl border-b border-sand/20 pb-4 text-charcoal">Total Panier</h3>
-
-            <div className="mt-5 space-y-3.5 text-sm">
+          <aside
+            aria-labelledby="total"
+            className="h-fit rounded-[20px] border border-m-line bg-m-paper p-6 lg:sticky lg:top-24"
+          >
+            <h2 id="total" className="font-serif text-[26px] text-m-ink">
+              {c.total}
+            </h2>
+            <dl className="mt-4 space-y-3 text-[15px]">
               <div className="flex justify-between">
-                <span className="text-muted-foreground">Total tirages ({quote.totalQuantity} ex.)</span>
-                <span className="font-medium text-charcoal">{formatTND(quote.itemsSubtotal)}</span>
+                <dt className="text-m-muted">{c.photos(quote.totalQuantity)}</dt>
+                <dd className="text-m-ink">{t.money(quote.itemsSubtotal)}</dd>
               </div>
-
               {quote.framesSubtotal > 0 && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Cadres en bois noble</span>
-                  <span className="font-medium text-charcoal">+{formatTND(quote.framesSubtotal)}</span>
+                  <dt className="text-m-muted">{c.frames}</dt>
+                  <dd className="text-m-ink">+{t.money(quote.framesSubtotal)}</dd>
                 </div>
               )}
-
               {quote.videoSurcharges > 0 && (
                 <div className="flex justify-between">
-                  <span className="text-muted-foreground">Supplément durée vidéo</span>
-                  <span className="font-medium text-charcoal">+{formatTND(quote.videoSurcharges)}</span>
+                  <dt className="text-m-muted">{c.extraMinutes}</dt>
+                  <dd className="text-m-ink">+{t.money(quote.videoSurcharges)}</dd>
                 </div>
               )}
-
               {quote.discount > 0 && (
-                <div className="flex justify-between text-deep-brown font-medium">
-                  <span>Réduction appliquée</span>
-                  <span>-{formatTND(quote.discount)}</span>
+                <div className="flex justify-between text-m-sage">
+                  <dt>{c.discount}</dt>
+                  <dd>−{t.money(quote.discount)}</dd>
                 </div>
               )}
-
-              <div className="flex justify-between border-t border-sand/20 pt-3">
-                <span className="text-muted-foreground flex items-center gap-1.5">
-                  <Truck className="h-4 w-4 text-deep-brown" />
-                  <span>Livraison express</span>
-                </span>
-                <span>
+              <div className="flex justify-between">
+                <dt className="text-m-muted">{c.shipping}</dt>
+                <dd className="text-m-ink">
                   {quote.isFreeShipping ? (
-                    <strong className="text-deep-brown">Offerte</strong>
+                    <strong className="font-semibold text-m-sage">{c.free}</strong>
                   ) : (
-                    <span className="font-medium text-charcoal">{formatTND(quote.shippingCost)}</span>
+                    t.money(quote.shippingCost)
                   )}
-                </span>
+                </dd>
               </div>
-
-              <div className="flex justify-between border-t border-sand/20 pt-4 text-xl font-serif font-bold text-charcoal">
-                <span>Total à régler</span>
-                <span className="text-2xl text-charcoal">{formatTND(quote.total)}</span>
+              <div className="flex justify-between gap-4 border-t border-m-line pt-4 font-serif text-[24px] font-semibold text-m-ink">
+                <dt>{c.toPay}</dt>
+                <dd className="shrink-0">{t.money(quote.total)}</dd>
               </div>
-            </div>
-
+            </dl>
+            {!quote.isFreeShipping && <p className="mt-3 text-sm text-m-step">{c.freeFrom}</p>}
             <button
+              type="button"
               onClick={() => navigate({ to: "/commander", search: { stage: "delivery" } })}
-              className="mt-8 w-full inline-flex items-center justify-center gap-2 rounded-full bg-primary py-4 text-xs uppercase tracking-[0.2em] text-primary-foreground hover:bg-charcoal transition-all shadow-luxury hover:shadow-luxury-lg hover:scale-[1.01] active:scale-[0.99] font-semibold cursor-pointer"
+              className={buttonStyles({ className: "mt-6 w-full" })}
             >
-              <span>Finaliser ma commande</span>
-              <ArrowRight className="h-4 w-4" />
+              {c.checkout}
             </button>
-          </div>
+          </aside>
         </div>
       )}
     </section>

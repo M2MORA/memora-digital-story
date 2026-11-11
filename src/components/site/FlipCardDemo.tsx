@@ -1,95 +1,75 @@
 import { useState } from "react";
-import { RotateCw, Smartphone, CheckCircle2 } from "lucide-react";
+import { RotateCw } from "lucide-react";
 import rectoPhoto from "@/assets/recto-family-v2.jpg";
+import { useT } from "@/i18n";
 
+/** La carte MÉMORA, recto et verso : on la retourne pour lire la notice imprimée au dos */
 export function FlipCardDemo() {
-  const [isFlipped, setIsFlipped] = useState(false);
+  const t = useT();
+  const [flipped, setFlipped] = useState(false);
 
   return (
     <div className="flex flex-col items-center">
-      {/* 3D Flip Container */}
-      <div
-          className="relative h-[420px] w-full max-w-[280px] cursor-pointer select-none [perspective:1200px]"
-        onClick={() => setIsFlipped(!isFlipped)}
+      <button
+        type="button"
+        onClick={() => setFlipped((f) => !f)}
+        aria-pressed={flipped}
+        aria-label={flipped ? t.flip.toFront : t.flip.toBack}
+        className="relative h-[420px] w-[280px] cursor-pointer select-none rounded-[4px] [perspective:1400px]"
       >
         <div
-          className={`relative h-full w-full rounded-2xl shadow-2xl transition-transform duration-700 [transform-style:preserve-3d] ${isFlipped ? "[transform:rotateY(180deg)]" : ""
-            }`}
+          className={`relative h-full w-full transition-transform duration-700 ease-[cubic-bezier(0.2,0.7,0.2,1)] [transform-style:preserve-3d] ${
+            flipped ? "[transform:rotateY(180deg)]" : ""
+          }`}
         >
-          {/* RECTO (Front) */}
-          <div className="absolute inset-0 flex flex-col overflow-hidden rounded-2xl border-4 border-ivory bg-white p-3 shadow-xl [backface-visibility:hidden]">
-            <div className="relative flex-1 overflow-hidden rounded-lg">
-              <img
-                src={rectoPhoto}
-                alt="Photo souvenir d'une famille au bord de la mer"
-                className="h-full w-full object-cover"
-              />
-            </div>
+          {/* Recto */}
+          <div className="absolute inset-0 overflow-hidden rounded-[4px] border-[8px] border-m-paper bg-m-paper shadow-paper [backface-visibility:hidden]">
+            <img
+              src={rectoPhoto}
+              alt={t.flip.front}
+              width={560}
+              height={840}
+              loading="lazy"
+              decoding="async"
+              className="h-full w-full object-cover"
+            />
           </div>
 
-          {/* VERSO (Back) */}
-          <div className="absolute inset-0 flex flex-col justify-between overflow-hidden rounded-2xl border-2 border-border bg-[#FBF9F5] p-6 text-charcoal shadow-xl [backface-visibility:hidden] [transform:rotateY(180deg)]">
-            {/* Header with NFC target spot */}
-            <div className="border-b border-border/80 pb-4 text-center">
-              <div className="mx-auto mb-2 flex h-10 w-10 items-center justify-center rounded-full bg-sand/30">
-                <Smartphone className="h-5 w-5 text-deep-brown" />
-              </div>
-              <p className="font-serif text-xl tracking-wider text-charcoal">MÉMORA</p>
-              <p className="text-[10px] uppercase tracking-[0.25em] text-muted-foreground">
-                Notice d'utilisation au dos
-              </p>
-            </div>
-
-            {/* Target Area where the phone touches */}
-            <div className="my-auto flex flex-col items-center justify-center rounded-xl border border-dashed border-taupe/40 bg-sand/15 p-4 text-center">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full border border-taupe/30 bg-background text-deep-brown shadow-xs">
-                <span className="text-xs font-semibold uppercase tracking-wider">NFC</span>
-              </div>
-              <p className="mt-2 text-xs font-medium text-charcoal">Posez votre smartphone ici</p>
-              <p className="text-[11px] text-muted-foreground">Haut de l'iPhone ou dos d'Android</p>
-            </div>
-
-            {/* 3 Step Instructions */}
-            <div className="space-y-2.5 text-xs text-charcoal/90">
-              <div className="flex items-start gap-2.5">
-                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-deep-brown text-[10px] font-bold text-ivory">
-                  1
-                </span>
-                <p className="leading-tight">Déverrouillez l'écran de votre smartphone</p>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-deep-brown text-[10px] font-bold text-ivory">
-                  2
-                </span>
-                <p className="leading-tight">Approchez-le du centre de la photo</p>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-deep-brown text-[10px] font-bold text-ivory">
-                  3
-                </span>
-                <p className="leading-tight">Touchez la notification : votre vidéo démarre</p>
-              </div>
-            </div>
-
-            {/* Footer reassurance */}
-            <div className="flex items-center justify-between border-t border-border/80 pt-3 text-[10px] text-muted-foreground">
-              <span className="flex items-center gap-1">
-                <CheckCircle2 className="h-3 w-3 text-deep-brown" /> Sans application
+          {/* Verso, tel qu'il est imprimé */}
+          <div className="absolute inset-0 flex flex-col rounded-[4px] bg-m-paper p-6 text-start text-m-ink shadow-paper [backface-visibility:hidden] [transform:rotateY(180deg)]">
+            <p className="keep-tracking text-center font-serif text-[22px] font-semibold tracking-[0.18em] text-m-wine">
+              MÉMORA
+            </p>
+            <div className="my-auto flex flex-col items-center">
+              <span className="flex h-24 w-24 items-center justify-center rounded-full border-2 border-dashed border-m-rose text-sm font-bold text-m-wine">
+                {t.flip.place}
               </span>
-              <span>iOS & Android</span>
+              <p className="mt-3 text-center text-sm text-m-muted">{t.flip.where}</p>
             </div>
+            <ol className="space-y-2.5 text-[15px] leading-snug">
+              {t.flip.steps.map((s, i) => (
+                <li key={s} className="flex gap-3">
+                  <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-m-wine text-[13px] font-bold text-m-linen">
+                    {i + 1}
+                  </span>
+                  <span>{s}</span>
+                </li>
+              ))}
+            </ol>
+            <p className="mt-4 border-t border-m-line pt-3 text-center text-[13px] text-m-step">
+              {t.flip.noApp}
+            </p>
           </div>
         </div>
-      </div>
-
-      {/* Button to flip */}
-      <button
-        onClick={() => setIsFlipped(!isFlipped)}
-        className="mt-5 inline-flex items-center gap-2 rounded-full border border-border bg-background px-4 py-2 text-xs uppercase tracking-[0.15em] text-charcoal shadow-xs transition-colors hover:bg-cream"
-      >
-        <RotateCw className="h-3.5 w-3.5 text-taupe" />
-        {isFlipped ? "Voir la photo (recto)" : "Voir les instructions au dos (verso)"}
       </button>
+
+      <p
+        className="mt-5 inline-flex items-center gap-2 text-[15px] text-m-muted"
+        aria-hidden="true"
+      >
+        <RotateCw className="h-4 w-4" />
+        {flipped ? t.flip.hintFront : t.flip.hintBack}
+      </p>
     </div>
   );
 }

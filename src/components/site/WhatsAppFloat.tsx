@@ -1,25 +1,19 @@
 import { MessageCircle } from "lucide-react";
+import { whatsappLink } from "@/lib/contact";
+import { useT } from "@/i18n";
 
+/** Bouton WhatsApp flottant, sur ordinateur seulement (sur mobile il vit dans la barre du bas) */
 export function WhatsAppFloat() {
-  const whatsappUrl =
-    "https://wa.me/21698000000?text=Bonjour%20M%C3%A9mora%2C%20je%20souhaite%20des%20informations%20ou%20passer%20une%20commande.";
-
+  const t = useT();
   return (
-    <aside
-      aria-label="Contact WhatsApp"
-      className="fixed bottom-6 right-6 z-40 flex items-center gap-2 group"
+    <a
+      href={whatsappLink(t.common.whatsappHello)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="fixed bottom-6 end-6 z-40 hidden min-h-12 items-center gap-2.5 rounded-full bg-m-ink px-5 text-[15px] font-semibold text-m-linen shadow-paper transition-colors hover:bg-m-wine md:inline-flex"
     >
-      <a
-        href={whatsappUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        aria-label="Discuter sur WhatsApp"
-        className="flex h-12 w-12 items-center justify-center rounded-full bg-[#25D366] p-0 text-xs font-semibold text-white shadow-xl transition-all duration-300 hover:scale-105 hover:bg-[#20bd5a] hover:shadow-2xl md:h-auto md:w-auto md:gap-2.5 md:px-4 md:py-3"
-      >
-        <MessageCircle className="h-5 w-5 fill-current shrink-0 md:h-4 md:w-4" />
-        <span className="hidden md:inline">Besoin d'aide ? WhatsApp</span>
-      </a>
-    </aside>
+      <MessageCircle className="h-5 w-5" aria-hidden="true" />
+      <span>{t.whatsappFloat}</span>
+    </a>
   );
 }
-

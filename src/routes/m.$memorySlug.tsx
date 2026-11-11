@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { MessageCircle, Play, Volume2, VolumeX, X } from "lucide-react";
 import { getMemoryBySlug } from "@/lib/supabase";
 import { DEMO_PHOTO_URL, DEMO_VIDEO_URL } from "@/lib/demo-media";
+import { useT } from "@/i18n";
 
 type Memory = {
   title: string;
@@ -13,11 +14,12 @@ type Memory = {
 
 const DEMO_MEMORIES: Record<string, Memory> = {
   "demo-leila-and-sami": {
-    title: "Leila & Sami",
+    // Le titre et le message restent neutres : ils doivent coller à la vidéo de démo
+    title: "Un message pour toi",
     videoUrl: DEMO_VIDEO_URL,
     coverPhoto: DEMO_PHOTO_URL,
     message:
-      "Sami, je voulais garder ce souvenir vivant dans tes mains. À chaque fois que ton téléphone touchera cette photo, j'espère que tu réentendras le bruit des vagues et notre rire ce jour-là.",
+      "Je voulais que tu puisses réécouter ce message quand tu veux. Pose ton téléphone sur la photo, et je suis là.",
   },
   "demo-famille": {
     title: "Notre Famille",
@@ -55,21 +57,27 @@ export const Route = createFileRoute("/m/$memorySlug")({
       { name: "robots", content: "noindex, nofollow" },
     ],
   }),
-  notFoundComponent: () => (
+  notFoundComponent: MemoryNotFound,
+  component: MemoryPlaybackPage,
+});
+
+function MemoryNotFound() {
+  const t = useT();
+  return (
     <div className="flex min-h-dvh flex-col items-center justify-center bg-black px-6 text-center text-ivory">
-      <h1 className="font-serif text-3xl">Ce souvenir MÉMORA n'est pas disponible</h1>
+      <h1 className="font-serif text-3xl">{t.memory.notFound}</h1>
       <Link
         to="/"
         className="mt-6 rounded-full bg-sand px-6 py-2.5 text-xs uppercase tracking-widest text-charcoal"
       >
-        Retour à l'accueil
+        {t.common.home}
       </Link>
     </div>
-  ),
-  component: MemoryPlaybackPage,
-});
+  );
+}
 
 function MemoryPlaybackPage() {
+  const t = useT();
   const { memory } = Route.useLoaderData();
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [isMuted, setIsMuted] = useState(true);
@@ -133,7 +141,7 @@ function MemoryPlaybackPage() {
         <button
           type="button"
           onClick={togglePlayback}
-          aria-label="Lancer la vidéo"
+          aria-label={t.memory.play}
           className="absolute inset-0 flex items-center justify-center bg-black/30"
         >
           <span className="rounded-full bg-ivory/90 p-5 text-charcoal">
@@ -144,13 +152,13 @@ function MemoryPlaybackPage() {
 
       {hasError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black px-6 text-center">
-          <p className="font-serif text-xl">Cette vidéo n'est pas disponible pour le moment.</p>
+          <p className="font-serif text-xl">{t.memory.unavailable}</p>
           <button
             type="button"
             onClick={retry}
             className="mt-5 rounded-full bg-sand px-6 py-2.5 text-xs uppercase tracking-widest text-charcoal"
           >
-            Réessayer
+            {t.memory.retry}
           </button>
         </div>
       )}
@@ -163,7 +171,7 @@ function MemoryPlaybackPage() {
             className="inline-flex min-h-11 items-center gap-2 rounded-full bg-black/60 px-4 text-xs font-medium backdrop-blur-sm"
           >
             {isMuted ? <VolumeX className="h-4 w-4" /> : <Volume2 className="h-4 w-4" />}
-            <span>{isMuted ? "Activer le son" : "Couper le son"}</span>
+            <span>{isMuted ? t.memory.soundOn : t.memory.soundOff}</span>
           </button>
           {memory.message && (
             <button
@@ -172,7 +180,7 @@ function MemoryPlaybackPage() {
               className="inline-flex min-h-11 items-center gap-2 rounded-full bg-black/60 px-4 text-xs font-medium backdrop-blur-sm"
             >
               <MessageCircle className="h-4 w-4" />
-              <span>Le message</span>
+              <span>{t.memory.message}</span>
             </button>
           )}
         </div>
@@ -182,14 +190,14 @@ function MemoryPlaybackPage() {
         <div
           role="dialog"
           aria-modal="true"
-          aria-label="Le message"
+          aria-label={t.memory.message}
           className="absolute inset-x-0 bottom-0 rounded-t-3xl bg-charcoal p-6 pb-[max(1.5rem,env(safe-area-inset-bottom))] text-center"
         >
           <button
             type="button"
             onClick={() => setIsMessageOpen(false)}
-            aria-label="Fermer le message"
-            className="absolute right-3 top-3 flex h-11 w-11 items-center justify-center text-ivory/70"
+            aria-label={t.memory.close}
+            className="absolute end-3 top-3 flex h-11 w-11 items-center justify-center text-ivory/70"
           >
             <X className="h-5 w-5" />
           </button>
@@ -200,7 +208,7 @@ function MemoryPlaybackPage() {
             to="/commander"
             className="mt-6 inline-flex rounded-full bg-sand px-6 py-3 text-xs font-semibold uppercase tracking-[0.2em] text-charcoal"
           >
-            Créer un MÉMORA
+            {t.memory.create}
           </Link>
         </div>
       )}

@@ -49,7 +49,7 @@ export const PRODUCTS: Product[] = [
     connectivity: ["nfc"],
     occasions: ["love", "family", "special", "birthday", "travel"],
     style: "classic",
-    delivery: "Fabrication artisanale en 48h. Livraison soignée en 2 à 3 jours.",
+    delivery: "Fabriqué en 48 h, puis livré en 3 à 5 jours ouvrés partout en Tunisie.",
     badge: "L'Essentiel",
     includedVideoMin: 8,
   },
@@ -61,4 +61,3 @@ export const getProduct = (slugOrId: string) => {
 };
 
 export const formatPrice = (n: number) => formatTND(n);
-

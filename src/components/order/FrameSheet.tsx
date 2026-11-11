@@ -1,4 +1,5 @@
 import { useRef, useState } from "react";
+import { useT } from "@/i18n";
 import { BottomSheet, OrderCta } from "./OrderChrome";
 
 function formatClock(seconds: number): string {
@@ -18,6 +19,7 @@ export function FrameSheet({
   onCapture: (file: File) => Promise<void> | void;
   onClose: () => void;
 }) {
+  const f = useT().order.frame;
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [time, setTime] = useState(0);
   const [ready, setReady] = useState(false);
@@ -34,7 +36,7 @@ export function FrameSheet({
   const capture = async () => {
     const video = videoRef.current;
     if (!video || !video.videoWidth) {
-      setError("La vidéo n'est pas encore prête. Réessaie dans un instant.");
+      setError(f.notReady);
       return;
     }
     setBusy(true);
@@ -55,19 +57,14 @@ export function FrameSheet({
         }),
       );
     } catch {
-      setError("Cette image n'a pas pu être capturée. Choisis plutôt une photo de ta galerie.");
+      setError(f.failed);
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <BottomSheet
-      titleId="frame-title"
-      title="Une image de ta vidéo"
-      subtitle="Fais glisser, on capture"
-      onClose={onClose}
-    >
+    <BottomSheet titleId="frame-title" title={f.title} subtitle={f.sub} onClose={onClose}>
       <div className="flex h-[250px] items-center justify-center overflow-hidden rounded-[18px] bg-m-night">
         <video
           ref={videoRef}
@@ -83,11 +80,7 @@ export function FrameSheet({
           }}
           onLoadedData={() => setReady(true)}
           onSeeked={() => setReady(true)}
-          onError={() =>
-            setError(
-              "Cette vidéo ne peut pas être lue ici. Choisis plutôt une photo de ta galerie.",
-            )
-          }
+          onError={() => setError(f.unreadable)}
         />
       </div>
 
@@ -96,8 +89,8 @@ export function FrameSheet({
           htmlFor="frame-time"
           className="mb-1.5 flex justify-between text-sm font-medium text-m-muted"
         >
-          <span>Moment choisi</span>
-          <span className="tabular-nums">
+          <span>{f.moment}</span>
+          <span className="tabular-nums" dir="ltr">
             {formatClock(time)} / {formatClock(max)}
           </span>
         </label>
@@ -123,7 +116,7 @@ export function FrameSheet({
       )}
 
       <OrderCta
-        label="Prendre cette image"
+        label={f.take}
         onClick={() => void capture()}
         disabled={!ready}
         busy={busy}

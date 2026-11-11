@@ -15,23 +15,24 @@ import appCss from "../styles.css?url";
 import { SiteHeader } from "@/components/site/SiteHeader";
 import { SiteFooter } from "@/components/site/SiteFooter";
 import { WhatsAppFloat } from "@/components/site/WhatsAppFloat";
+import { MobileOrderBar, MobileOrderBarSpacer } from "@/components/site/MobileOrderBar";
+import { buttonStyles } from "@/components/site/kit";
+import { LangProvider, dictFor, dirOf, effectiveLang, readLang, useT, type Lang } from "@/i18n";
 import { Toaster } from "@/components/ui/sonner";
 
 function NotFoundComponent() {
+  const t = useT();
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="flex min-h-[70vh] items-center justify-center bg-background px-5">
       <div className="max-w-md text-center">
-        <h1 className="text-7xl font-bold font-serif text-primary">404</h1>
-        <h2 className="mt-4 text-xl font-semibold text-foreground">Page introuvable</h2>
-        <p className="mt-2 text-sm text-muted-foreground">
-          La page que vous recherchez n'existe pas ou a été déplacée.
-        </p>
-        <div className="mt-6">
-          <Link
-            to="/"
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 shadow-sm"
-          >
-            Retour à l'accueil
+        <h1 className="font-serif text-[40px] leading-tight text-m-ink">{t.notFound.title}</h1>
+        <p className="mt-3 text-[17px] text-m-muted">{t.notFound.text}</p>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
+          <Link to="/" className={buttonStyles({ variant: "secondary" })}>
+            {t.common.home}
+          </Link>
+          <Link to="/commander" className={buttonStyles()}>
+            {t.common.create}
           </Link>
         </div>
       </div>
@@ -42,31 +43,26 @@ function NotFoundComponent() {
 function ErrorComponent({ error, reset }: ErrorComponentProps) {
   console.error(error);
   const router = useRouter();
+  const t = useT();
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-background px-4">
+    <div className="flex min-h-screen items-center justify-center bg-background px-5">
       <div className="max-w-md text-center">
-        <h1 className="text-2xl font-serif font-semibold tracking-tight text-foreground">
-          Une erreur est survenue
-        </h1>
-        <p className="mt-2 text-sm text-muted-foreground">
-          Quelque chose s'est mal passé. Vous pouvez rafraîchir la page ou retourner à l'accueil.
-        </p>
-        <div className="mt-6 flex flex-wrap justify-center gap-3">
+        <h1 className="font-serif text-[36px] leading-tight text-m-ink">{t.error.title}</h1>
+        <p className="mt-3 text-[17px] text-m-muted">{t.error.text}</p>
+        <div className="mt-8 flex flex-wrap justify-center gap-3">
           <button
+            type="button"
             onClick={() => {
               router.invalidate();
               reset();
             }}
-            className="inline-flex items-center justify-center rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground transition-colors hover:bg-primary/90 shadow-sm"
+            className={buttonStyles()}
           >
-            Réessayer
+            {t.error.retry}
           </button>
-          <a
-            href="/"
-            className="inline-flex items-center justify-center rounded-md border border-input bg-background px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-accent"
-          >
-            Retour à l'accueil
+          <a href="/" className={buttonStyles({ variant: "secondary" })}>
+            {t.common.home}
           </a>
         </div>
       </div>
@@ -75,12 +71,19 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
 }
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
+  // Langue choisie (cookie), relue à chaque navigation et après un changement de langue
+  loader: (): { lang: Lang } => ({ lang: readLang() }),
   head: () => ({
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
       { title: "MÉMORA — Les instants passent. Les souvenirs restent." },
-      { name: "description", content: "Premium personalized keepsakes connected to private digital memories. Born in Tunisia." },
+      {
+        name: "description",
+        content:
+          "Une photo imprimée avec une puce NFC invisible : posez un téléphone dessus et votre vidéo se lance, sans application. Fabriqué en Tunisie.",
+      },
+      { name: "theme-color", content: "#F5F0E8" },
       { property: "og:site_name", content: "MÉMORA" },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },
@@ -99,7 +102,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
       {
         rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,300;0,400;0,500;0,600;1,300;1,400&family=Manrope:wght@300;400;500;600;700&display=swap",
+        href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,500;0,600;1,500&family=Manrope:wght@400;500;600;700&family=Amiri:wght@400;700&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap",
       },
     ],
   }),
@@ -109,9 +112,17 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
   errorComponent: ErrorComponent,
 });
 
+/** Langue de la page affichée : celle choisie, sauf sur les pages encore en français */
+function useActiveLang(): Lang {
+  const data = Route.useLoaderData();
+  const pathname = useRouterState({ select: (s) => s.location.pathname });
+  return effectiveLang(data?.lang ?? "fr", pathname);
+}
+
 function RootShell({ children }: { children: ReactNode }) {
+  const lang = useActiveLang();
   return (
-    <html lang="fr">
+    <html lang={lang} dir={dirOf(lang)}>
       <head>
         <HeadContent />
       </head>
@@ -129,17 +140,36 @@ function RootComponent() {
   // Le parcours de commande a son propre en-tête et son bouton fixé en bas
   const isOrderFlow = pathname === "/commander";
   const immersive = pathname.startsWith("/m/") || isOrderFlow;
+  const lang = useActiveLang();
+  // Le fournisseur de langue est rendu ici : on lit donc le dictionnaire directement
+  const t = dictFor(lang);
 
   return (
-    <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      {!immersive && <SiteHeader />}
-      <main>
-        <Outlet />
-      </main>
-      {!immersive && <SiteFooter />}
-      {!immersive && <WhatsAppFloat />}
-      <Toaster position={isOrderFlow ? "top-center" : "bottom-right"} />
-    </QueryClientProvider>
+    <LangProvider lang={lang}>
+      <QueryClientProvider client={queryClient}>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        {!immersive && (
+          <a
+            href="#contenu"
+            className="sr-only z-[60] rounded-full bg-m-wine px-5 py-3 text-m-linen focus:not-sr-only focus:fixed focus:start-4 focus:top-3"
+          >
+            {t.common.skip}
+          </a>
+        )}
+        {!immersive && <SiteHeader />}
+        <main id="contenu">
+          <Outlet />
+        </main>
+        {!immersive && <SiteFooter />}
+        {!immersive && <WhatsAppFloat />}
+        {!immersive && pathname !== "/cart" && (
+          <>
+            <MobileOrderBarSpacer />
+            <MobileOrderBar />
+          </>
+        )}
+        <Toaster position={isOrderFlow ? "top-center" : "bottom-right"} />
+      </QueryClientProvider>
+    </LangProvider>
   );
 }

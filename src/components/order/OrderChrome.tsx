@@ -2,8 +2,7 @@ import { useEffect, useRef, type KeyboardEvent, type PointerEvent, type ReactNod
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft, ArrowRight, Check, Loader2, ShoppingBag, X } from "lucide-react";
 import { placePhoto, type PhotoCrop, type Size } from "@/lib/photo-crop";
-
-export const ORDER_STEPS = ["Vidéo", "Photo", "Panier", "Livraison"] as const;
+import { useT } from "@/i18n";
 
 export function OrderHeader({
   onBack,
@@ -14,24 +13,25 @@ export function OrderHeader({
   cartCount: number;
   onOpenCart: () => void;
 }) {
+  const o = useT().order;
   return (
     <header className="sticky top-0 z-30 flex h-16 shrink-0 items-center justify-between border-b border-m-line bg-m-linen/95 px-3.5 backdrop-blur-sm">
       {onBack ? (
         <button
           type="button"
           onClick={onBack}
-          aria-label="Retour"
+          aria-label={o.back}
           className="flex h-11 w-11 items-center justify-center rounded-[14px] border border-m-line bg-m-paper text-m-ink transition-colors hover:bg-m-blush"
         >
-          <ArrowLeft className="h-5 w-5" />
+          <ArrowLeft className="h-5 w-5 rtl:-scale-x-100" />
         </button>
       ) : (
         <span className="w-11" aria-hidden="true" />
       )}
       <Link
         to="/"
-        aria-label="MÉMORA — retour à l'accueil"
-        className="pl-[0.18em] font-serif text-[25px] font-semibold tracking-[0.18em] text-m-wine"
+        aria-label={o.homeLabel}
+        className="keep-tracking pl-[0.18em] font-serif text-[25px] font-semibold tracking-[0.18em] text-m-wine"
       >
         MÉMORA
       </Link>
@@ -39,12 +39,12 @@ export function OrderHeader({
         type="button"
         onClick={onOpenCart}
         disabled={cartCount === 0}
-        aria-label={`Panier : ${cartCount} article${cartCount > 1 ? "s" : ""}`}
+        aria-label={o.cartLabel(cartCount)}
         className="relative flex h-11 w-11 items-center justify-center text-m-ink disabled:cursor-default"
       >
         <ShoppingBag className="h-6 w-6" strokeWidth={1.8} />
         {cartCount > 0 && (
-          <span className="absolute right-0 top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-m-wine px-1 text-[11px] font-bold text-m-linen">
+          <span className="absolute end-0 top-0.5 flex h-5 min-w-5 items-center justify-center rounded-full bg-m-wine px-1 text-[11px] font-bold text-m-linen">
             {cartCount}
           </span>
         )}
@@ -54,12 +54,13 @@ export function OrderHeader({
 }
 
 export function OrderStepper({ current }: { current: number }) {
+  const o = useT().order;
   return (
     <ol
-      aria-label="Étapes de la commande"
+      aria-label={o.stepsLabel}
       className="flex shrink-0 justify-between gap-1 border-b border-m-line px-4 py-3.5"
     >
-      {ORDER_STEPS.map((label, i) => {
+      {o.steps.map((label, i) => {
         const done = i < current;
         const active = i === current;
         return (
@@ -80,7 +81,7 @@ export function OrderStepper({ current }: { current: number }) {
               }`}
             >
               {done ? (
-                <Check className="h-3.5 w-3.5" strokeWidth={3} aria-label="terminée" />
+                <Check className="h-3.5 w-3.5" strokeWidth={3} aria-label={o.stepDone} />
               ) : (
                 i + 1
               )}
@@ -134,7 +135,7 @@ export function OrderCta({
     >
       {busy && <Loader2 className="h-5 w-5 animate-spin" />}
       <span>{label}</span>
-      {showArrow && !busy && <ArrowRight className="h-5 w-5" />}
+      {showArrow && !busy && <ArrowRight className="h-5 w-5 rtl:-scale-x-100" />}
     </button>
   );
 }
@@ -153,6 +154,7 @@ export function BottomSheet({
   onClose: () => void;
   children: ReactNode;
 }) {
+  const o = useT().order;
   const panelRef = useRef<HTMLDivElement | null>(null);
   const closeRef = useRef(onClose);
   closeRef.current = onClose;
@@ -198,7 +200,7 @@ export function BottomSheet({
           <button
             type="button"
             onClick={onClose}
-            aria-label="Fermer"
+            aria-label={o.close}
             className="flex h-11 w-11 shrink-0 items-center justify-center rounded-full bg-m-blush text-m-ink"
           >
             <X className="h-[18px] w-[18px]" />
@@ -226,6 +228,7 @@ export function CroppedPhoto({
   className?: string;
   onPan?: ((dx: number, dy: number) => void) | undefined;
 }) {
+  const o = useT().order;
   const drag = useRef<{ id: number; x: number; y: number } | null>(null);
   const p = placePhoto(natural, box, crop);
 
@@ -233,7 +236,7 @@ export function CroppedPhoto({
     ? {
         tabIndex: 0,
         role: "img",
-        "aria-label": "Photo à recadrer : fais-la glisser, ou utilise les flèches du clavier",
+        "aria-label": o.panHint,
         onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
           e.currentTarget.setPointerCapture(e.pointerId);
           drag.current = { id: e.pointerId, x: e.clientX, y: e.clientY };
