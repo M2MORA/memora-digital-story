@@ -3,9 +3,8 @@ import { ChevronDown } from "lucide-react";
 import { Img } from "./Img";
 import { IMAGES } from "@/lib/images.gen";
 
-/** Part du défilement (en hauteurs d'écran) où le texte apparaît : de 4 % à 40 % */
-const START = 0.04;
-const SPAN = 0.36;
+/** Le texte commence à apparaître après 10 % du chemin jusqu'au point d'arrêt */
+const START = 0.1;
 
 /**
  * Hero de l'accueil : à l'ouverture, seule la photo est visible, en plein écran.
@@ -24,6 +23,7 @@ export function HeroReveal({
   children: ReactNode;
 }) {
   const ref = useRef<HTMLElement>(null);
+  const stopRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const el = ref.current;
@@ -35,8 +35,13 @@ export function HeroReveal({
     let frame = 0;
     const update = () => {
       frame = 0;
-      const vh = window.innerHeight || 1;
-      const p = Math.min(1, Math.max(0, (window.scrollY / vh - START) / SPAN));
+      // Le texte est entièrement visible pile au point d'arrêt, quelle que soit
+      // la hauteur réelle de l'écran (barre d'adresse du téléphone affichée ou non)
+      const marker = stopRef.current;
+      const stop = marker
+        ? marker.getBoundingClientRect().top + window.scrollY
+        : window.innerHeight * 0.4;
+      const p = Math.min(1, Math.max(0, (window.scrollY / stop - START) / (1 - START)));
       el.style.setProperty("--reveal", p.toFixed(3));
     };
     const onScroll = () => {
@@ -52,6 +57,70 @@ export function HeroReveal({
     };
   }, []);
 
+  // Arrêt au texte : un geste qui descend depuis le haut s'arrête au point
+  // d'arrêt (texte entièrement visible), inertie comprise. Le geste suivant
+  // continue normalement. Seulement pour un défilement fait par la personne
+  // (molette, doigt, clavier) : un lien interne comme #occasions passe sans arrêt.
+  // Le CSS scroll-snap ne suffit pas : Chrome ignore scroll-snap-stop en mode
+  // « proximity », et « mandatory » bloquerait le reste de la page.
+  useEffect(() => {
+    const marker = stopRef.current;
+    if (!marker) return;
+    const IDLE_MS = 180;
+    const stopY = () => marker.getBoundingClientRect().top + window.scrollY;
+    let armed = window.scrollY < stopY() - 4;
+    let holding = false;
+    let lastInput = 0;
+    let idle: ReturnType<typeof setTimeout> | undefined;
+
+    const markInput = () => {
+      lastInput = performance.now();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (["PageDown", "ArrowDown", " ", "End"].includes(e.key)) markInput();
+    };
+    const holdUntilIdle = () => {
+      clearTimeout(idle);
+      idle = setTimeout(() => {
+        holding = false;
+      }, IDLE_MS);
+    };
+    const onScroll = () => {
+      const y = window.scrollY;
+      const stop = stopY();
+      if (holding) {
+        if (y > stop) window.scrollTo(0, stop);
+        holdUntilIdle();
+        return;
+      }
+      if (y < stop - 4) {
+        armed = true;
+        return;
+      }
+      const byUser = performance.now() - lastInput < 600;
+      if (armed && byUser && y > stop + 1) {
+        armed = false;
+        holding = true;
+        window.scrollTo(0, stop);
+        holdUntilIdle();
+      } else {
+        armed = false;
+      }
+    };
+
+    window.addEventListener("wheel", markInput, { passive: true });
+    window.addEventListener("touchmove", markInput, { passive: true });
+    window.addEventListener("keydown", onKey);
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => {
+      clearTimeout(idle);
+      window.removeEventListener("wheel", markInput);
+      window.removeEventListener("touchmove", markInput);
+      window.removeEventListener("keydown", onKey);
+      window.removeEventListener("scroll", onScroll);
+    };
+  }, []);
+
   const reveal = "var(--reveal)";
 
   return (
@@ -63,6 +132,12 @@ export function HeroReveal({
       className="relative -mt-16 h-[160svh] bg-m-night"
       style={{ "--reveal": 0 } as CSSProperties}
     >
+      {/* Point d'arrêt : texte entièrement visible (voir l'effet « Arrêt au texte ») */}
+      <div
+        ref={stopRef}
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-x-0 top-[40svh] h-px"
+      />
       <div className="sticky top-0 flex h-svh items-end overflow-hidden md:items-center">
         <Img
           image={IMAGES.hero}
