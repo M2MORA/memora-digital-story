@@ -43,10 +43,12 @@ export default function OrderDetail({
   order: o,
   data,
   onBack,
+  onOpenConversation,
 }: {
   order: Order;
   data: AdminData;
   onBack: () => void;
+  onOpenConversation: (conversationId: string) => void;
 }) {
   const { memories, copiedSlug, downloadingUrl, slugFor, resolveMedia } = data;
   const next = NEXT_STATUS[o.status];
@@ -78,6 +80,7 @@ export default function OrderDetail({
           <h2>{o.customer_name}</h2>
           <p className="muted">
             {o.order_number} · {fmtDate(o.created_at)}
+            {o.source === "whatsapp" && <> · <span className="tag">WhatsApp</span></>}
           </p>
         </div>
         <div className="detail-head-side">
@@ -88,6 +91,11 @@ export default function OrderDetail({
 
       <section className="panel">
         <h3 className="panel-title">Client</h3>
+        {o.wa_conversation_id && (
+          <button type="button" className="btn primary" onClick={() => onOpenConversation(o.wa_conversation_id!)}>
+            <MessageCircle size={16} aria-hidden /> Conversation avec Ballech
+          </button>
+        )}
         {o.customer_phone && (
           <div className="actions-row">
             <a className="btn" href={`tel:${o.customer_phone}`}>

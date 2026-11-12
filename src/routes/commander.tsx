@@ -53,35 +53,9 @@ import { CropSheet } from "@/components/order/CropSheet";
 import { FrameSheet } from "@/components/order/FrameSheet";
 import { TapPreview } from "@/components/order/TapPreview";
 import { whatsappLink } from "@/lib/contact";
+import { TUNISIAN_GOVERNORATES } from "@/lib/governorates";
 import { dictFromMatches, useT } from "@/i18n";
 import hero from "@/assets/hero-v2.jpg";
-
-const TUNISIAN_GOVERNORATES = [
-  "Ariana",
-  "Béja",
-  "Ben Arous",
-  "Bizerte",
-  "Gabès",
-  "Gafsa",
-  "Jendouba",
-  "Kairouan",
-  "Kasserine",
-  "Kébili",
-  "Le Kef",
-  "Mahdia",
-  "La Manouba",
-  "Médenine",
-  "Monastir",
-  "Nabeul",
-  "Sfax",
-  "Sidi Bouzid",
-  "Siliana",
-  "Sousse",
-  "Tataouine",
-  "Tozeur",
-  "Tunis",
-  "Zaghouan",
-];
 
 const VIDEO_ACCEPT = ".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm";
 const PHOTO_ACCEPT = "image/jpeg,image/png,image/webp";

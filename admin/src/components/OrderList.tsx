@@ -83,6 +83,7 @@ export default function OrderList({
                   <span className="row-title">{o.customer_name}</span>
                   <span className="row-sub">
                     {o.order_number} · {fmtDate(o.created_at)}
+                    {o.source === "whatsapp" && " · WhatsApp"}
                   </span>
                 </span>
                 <span className="row-side">

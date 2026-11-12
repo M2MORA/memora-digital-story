@@ -1,16 +1,19 @@
 import { useEffect, useState } from "react";
-import { Menu, Nfc, Package, PanelLeftClose, PanelLeftOpen, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
+import { Menu, MessageCircle, Nfc, Package, PanelLeftClose, PanelLeftOpen, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
 import { fmt } from "../lib/format";
 import { useAdminData } from "../lib/useAdminData";
+import { useWhatsApp } from "../lib/useWhatsApp";
 import OrderList from "./OrderList";
 import OrderDetail from "./OrderDetail";
 import MemoryList from "./MemoryList";
 import Settings from "./Settings";
+import WhatsAppInbox from "./WhatsAppInbox";
 
-type Tab = "orders" | "memories" | "settings";
+type Tab = "orders" | "whatsapp" | "memories" | "settings";
 
 const TABS = [
   { value: "orders" as const, Icon: Package, label: "Commandes" },
+  { value: "whatsapp" as const, Icon: MessageCircle, label: "WhatsApp" },
   { value: "memories" as const, Icon: Nfc, label: "Souvenirs" },
   { value: "settings" as const, Icon: SettingsIcon, label: "Réglages" },
 ];
@@ -20,6 +23,7 @@ const COLLAPSE_KEY = "memora_admin_sidebar_collapsed";
 export default function Dashboard({ email }: { email: string }) {
   const data = useAdminData();
   const [tab, setTab] = useState<Tab>("orders");
+  const wa = useWhatsApp({ inboxOpen: tab === "whatsapp" });
   const [openId, setOpenId] = useState<string | null>(null);
   // Téléphone : la barre s'ouvre par-dessus. Ordinateur : elle se réduit aux icônes.
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -75,6 +79,22 @@ export default function Dashboard({ email }: { email: string }) {
     window.scrollTo({ top: 0 });
   };
 
+  /** Depuis l'inbox WhatsApp ou une bulle : ouvre la fiche de la commande. */
+  const showOrder = (id: string) => {
+    setTab("orders");
+    // Commande créée par Ballech depuis le dernier chargement : on recharge la liste.
+    if (!data.orders.some((o) => o.id === id)) void data.load();
+    openOrder(id);
+  };
+
+  /** Depuis une commande WhatsApp : ouvre la conversation du client. */
+  const showConversation = (conversationId: string) => {
+    if (openId) closeOrder();
+    setTab("whatsapp");
+    void wa.select(conversationId);
+    window.scrollTo({ top: 0 });
+  };
+
   const openOrderData = openId ? data.orders.find((o) => o.id === openId) : undefined;
   const current = TABS.find((t) => t.value === tab)!;
 
@@ -100,6 +120,7 @@ export default function Dashboard({ email }: { email: string }) {
               <Icon size={20} strokeWidth={1.75} aria-hidden />
               <span className="nav-label">{label}</span>
               {value === "orders" && data.stats.todo > 0 && <span className="nav-count">{data.stats.todo}</span>}
+              {value === "whatsapp" && wa.waitingCount > 0 && <span className="nav-count">{wa.waitingCount}</span>}
             </button>
           ))}
         </nav>
@@ -127,7 +148,7 @@ export default function Dashboard({ email }: { email: string }) {
           <button
             type="button"
             className="icon-btn"
-            onClick={() => void data.load()}
+            onClick={() => void (tab === "whatsapp" ? wa.reload() : data.load())}
             aria-label="Actualiser"
             title="Actualiser"
             disabled={data.loading}
@@ -158,7 +179,13 @@ export default function Dashboard({ email }: { email: string }) {
               <div className={`orders-layout ${openOrderData ? "has-detail" : ""}`}>
                 <OrderList orders={data.orders} loading={data.loading} selectedId={openId} onOpen={openOrder} />
                 {openOrderData ? (
-                  <OrderDetail key={openOrderData.id} order={openOrderData} data={data} onBack={closeOrder} />
+                  <OrderDetail
+                    key={openOrderData.id}
+                    order={openOrderData}
+                    data={data}
+                    onBack={closeOrder}
+                    onOpenConversation={showConversation}
+                  />
                 ) : (
                   <div className="detail-placeholder">
                     <Package size={28} strokeWidth={1.5} aria-hidden />
@@ -169,6 +196,7 @@ export default function Dashboard({ email }: { email: string }) {
             </>
           )}
 
+          {tab === "whatsapp" && <WhatsAppInbox wa={wa} orders={data.orders} onOpenOrder={showOrder} />}
           {tab === "memories" && <MemoryList data={data} />}
           {tab === "settings" && <Settings email={email} />}
         </main>
