@@ -9,7 +9,11 @@ import {
 import { handleAdminSend } from "../server/whatsapp/admin";
 import { createWhatsAppClient, type WhatsAppClient } from "../server/whatsapp/client";
 import { createAnthropicProvider } from "../server/whatsapp/llm/anthropic";
-import { createGeminiProvider } from "../server/whatsapp/llm/gemini";
+import {
+  DEFAULT_GEMINI_MODELS,
+  createGeminiProvider,
+  resetGeminiCooldowns,
+} from "../server/whatsapp/llm/gemini";
 import { withRateLimitRetry, type ChatTurn, type LlmProvider } from "../server/whatsapp/llm";
 import { storeWhatsAppMedia } from "../server/whatsapp/media";
 import type { BallechStore, Conversation, OrderRow, StoredMessage } from "../server/whatsapp/store";
@@ -782,5 +786,90 @@ describe("POST /api/admin/whatsapp/send", () => {
       },
     );
     expect(res.status).toBe(401);
+  });
+});
+
+// ---------------------------------------------------------------- modèles Gemini
+
+describe("Gemini : choix du modèle", () => {
+  const overloaded = () => Object.assign(new Error("high demand"), { status: 503 });
+  const textReply = (text: string) => ({
+    candidates: [{ content: { role: "model", parts: [{ text }] } }],
+    functionCalls: undefined,
+  });
+
+  it("passe au modèle suivant si le premier est surchargé, puis le met de côté", async () => {
+    resetGeminiCooldowns();
+    const models: string[] = [];
+    const generateContent = vi.fn(async ({ model }: { model: string }) => {
+      models.push(model);
+      if (model === DEFAULT_GEMINI_MODELS[0]) throw overloaded();
+      return textReply(`ok ${model}`);
+    });
+    const provider = createGeminiProvider({
+      apiKey: "k",
+      generateContent: generateContent as never,
+    });
+
+    const first = await provider
+      .createSession({ system: "s", history: [{ role: "user", text: "salam" }], tools: [] })
+      .send();
+    expect(first.text).toBe(`ok ${DEFAULT_GEMINI_MODELS[1]}`);
+
+    // Message suivant : le modèle surchargé n'est pas réessayé pendant le délai.
+    models.length = 0;
+    await provider
+      .createSession({ system: "s", history: [{ role: "user", text: "salam" }], tools: [] })
+      .send();
+    expect(models).toEqual([DEFAULT_GEMINI_MODELS[1]]);
+  });
+
+  it("garde le même modèle pendant toute la boucle d'outils", async () => {
+    resetGeminiCooldowns();
+    const models: string[] = [];
+    const generateContent = vi.fn(async ({ model }: { model: string }) => {
+      models.push(model);
+      return textReply("ok");
+    });
+    const session = createGeminiProvider({
+      apiKey: "k",
+      model: "gemini-test",
+      generateContent: generateContent as never,
+    }).createSession({ system: "s", history: [{ role: "user", text: "salam" }], tools: [] });
+    await session.send();
+    session.addToolResults([{ id: "1", name: "x", result: {} }]);
+    await session.send();
+    expect(models).toEqual(["gemini-test", "gemini-test"]);
+  });
+
+  it("ne change pas de modèle sur une erreur de requête (400)", async () => {
+    resetGeminiCooldowns();
+    const generateContent = vi.fn(async () => {
+      throw Object.assign(new Error("bad request"), { status: 400 });
+    });
+    const session = createGeminiProvider({
+      apiKey: "k",
+      generateContent: generateContent as never,
+    }).createSession({ system: "s", history: [{ role: "user", text: "salam" }], tools: [] });
+    await expect(session.send()).rejects.toThrow("bad request");
+    expect(generateContent).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe("Gemini : délai dépassé", () => {
+  it("passe au modèle suivant quand un modèle ne répond pas à temps", async () => {
+    resetGeminiCooldowns();
+    const generateContent = vi.fn(async ({ model }: { model: string }) => {
+      if (model === DEFAULT_GEMINI_MODELS[0])
+        throw Object.assign(new Error("timeout"), { name: "TimeoutError" });
+      return { candidates: [{ content: { role: "model", parts: [{ text: model }] } }] };
+    });
+    const turn = await createGeminiProvider({
+      apiKey: "k",
+      generateContent: generateContent as never,
+    })
+      .createSession({ system: "s", history: [{ role: "user", text: "salam" }], tools: [] })
+      .send();
+    expect(turn.text).toBe(DEFAULT_GEMINI_MODELS[1]);
   });
 });
