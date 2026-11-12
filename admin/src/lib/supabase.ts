@@ -31,6 +31,35 @@ export type Order = {
   currency: string;
   status: OrderStatus;
   draft_id?: string | null;
+  source?: "web" | "whatsapp";
+  wa_conversation_id?: string | null;
+  created_at: string;
+};
+
+export type WaConversation = {
+  id: string;
+  wa_phone: string;
+  customer_name: string | null;
+  mode: "bot" | "human";
+  handoff_reason: string | null;
+  handoff_at: string | null;
+  last_inbound_at: string | null;
+  last_message_at: string;
+  unread_count: number;
+  created_at: string;
+};
+
+export type WaMedia = { storage_key: string; mime: string; size: number; caption?: string };
+
+export type WaMessage = {
+  id: string;
+  conversation_id: string;
+  direction: "in" | "out";
+  author: "customer" | "bot" | "admin";
+  type: "text" | "image" | "video" | "audio" | "document" | "other";
+  body: string | null;
+  payload: { media?: WaMedia; media_error?: string; media_id?: string };
+  order_id: string | null;
   created_at: string;
 };
 

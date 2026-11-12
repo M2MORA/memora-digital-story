@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase, type Order, type OrderStatus, type Memory } from "./supabase";
-import { computeStats, deleteOrderViaApi, displayMediaUrl, mediaPath } from "./rules";
+import { computeStats, deleteOrderViaApi, displayMediaUrl, mediaPath, whatsappMediaKey } from "./rules";
 import { qrDataUrl } from "./qr";
 import { downloadPhotoPdf as downloadPdf, printPhoto } from "./print";
 
@@ -85,6 +85,9 @@ export function useAdminData() {
       : it["videoUrl"] || it["video_url"] || it["videoPreviewUrl"]) as string | undefined;
     if (direct) return displayMediaUrl(direct, apiBase);
 
+    const waKey = whatsappMediaKey(it, kind);
+    if (waKey) return `${apiBase}${mediaPath(waKey)}`;
+
     const intent = intentFor(o, it, kind);
     if (intent?.storage_key) {
       return `${apiBase}${mediaPath(intent.storage_key)}`;
@@ -99,6 +102,8 @@ export function useAdminData() {
   const storedMediaFor = (o: Order, it: Record<string, unknown>, kind: "photo" | "video", itemIndex: number) => {
     const intent = intentFor(o, it, kind);
     if (intent?.storage_key) return mediaPath(intent.storage_key);
+    const waKey = whatsappMediaKey(it, kind);
+    if (waKey) return mediaPath(waKey);
     return resolveMedia(o, it, kind, itemIndex);
   };
 

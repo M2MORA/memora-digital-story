@@ -15,6 +15,8 @@ import { createClient } from "@supabase/supabase-js";
 import { S3Client, GetObjectCommand, HeadObjectCommand } from "@aws-sdk/client-s3";
 import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { resolveStreamingResponse } from "./lib/streaming-handler";
+import { requireAdmin } from "./server/admin-auth";
+import { routeWhatsApp } from "./server/whatsapp";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -695,8 +697,9 @@ export async function handleProxyPutRoute(request: Request, _env: any): Promise<
   }
 }
 
-const PRIVATE_MEDIA_KEY_PREFIX =
-  "^staging\\/[a-zA-Z0-9_-]{3,64}\\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const UUID_PATTERN = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+// Médias du site (staging/{draft}/{uuid}) et médias reçus sur WhatsApp (whatsapp/{conversation}/{message}).
+const PRIVATE_MEDIA_KEY_PREFIX = `^(?:staging\\/[a-zA-Z0-9_-]{3,64}|whatsapp\\/${UUID_PATTERN})\\/${UUID_PATTERN}`;
 const PRIVATE_MEDIA_KEY = {
   video: new RegExp(`${PRIVATE_MEDIA_KEY_PREFIX}\\.(?:mp4|webm|mov)$`, "i"),
   photo: new RegExp(`${PRIVATE_MEDIA_KEY_PREFIX}\\.(?:jpe?g|png|webp)$`, "i"),
@@ -1002,6 +1005,23 @@ export async function handleNfcMemoryRoute(
   }
 }
 
+/** Client service role pour les routes admin, ou null si la configuration manque. */
+function getServiceRoleClient(env: any): any {
+  const supabaseUrl =
+    env?.VITE_SUPABASE_URL ||
+    env?.SUPABASE_URL ||
+    (typeof process !== "undefined"
+      ? process.env?.["VITE_SUPABASE_URL"] || process.env?.["SUPABASE_URL"]
+      : "");
+  const serviceKey =
+    env?.SUPABASE_SERVICE_ROLE_KEY ||
+    (typeof process !== "undefined" ? process.env?.["SUPABASE_SERVICE_ROLE_KEY"] : "");
+  if (!supabaseUrl || !serviceKey) return null;
+  return createClient(supabaseUrl, serviceKey, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+}
+
 export async function handleDeleteOrderRoute(
   request: Request,
   env: any,
@@ -1013,41 +1033,13 @@ export async function handleDeleteOrderRoute(
       headers: { "content-type": "application/json", "Access-Control-Allow-Origin": "*" },
     });
 
-  const accessToken = request.headers.get("authorization")?.match(/^Bearer\s+(\S+)$/i)?.[1];
-  if (!accessToken) return deny(401, "Authentification requise");
-
-  let supabase = dependencies?.supabaseAdmin;
-  if (!supabase) {
-    const supabaseUrl =
-      env?.VITE_SUPABASE_URL ||
-      env?.SUPABASE_URL ||
-      (typeof process !== "undefined"
-        ? process.env?.["VITE_SUPABASE_URL"] || process.env?.["SUPABASE_URL"]
-        : "");
-    const serviceKey =
-      env?.SUPABASE_SERVICE_ROLE_KEY ||
-      (typeof process !== "undefined" ? process.env?.["SUPABASE_SERVICE_ROLE_KEY"] : "");
-
-    if (!supabaseUrl || !serviceKey) return deny(500, "Supabase service role non configuré");
-
-    supabase = createClient(supabaseUrl, serviceKey, {
-      auth: { persistSession: false, autoRefreshToken: false },
-    });
-  }
-
-  // Le service role contourne le RLS : le jeton de l'appelant doit être validé ici.
-  // Seul app_metadata fait foi, user_metadata étant modifiable par l'utilisateur.
-  let caller: { app_metadata?: Record<string, unknown> } | null | undefined;
-  try {
-    const { data, error } = await supabase.auth.getUser(accessToken);
-    if (error) return deny(401, "Session invalide ou expirée");
-    caller = data?.user;
-  } catch (err) {
-    console.error("[admin/orders] Échec de vérification de la session:", err);
-    return deny(503, "Vérification de la session indisponible");
-  }
-  if (!caller) return deny(401, "Session invalide ou expirée");
-  if (caller.app_metadata?.["role"] !== "admin") return deny(403, "Accès administrateur requis");
+  const check = await requireAdmin(
+    request,
+    () => dependencies?.supabaseAdmin ?? getServiceRoleClient(env),
+    "[admin/orders]",
+  );
+  if (!check.ok) return deny(check.status, check.error);
+  const supabase = check.supabase;
 
   const url = new URL(request.url);
   const id = url.searchParams.get("id");
@@ -1120,6 +1112,15 @@ export default {
       if (url.pathname === "/api/nfc-video" && (request.method === "GET" || request.method === "HEAD")) {
         const slug = url.searchParams.get("slug") ?? "";
         return await handleNfcMemoryRoute(request, env, slug);
+      }
+      if (url.pathname === "/api/whatsapp/webhook" || url.pathname.startsWith("/api/admin/whatsapp/")) {
+        const whatsappResponse = await routeWhatsApp(request, env, ctx, {
+          supabaseAdmin: () => getSupabaseAdmin(env),
+          supabaseAdminOrNull: () => getServiceRoleClient(env),
+          storage: () => getR2Adapter(env),
+          signMediaUrl: (key) => signR2GetUrl(env, key),
+        });
+        if (whatsappResponse) return whatsappResponse;
       }
       if (url.pathname === "/api/admin/orders" && request.method === "OPTIONS") {
         return new Response(null, {

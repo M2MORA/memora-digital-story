@@ -361,3 +361,32 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
   .spin, .row.skeleton { animation: none; }
   .sidebar, .main { transition: none; }
 }
+
+/* ---------- WhatsApp (Ballech) ---------- */
+.badge svg { flex-shrink: 0; }
+.row-side .nav-count { align-self: flex-end; }
+.wa-thread { gap: 12px; }
+.thread { list-style: none; margin: 0; padding: 12px; display: flex; flex-direction: column; gap: 8px; background: var(--surface-2); border: 1px solid var(--line); border-radius: var(--r); min-height: 200px; }
+.bubble { max-width: min(85%, 520px); display: flex; flex-direction: column; gap: 4px; padding: 8px 12px; border-radius: var(--r); background: var(--surface); border: 1px solid var(--line); }
+.bubble.from-customer { align-self: flex-start; }
+.bubble.from-bot { align-self: flex-end; background: var(--accent-tint); border-color: transparent; }
+.bubble.from-admin { align-self: flex-end; background: var(--ok-tint); border-color: transparent; }
+.bubble-meta { font-size: 12px; color: var(--ink-2); font-variant-numeric: tabular-nums; }
+.bubble-text { white-space: pre-wrap; overflow-wrap: anywhere; font-size: 14px; }
+.bubble .link { font-size: 13px; align-self: flex-start; }
+.bubble-media { display: flex; }
+.wa-media { display: block; max-width: 100%; border-radius: var(--r-sm); overflow: hidden; }
+.wa-media img, video.wa-media { max-width: 100%; max-height: 320px; object-fit: contain; background: #000; }
+.wa-audio { width: 260px; max-width: 100%; }
+.wa-media-missing, .wa-media-loading { display: inline-flex; align-items: center; gap: 6px; font-size: 13px; color: var(--ink-2); }
+.thread-end { height: 0; }
+.composer { display: flex; gap: 8px; align-items: flex-end; position: sticky; bottom: 0; padding: 8px 0 calc(8px + env(safe-area-inset-bottom, 0px)); background: var(--bg); }
+.composer textarea {
+  flex: 1; min-width: 0; font: inherit; font-size: 16px; padding: 10px 12px; resize: vertical; min-height: 44px; max-height: 200px;
+  border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--surface); color: var(--ink);
+}
+.composer textarea:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: var(--accent); }
+.composer .note { flex: 1; }
+@media (min-width: 1024px) {
+  .wa-thread { padding-bottom: 0; }
+}

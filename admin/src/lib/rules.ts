@@ -27,6 +27,27 @@ export function computeStats(orders: StatOrder[], memories: StatMemory[]) {
 export const mediaPath = (storageKey: string) => `/api/media?key=${encodeURIComponent(storageKey)}`;
 
 /**
+ * Média reçu sur WhatsApp et rattaché à un article (items[i].media, écrit par Ballech) :
+ * clé R2 de la dernière photo ou vidéo reçue.
+ */
+export function whatsappMediaKey(item: Record<string, unknown>, kind: "photo" | "video"): string | undefined {
+  const media = item["media"];
+  if (!Array.isArray(media)) return undefined;
+  const matches = media.filter(
+    (m): m is { kind: string; storage_key: string } =>
+      !!m && typeof m === "object" && (m as { kind?: unknown }).kind === kind &&
+      typeof (m as { storage_key?: unknown }).storage_key === "string",
+  );
+  return matches[matches.length - 1]?.storage_key;
+}
+
+/** Plus de 24 h depuis le dernier message du client : WhatsApp refuse une réponse libre. */
+export function whatsappWindowClosed(lastInboundAt: string | null | undefined, now = Date.now()): boolean {
+  if (!lastInboundAt) return true;
+  return now - new Date(lastInboundAt).getTime() > 24 * 60 * 60 * 1000;
+}
+
+/**
  * Un souvenir peut contenir une adresse complète enregistrée depuis un autre poste
  * (ex. une ancienne adresse de test, ou memora.tn/api/media?… sans https).
  * Pour l'affichage, on garde seulement la clé et on la sert depuis le serveur actuel.
