@@ -177,7 +177,16 @@ export default function Dashboard({ email }: { email: string }) {
               )}
 
               <div className={`orders-layout ${openOrderData ? "has-detail" : ""}`}>
-                <OrderList orders={data.orders} loading={data.loading} selectedId={openId} onOpen={openOrder} />
+                <OrderList
+                  orders={data.orders}
+                  loading={data.loading}
+                  selectedId={openId}
+                  onOpen={openOrder}
+                  counts={data.statusCounts}
+                  hasMore={data.hasMoreOrders}
+                  loadingMore={data.loadingMore}
+                  onLoadMore={() => void data.loadMoreOrders()}
+                />
                 {openOrderData ? (
                   <OrderDetail
                     key={openOrderData.id}

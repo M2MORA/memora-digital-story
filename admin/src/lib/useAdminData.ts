@@ -1,6 +1,18 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { supabase, type Order, type OrderStatus, type Memory } from "./supabase";
-import { computeStats, deleteOrderViaApi, displayMediaUrl, mediaPath, whatsappMediaKey } from "./rules";
+import {
+  FETCH_BATCH,
+  ORDERS_PAGE_SIZE,
+  chunk,
+  computeStats,
+  deleteOrderViaApi,
+  displayMediaUrl,
+  mediaPath,
+  mergeById,
+  olderThanCursor,
+  parseServerStats,
+  whatsappMediaKey,
+} from "./rules";
 import { qrDataUrl } from "./qr";
 import { downloadPhotoPdf as downloadPdf, printPhoto } from "./print";
 
@@ -34,6 +46,10 @@ export function useAdminData() {
   // Vrai si la liste des fichiers clients n'a pas pu être chargée : « pas de photo »
   // ne doit alors pas être affiché comme un fait.
   const [mediaUnavailable, setMediaUnavailable] = useState(false);
+  // Les commandes arrivent par pages ; les chiffres exacts viennent de la base (admin_stats).
+  const [hasMoreOrders, setHasMoreOrders] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [serverStats, setServerStats] = useState<ReturnType<typeof parseServerStats>>(null);
   const [copiedSlug, setCopiedSlug] = useState<string | null>(null);
   const [downloadingUrl, setDownloadingUrl] = useState<string | null>(null);
 
@@ -126,29 +142,111 @@ export function useAdminData() {
     }
   };
 
+  /** Fichiers des clients des commandes affichées seulement (pas toute la table). */
+  const fetchIntentsFor = async (list: Order[]) => {
+    const found: UploadIntent[] = [];
+    for (const part of chunk(list, 25)) {
+      const orderIds = part.map((o) => o.id).join(",");
+      const draftIds = part.map((o) => o.draft_id).filter((d): d is string => !!d);
+      const filter = draftIds.length
+        ? `order_id.in.(${orderIds}),draft_id.in.(${draftIds.join(",")})`
+        : `order_id.in.(${orderIds})`;
+      const { data, error } = await supabase.from("upload_intents").select("*").or(filter);
+      if (error) throw new Error(error.message);
+      found.push(...((data ?? []) as UploadIntent[]));
+    }
+    return found;
+  };
+
+  /** Tous les souvenirs, par lots de 1 000 : PostgREST coupe en silence au-delà. */
+  const fetchAllMemories = async () => {
+    const rows: Memory[] = [];
+    for (let from = 0; ; from += FETCH_BATCH) {
+      const { data, error } = await supabase
+        .from("memories")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .range(from, from + FETCH_BATCH - 1);
+      if (error) throw new Error(error.message);
+      rows.push(...((data ?? []) as Memory[]));
+      if (!data || data.length < FETCH_BATCH) return rows;
+    }
+  };
+
+  /** Chiffres exacts de la base ; sans la fonction admin_stats, repli sur les commandes chargées. */
+  const refreshStats = useCallback(async () => {
+    const { data, error } = await supabase.rpc("admin_stats");
+    setServerStats(error ? null : parseServerStats(data));
+  }, []);
+
   const load = useCallback(async () => {
     setError("");
     setLoading(true);
-    const [o, m, u] = await Promise.all([
-      supabase.from("orders").select("*").order("created_at", { ascending: false }),
-      supabase.from("memories").select("*").order("created_at", { ascending: false }),
-      supabase.from("upload_intents").select("*"),
-    ]);
     const problems: string[] = [];
+
+    const [o, m] = await Promise.all([
+      supabase
+        .from("orders")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .order("id", { ascending: false })
+        .limit(ORDERS_PAGE_SIZE),
+      fetchAllMemories().then(
+        (rows) => ({ rows, error: null as string | null }),
+        (err: Error) => ({ rows: [] as Memory[], error: err.message }),
+      ),
+      refreshStats(),
+    ]);
+
+    let firstPage: Order[] = [];
     if (o.error) problems.push(`Commandes non chargées : ${o.error.message}`);
-    else setOrders(o.data as Order[]);
-    if (m.error) problems.push(`Souvenirs non chargés : ${m.error.message}`);
-    else setMemories(m.data as Memory[]);
-    if (u.error) {
-      problems.push(`Fichiers des clients non chargés : ${u.error.message}`);
-      setMediaUnavailable(true);
-    } else {
-      setUploadIntents((u.data ?? []) as UploadIntent[]);
+    else {
+      firstPage = o.data as Order[];
+      setOrders(firstPage);
+      setHasMoreOrders(firstPage.length === ORDERS_PAGE_SIZE);
+    }
+    if (m.error) problems.push(`Souvenirs non chargés : ${m.error}`);
+    else setMemories(m.rows);
+
+    try {
+      setUploadIntents(await fetchIntentsFor(firstPage));
       setMediaUnavailable(false);
+    } catch (err) {
+      problems.push(`Fichiers des clients non chargés : ${err instanceof Error ? err.message : String(err)}`);
+      setMediaUnavailable(true);
     }
     if (problems.length) setError(problems.join(" · "));
     setLoading(false);
-  }, []);
+  }, [refreshStats]);
+
+  const loadMoreOrders = async () => {
+    const last = orders[orders.length - 1];
+    if (!last || loadingMore) return;
+    setLoadingMore(true);
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .or(olderThanCursor(last))
+      .order("created_at", { ascending: false })
+      .order("id", { ascending: false })
+      .limit(ORDERS_PAGE_SIZE);
+    if (error) {
+      setError(`Commandes non chargées : ${error.message}`);
+    } else {
+      const page = (data ?? []) as Order[];
+      setOrders((prev) => mergeById(prev, page));
+      setHasMoreOrders(page.length === ORDERS_PAGE_SIZE);
+      try {
+        const more = await fetchIntentsFor(page);
+        setUploadIntents((prev) => mergeById(prev, more));
+      } catch (err) {
+        setError(`Fichiers des clients non chargés : ${err instanceof Error ? err.message : String(err)}`);
+        setMediaUnavailable(true);
+      }
+    }
+    setLoadingMore(false);
+  };
 
   useEffect(() => {
     void load();
@@ -179,6 +277,7 @@ export function useAdminData() {
     const { error } = await supabase.from("orders").update({ status }).eq("id", id);
     if (error) return setError(error.message);
     setOrders((prev) => prev.map((o) => (o.id === id ? { ...o, status } : o)));
+    void refreshStats();
 
     // Une commande annulée ne doit plus diffuser la vidéo du client.
     if (status === "cancelled" && activeLinks.length) {
@@ -221,6 +320,7 @@ export function useAdminData() {
 
       await deleteOrderViaApi({ apiBase, accessToken: session.access_token, orderId: id });
       setOrders((prev) => prev.filter((o) => o.id !== id));
+      void refreshStats();
       return true;
     } catch (err: unknown) {
       const message = err instanceof Error ? err.message : String(err);
@@ -272,7 +372,8 @@ export function useAdminData() {
     await copyLink(slug);
   };
 
-  const stats = useMemo(() => computeStats(orders, memories), [orders, memories]);
+  const stats = useMemo(() => serverStats ?? computeStats(orders, memories), [serverStats, orders, memories]);
+  const statusCounts = serverStats?.byStatus ?? null;
 
   /** Adresse d'affichage d'un média enregistré dans un souvenir (liste Souvenirs). */
   const memoryMediaUrl = (stored: string | null | undefined) => displayMediaUrl(stored, apiBase);
@@ -297,6 +398,10 @@ export function useAdminData() {
     setMemoryStatus,
     createMemory,
     stats,
+    statusCounts,
+    hasMoreOrders,
+    loadingMore,
+    loadMoreOrders,
   };
 }
 

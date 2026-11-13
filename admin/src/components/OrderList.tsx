@@ -11,11 +11,20 @@ export default function OrderList({
   loading,
   selectedId,
   onOpen,
+  counts,
+  hasMore,
+  loadingMore,
+  onLoadMore,
 }: {
   orders: Order[];
   loading: boolean;
   selectedId: string | null;
   onOpen: (id: string) => void;
+  /** Nombre exact de commandes par statut, calculé par la base. */
+  counts: Record<string, number> | null;
+  hasMore: boolean;
+  loadingMore: boolean;
+  onLoadMore: () => void;
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
@@ -27,7 +36,12 @@ export default function OrderList({
       (!q || `${o.order_number} ${o.customer_name} ${o.customer_phone ?? ""}`.toLowerCase().includes(q)),
   );
 
-  const countOf = (f: Filter) => (f === "all" ? orders.length : orders.filter((o) => o.status === f).length);
+  const countOf = (f: Filter) => {
+    if (counts) {
+      return f === "all" ? Object.values(counts).reduce((sum, n) => sum + n, 0) : (counts[f] ?? 0);
+    }
+    return f === "all" ? orders.length : orders.filter((o) => o.status === f).length;
+  };
   const chips: { value: Filter; label: string }[] = [{ value: "all", label: "Toutes" }, ...STATUSES];
 
   return (
@@ -95,6 +109,17 @@ export default function OrderList({
             </li>
           ))}
         </ul>
+      )}
+
+      {hasMore && (
+        <div className="load-more">
+          <p className="muted">
+            {orders.length} commandes affichées. La recherche et le filtre portent sur celles-ci.
+          </p>
+          <button type="button" className="btn" onClick={onLoadMore} disabled={loadingMore}>
+            {loadingMore ? "Chargement…" : "Charger les commandes plus anciennes"}
+          </button>
+        </div>
       )}
     </section>
   );
