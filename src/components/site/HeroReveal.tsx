@@ -1,7 +1,6 @@
 import { useEffect, useRef, type CSSProperties, type ReactNode } from "react";
 import { ChevronDown } from "lucide-react";
-import { Img } from "./Img";
-import { IMAGES } from "@/lib/images.gen";
+import { HeroCardPhoto } from "./HeroCardPhoto";
 
 /** Le texte commence à apparaître après 10 % du chemin jusqu'au point d'arrêt */
 const START = 0.1;
@@ -139,14 +138,7 @@ export function HeroReveal({
         className="pointer-events-none absolute inset-x-0 top-[40svh] h-px"
       />
       <div className="sticky top-0 flex h-svh items-end overflow-hidden md:items-center">
-        <Img
-          image={IMAGES.hero}
-          alt={alt}
-          sizes="100vw"
-          priority
-          // En arabe, la photo est retournée pour que la zone sombre soit du côté du texte
-          className="absolute inset-0 h-full w-full object-cover object-[72%_center] md:object-center rtl:-scale-x-100"
-        />
+        <HeroCardPhoto alt={alt} />
         {/* Bande sombre en haut : l'en-tête transparent reste lisible sur la pierre claire */}
         <div
           aria-hidden="true"
