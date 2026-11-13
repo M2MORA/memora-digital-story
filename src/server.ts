@@ -17,6 +17,7 @@ import { getSignedUrl } from "@aws-sdk/s3-request-presigner";
 import { resolveStreamingResponse } from "./lib/streaming-handler";
 import { requireAdmin } from "./server/admin-auth";
 import { routeWhatsApp } from "./server/whatsapp";
+import { routePush } from "./server/push";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
@@ -1121,6 +1122,12 @@ export default {
           signMediaUrl: (key) => signR2GetUrl(env, key),
         });
         if (whatsappResponse) return whatsappResponse;
+      }
+      if (url.pathname === "/api/internal/order-created" || url.pathname.startsWith("/api/admin/push/")) {
+        const pushResponse = await routePush(request, env, {
+          getSupabase: () => getServiceRoleClient(env),
+        });
+        if (pushResponse) return pushResponse;
       }
       if (url.pathname === "/api/admin/orders" && request.method === "OPTIONS") {
         return new Response(null, {

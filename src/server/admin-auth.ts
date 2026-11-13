@@ -7,14 +7,15 @@
 type SupabaseAuthLike = {
   auth: {
     getUser(token: string): Promise<{
-      data: { user: { app_metadata?: Record<string, unknown> } | null };
+      data: { user: { id?: string; app_metadata?: Record<string, unknown> } | null };
       error: unknown;
     }>;
   };
 };
 
 export type AdminCheck<S> =
-  { ok: true; supabase: S } | { ok: false; status: number; error: string };
+  | { ok: true; supabase: S; /** Identifiant de l'admin connecté (vide si le fournisseur ne le renvoie pas). */ userId: string }
+  | { ok: false; status: number; error: string };
 
 export async function requireAdmin<S extends SupabaseAuthLike>(
   request: Request,
@@ -27,7 +28,7 @@ export async function requireAdmin<S extends SupabaseAuthLike>(
   const supabase = getSupabase();
   if (!supabase) return { ok: false, status: 500, error: "Supabase service role non configuré" };
 
-  let caller: { app_metadata?: Record<string, unknown> } | null | undefined;
+  let caller: { id?: string; app_metadata?: Record<string, unknown> } | null | undefined;
   try {
     const { data, error } = await supabase.auth.getUser(accessToken);
     if (error) return { ok: false, status: 401, error: "Session invalide ou expirée" };
@@ -40,5 +41,5 @@ export async function requireAdmin<S extends SupabaseAuthLike>(
   if (caller.app_metadata?.["role"] !== "admin")
     return { ok: false, status: 403, error: "Accès administrateur requis" };
 
-  return { ok: true, supabase };
+  return { ok: true, supabase, userId: caller.id ?? "" };
 }

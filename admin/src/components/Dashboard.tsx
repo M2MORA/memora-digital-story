@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Menu, MessageCircle, Nfc, Package, PanelLeftClose, PanelLeftOpen, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
 import { fmt } from "../lib/format";
 import { useAdminData } from "../lib/useAdminData";
@@ -94,6 +94,24 @@ export default function Dashboard({ email }: { email: string }) {
     void wa.select(conversationId);
     window.scrollTo({ top: 0 });
   };
+
+  // Clic sur une notification « nouvelle commande » : ouvre la fiche (admin fermé : ?order=…,
+  // déjà ouvert : message du service worker).
+  const showOrderRef = useRef(showOrder);
+  showOrderRef.current = showOrder;
+  useEffect(() => {
+    const fromUrl = new URLSearchParams(window.location.search).get("order");
+    if (fromUrl) {
+      history.replaceState(null, "", window.location.pathname);
+      showOrderRef.current(fromUrl);
+    }
+    const onMessage = (e: MessageEvent) => {
+      const msg = e.data as { type?: string; orderId?: string } | null;
+      if (msg?.type === "open-order" && typeof msg.orderId === "string") showOrderRef.current(msg.orderId);
+    };
+    navigator.serviceWorker?.addEventListener("message", onMessage);
+    return () => navigator.serviceWorker?.removeEventListener("message", onMessage);
+  }, []);
 
   const openOrderData = openId ? data.orders.find((o) => o.id === openId) : undefined;
   const current = TABS.find((t) => t.value === tab)!;
