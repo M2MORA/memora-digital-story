@@ -732,6 +732,74 @@ describe("limite de débit (429)", () => {
   });
 });
 
+// ---------------------------------------------------------------- notifications équipe
+
+describe("notification « client WhatsApp en attente »", () => {
+  function withAlerts(provider: LlmProvider) {
+    const ctx = setup(provider);
+    const alerts: { kind: string; conversationId: string; customerName: string | null }[] = [];
+    ctx.agentDeps.notifyTeam = async (alert) => {
+      alerts.push(alert);
+    };
+    return { ...ctx, alerts };
+  }
+
+  it("prévient l'équipe quand Ballech passe la main", async () => {
+    const script = scriptedProvider([
+      { text: "Behi, n3adik l'équipe", toolCalls: [{ name: "handoff_to_human", args: { reason: "x" } }] },
+    ]);
+    const { deps, alerts, db } = withAlerts(script.provider);
+    await handleWhatsAppWebhook(webhookRequest(metaPayload([textMessage("wamid.n1", "nheb 3abd")])), deps);
+    const conversation = [...db.conversations.values()][0]!;
+    expect(alerts).toEqual([
+      { kind: "handoff", conversationId: conversation.id, customerName: conversation.customer_name },
+    ]);
+  });
+
+  it("prévient aussi quand Ballech est en panne et passe la main", async () => {
+    const script = scriptedProvider([rateLimit(), rateLimit()]);
+    const { deps, alerts } = withAlerts(script.provider);
+    await handleWhatsAppWebhook(webhookRequest(metaPayload([textMessage("wamid.n2", "salam")])), deps);
+    expect(alerts.map((a) => a.kind)).toEqual(["handoff"]);
+  });
+
+  it("équipe aux commandes : une seule notification tant que l'admin n'a pas lu", async () => {
+    const script = scriptedProvider([{ text: "ne doit pas répondre" }]);
+    const { deps, alerts, db, wa } = withAlerts(script.provider);
+    const c = await db.store.ensureConversation(WA_PHONE, "Amira");
+    db.conversations.get(c.id)!.mode = "human";
+
+    await handleWhatsAppWebhook(webhookRequest(metaPayload([textMessage("wamid.n3", "allo")])), deps);
+    await handleWhatsAppWebhook(webhookRequest(metaPayload([textMessage("wamid.n4", "allo ?")])), deps);
+    expect(alerts.map((a) => a.kind)).toEqual(["message"]);
+    expect(wa.sent).toEqual([]);
+
+    // L'admin ouvre la conversation (non lus remis à 0) : le prochain message notifie de nouveau.
+    db.conversations.get(c.id)!.unread_count = 0;
+    await handleWhatsAppWebhook(webhookRequest(metaPayload([textMessage("wamid.n5", "ya jme3a")])), deps);
+    expect(alerts.map((a) => a.kind)).toEqual(["message", "message"]);
+  });
+
+  it("une conversation normale avec Ballech ne notifie pas", async () => {
+    const script = scriptedProvider([{ text: "Ahla!" }]);
+    const { deps, alerts } = withAlerts(script.provider);
+    await handleWhatsAppWebhook(webhookRequest(metaPayload([textMessage("wamid.n6", "salam")])), deps);
+    expect(alerts).toEqual([]);
+  });
+
+  it("une panne de notification n'empêche pas la réponse au client", async () => {
+    const script = scriptedProvider([
+      { text: "Behi, n3adik l'équipe", toolCalls: [{ name: "handoff_to_human", args: { reason: "x" } }] },
+    ]);
+    const { deps, agentDeps, wa } = setup(script.provider);
+    agentDeps.notifyTeam = async () => {
+      throw new Error("push en panne");
+    };
+    await handleWhatsAppWebhook(webhookRequest(metaPayload([textMessage("wamid.n7", "3abd")])), deps);
+    expect(wa.sent.map((x) => x.body)).toEqual(["Behi, n3adik l'équipe"]);
+  });
+});
+
 // ---------------------------------------------------------------- admin
 
 describe("POST /api/admin/whatsapp/send", () => {
