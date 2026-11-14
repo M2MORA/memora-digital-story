@@ -2,8 +2,10 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase, type WaConversation, type WaMessage } from "./supabase";
 import { publicSiteUrl } from "./useAdminData";
 
+// Boîte WhatsApp ouverte : rafraîchissement rapide. Fermée : un simple compteur, toutes les minutes.
 const CONVERSATIONS_POLL_MS = 10_000;
 const MESSAGES_POLL_MS = 5_000;
+const WAITING_POLL_MS = 60_000;
 
 async function accessToken(): Promise<string> {
   const { data } = await supabase.auth.getSession();
@@ -58,6 +60,17 @@ export function useWhatsApp(options: { inboxOpen: boolean }) {
   const [messages, setMessages] = useState<WaMessage[]>([]);
   const [error, setError] = useState("");
   const [loaded, setLoaded] = useState(false);
+  // Clients qui attendent l'équipe, compté par la base quand la boîte est fermée.
+  const [waiting, setWaiting] = useState(0);
+
+  const loadWaiting = useCallback(async () => {
+    const { count, error: err } = await supabase
+      .from("wa_conversations")
+      .select("id", { count: "exact", head: true })
+      .eq("mode", "human")
+      .gt("unread_count", 0);
+    if (!err && count !== null) setWaiting(count);
+  }, []);
 
   const loadConversations = useCallback(async () => {
     const { data, error: err } = await supabase
@@ -84,10 +97,13 @@ export function useWhatsApp(options: { inboxOpen: boolean }) {
     setMessages(((data ?? []) as WaMessage[]).reverse());
   }, []);
 
+  // Les 200 conversations ne sont chargées qu'à l'ouverture de la boîte WhatsApp.
   useEffect(() => {
-    void loadConversations();
-  }, [loadConversations]);
-  usePolling(() => void loadConversations(), CONVERSATIONS_POLL_MS, true);
+    if (options.inboxOpen) void loadConversations();
+    else void loadWaiting();
+  }, [options.inboxOpen, loadConversations, loadWaiting]);
+  usePolling(() => void loadConversations(), CONVERSATIONS_POLL_MS, options.inboxOpen);
+  usePolling(() => void loadWaiting(), WAITING_POLL_MS, !options.inboxOpen);
   usePolling(() => selectedId && void loadMessages(selectedId), MESSAGES_POLL_MS, options.inboxOpen && !!selectedId);
 
   const markRead = useCallback(async (conversation: WaConversation) => {
@@ -140,7 +156,9 @@ export function useWhatsApp(options: { inboxOpen: boolean }) {
   };
 
   /** Conversations où le client attend l'équipe (mode humain, non lues). */
-  const waitingCount = conversations.filter((c) => c.mode === "human" && c.unread_count > 0).length;
+  const waitingCount = options.inboxOpen
+    ? conversations.filter((c) => c.mode === "human" && c.unread_count > 0).length
+    : waiting;
 
   return {
     conversations,

@@ -1,5 +1,14 @@
 import { describe, expect, it, vi } from "vitest";
-import { computeStats, deleteOrderViaApi, displayMediaUrl, mediaPath } from "./rules";
+import {
+  chunk,
+  computeStats,
+  deleteOrderViaApi,
+  displayMediaUrl,
+  mediaPath,
+  mergeById,
+  olderThanCursor,
+  parseServerStats,
+} from "./rules";
 
 const key = "staging/dft_abc/11111111-2222-3333-4444-555555555555.jpg";
 const encoded = encodeURIComponent(key);
@@ -79,5 +88,31 @@ describe("deleteOrderViaApi", () => {
       throw new TypeError("Failed to fetch");
     });
     await expect(deleteOrderViaApi({ ...base, fetchImpl })).rejects.toThrow(/injoignable/);
+  });
+});
+
+describe("pagination helpers", () => {
+  it("chunk découpe sans rien perdre", () => {
+    expect(chunk([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
+    expect(chunk([], 3)).toEqual([]);
+  });
+
+  it("mergeById remplace par la ligne la plus récente et n'ajoute pas de doublon", () => {
+    const merged = mergeById([{ id: "a", v: 1 }, { id: "b", v: 1 }], [{ id: "b", v: 2 }, { id: "c", v: 1 }]);
+    expect(merged).toEqual([{ id: "a", v: 1 }, { id: "b", v: 2 }, { id: "c", v: 1 }]);
+  });
+
+  it("olderThanCursor départage les commandes de la même seconde par id", () => {
+    expect(olderThanCursor({ created_at: "2026-11-13T10:00:00+00:00", id: "x1" })).toBe(
+      'created_at.lt."2026-11-13T10:00:00+00:00",and(created_at.eq."2026-11-13T10:00:00+00:00",id.lt.x1)',
+    );
+  });
+
+  it("parseServerStats accepte la réponse de admin_stats et refuse le reste", () => {
+    expect(
+      parseServerStats({ count: 3, todo: 2, collected: "90.50", to_collect: 10, views: 7, by_status: { pending: 2 } }),
+    ).toEqual({ count: 3, todo: 2, collected: 90.5, toCollect: 10, views: 7, byStatus: { pending: 2 } });
+    expect(parseServerStats(null)).toBeNull();
+    expect(parseServerStats({ todo: 1 })).toBeNull();
   });
 });
