@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { Menu, MessageCircle, Nfc, Package, PanelLeftClose, PanelLeftOpen, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
+import { BarChart3, Menu, MessageCircle, Nfc, Package, PanelLeftClose, PanelLeftOpen, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
 import { fmt } from "../lib/format";
 import { useAdminData } from "../lib/useAdminData";
 import { useWhatsApp } from "../lib/useWhatsApp";
@@ -8,11 +8,13 @@ import OrderDetail from "./OrderDetail";
 import MemoryList from "./MemoryList";
 import Settings from "./Settings";
 import WhatsAppInbox from "./WhatsAppInbox";
+import Stats from "./Stats";
 
-type Tab = "orders" | "whatsapp" | "memories" | "settings";
+type Tab = "orders" | "stats" | "whatsapp" | "memories" | "settings";
 
 const TABS = [
   { value: "orders" as const, Icon: Package, label: "Commandes" },
+  { value: "stats" as const, Icon: BarChart3, label: "Statistiques" },
   { value: "whatsapp" as const, Icon: MessageCircle, label: "WhatsApp" },
   { value: "memories" as const, Icon: Nfc, label: "Souvenirs" },
   { value: "settings" as const, Icon: SettingsIcon, label: "Réglages" },
@@ -223,6 +225,7 @@ export default function Dashboard({ email }: { email: string }) {
             </>
           )}
 
+          {tab === "stats" && <Stats enabled />}
           {tab === "whatsapp" && <WhatsAppInbox wa={wa} orders={data.orders} onOpenOrder={showOrder} />}
           {tab === "memories" && <MemoryList data={data} />}
           {tab === "settings" && <Settings email={email} />}
