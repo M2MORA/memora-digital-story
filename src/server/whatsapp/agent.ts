@@ -40,7 +40,28 @@ export type AgentDeps = {
   now?: () => Date;
   retryBackoffMs?: number;
   log?: (message: string, error?: unknown) => void;
+  /**
+   * Prévient l'équipe (notification push) qu'un client attend. Une erreur ici ne doit
+   * jamais empêcher la réponse au client : l'appel est protégé par `alertTeam`.
+   */
+  notifyTeam?: (alert: {
+    kind: "handoff" | "message";
+    conversationId: string;
+    customerName: string | null;
+  }) => Promise<unknown>;
 };
+
+async function alertTeam(deps: AgentDeps, conversation: Conversation, kind: "handoff" | "message") {
+  if (!deps.notifyTeam) return;
+  try {
+    await deps.notifyTeam({ kind, conversationId: conversation.id, customerName: conversation.customer_name });
+  } catch (error) {
+    (deps.log ?? ((m: string, e?: unknown) => console.error(`[ballech] ${m}`, e ?? "")))(
+      "notification équipe non envoyée",
+      error,
+    );
+  }
+}
 
 export type InboundJob = {
   conversationId: string;
@@ -177,8 +198,13 @@ export async function processInbound(deps: AgentDeps, job: InboundJob): Promise<
     }
   }
 
-  // 2. L'équipe a la main : Ballech ne répond pas.
-  if (conversation.mode === "human") return;
+  // 2. L'équipe a la main : Ballech ne répond pas. On prévient l'équipe au premier message
+  // non lu seulement (compteur remis à 0 quand l'admin ouvre la conversation) : pas une
+  // notification par message.
+  if (conversation.mode === "human") {
+    if (job.respond !== false && conversation.unread_count === 1) await alertTeam(deps, conversation, "message");
+    return;
+  }
   if (job.respond === false && !mediaFailed) return;
 
   if (mediaFailed) {
@@ -230,6 +256,7 @@ async function handOff(
 ) {
   await deps.store.setMode(conversation.id, "human", reason);
   await sendBotMessage(deps, conversation, message);
+  await alertTeam(deps, conversation, "handoff");
 }
 
 async function runAgent(
@@ -268,6 +295,7 @@ async function runAgent(
 
   if (handedOff) {
     await sendBotMessage(deps, conversation, reply || HANDOFF_MESSAGE);
+    await alertTeam(deps, conversation, "handoff");
     return;
   }
   // Après une commande, le récap officiel est déjà parti : une phrase de plus suffit.

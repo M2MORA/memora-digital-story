@@ -1,7 +1,7 @@
 // @vitest-environment node
 // Le chiffrement est vérifié par un déchiffrement écrit à part, suivant le RFC 8291.
 import { describe, expect, it } from "vitest";
-import { orderMessage, routePush } from "../server/push";
+import { notifyAllAdmins, orderMessage, routePush, whatsappAlertMessage } from "../server/push";
 import {
   b64uDecode,
   b64uEncode,
@@ -149,6 +149,27 @@ describe("message de notification", () => {
     expect(m.body).toBe("#M1042 · Sarra · 89.00 DT");
     expect(m.orderId).toBe("0b8f2a52-1111-4222-8333-444455556666");
     expect(JSON.stringify(m)).not.toMatch(/Ben Ali|phone|address|email/i);
+  });
+});
+
+describe("notification client WhatsApp", () => {
+  it("prénom seulement, ouvre la conversation, remplace la précédente", () => {
+    const m = whatsappAlertMessage({ kind: "handoff", conversationId: "c1", customerName: "Amira Ben Salah" });
+    expect(m).toEqual({
+      title: "Client WhatsApp en attente",
+      body: "Amira attend une réponse de l'équipe",
+      conversationId: "c1",
+      tag: "wa-c1",
+    });
+    expect(whatsappAlertMessage({ kind: "message", conversationId: "c1", customerName: null }).body).toBe(
+      "Nouveau message d'un client",
+    );
+  });
+});
+
+describe("notifyAllAdmins", () => {
+  it("ne fait rien sans clés VAPID", async () => {
+    expect(await notifyAllAdmins({}, {}, { title: "t", body: "b" })).toBeNull();
   });
 });
 

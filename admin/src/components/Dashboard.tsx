@@ -97,19 +97,25 @@ export default function Dashboard({ email }: { email: string }) {
     window.scrollTo({ top: 0 });
   };
 
-  // Clic sur une notification « nouvelle commande » : ouvre la fiche (admin fermé : ?order=…,
-  // déjà ouvert : message du service worker).
+  // Clic sur une notification : ouvre la commande ou la conversation WhatsApp
+  // (admin fermé : ?order=… / ?conversation=…, déjà ouvert : message du service worker).
   const showOrderRef = useRef(showOrder);
   showOrderRef.current = showOrder;
+  const showConversationRef = useRef(showConversation);
+  showConversationRef.current = showConversation;
   useEffect(() => {
-    const fromUrl = new URLSearchParams(window.location.search).get("order");
-    if (fromUrl) {
-      history.replaceState(null, "", window.location.pathname);
-      showOrderRef.current(fromUrl);
-    }
+    const params = new URLSearchParams(window.location.search);
+    const orderId = params.get("order");
+    const conversationId = params.get("conversation");
+    if (orderId || conversationId) history.replaceState(null, "", window.location.pathname);
+    if (orderId) showOrderRef.current(orderId);
+    else if (conversationId) showConversationRef.current(conversationId);
+
     const onMessage = (e: MessageEvent) => {
-      const msg = e.data as { type?: string; orderId?: string } | null;
+      const msg = e.data as { type?: string; orderId?: string; conversationId?: string } | null;
       if (msg?.type === "open-order" && typeof msg.orderId === "string") showOrderRef.current(msg.orderId);
+      if (msg?.type === "open-conversation" && typeof msg.conversationId === "string")
+        showConversationRef.current(msg.conversationId);
     };
     navigator.serviceWorker?.addEventListener("message", onMessage);
     return () => navigator.serviceWorker?.removeEventListener("message", onMessage);

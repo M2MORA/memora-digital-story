@@ -107,6 +107,52 @@ export function orderMessage(order: {
   };
 }
 
+/** Un client WhatsApp attend l'équipe : Ballech a passé la main, ou il réécrit alors que l'équipe a la main. */
+export type TeamAlert = { kind: "handoff" | "message"; conversationId: string; customerName: string | null };
+
+/**
+ * Prénom (nom WhatsApp) seulement : ni le numéro, ni le texte du client, ni la raison donnée
+ * par le modèle, qui peuvent contenir des données personnelles affichées sur l'écran verrouillé.
+ */
+export function whatsappAlertMessage(alert: TeamAlert): PushMessage {
+  const firstName = String(alert.customerName ?? "").trim().split(/\s+/)[0] ?? "";
+  const body =
+    alert.kind === "handoff"
+      ? `${firstName || "Un client"} attend une réponse de l'équipe`
+      : firstName
+        ? `Nouveau message de ${firstName}`
+        : "Nouveau message d'un client";
+  return {
+    title: "Client WhatsApp en attente",
+    body,
+    conversationId: alert.conversationId,
+    // Même conversation = la notification remplace la précédente au lieu de s'empiler.
+    tag: `wa-${alert.conversationId}`,
+  };
+}
+
+/** Envoie à tous les appareils admin. Ne lève jamais : une panne de notification ne casse pas l'appelant. */
+export async function notifyAllAdmins(
+  env: unknown,
+  supabase: SupabaseAdmin,
+  message: PushMessage,
+  fetchImpl?: typeof fetch,
+): Promise<{ sent: number; removed: number; failed: number } | null> {
+  const vapid = vapidFromEnv(env);
+  if (!vapid || !supabase) return null;
+  try {
+    const { data: devices } = await supabase
+      .from("admin_push_subscriptions")
+      .select("id, endpoint, p256dh, auth, failures")
+      .lt("failures", MAX_FAILURES)
+      .limit(100);
+    return await sendToDevices(supabase, (devices ?? []) as Subscription[], message, vapid, fetchImpl);
+  } catch (error) {
+    console.error("[push] notification impossible", error instanceof Error ? error.message : error);
+    return null;
+  }
+}
+
 async function handleOrderCreated(request: Request, env: unknown, deps: PushRouteDeps): Promise<Response> {
   const secret = readEnv(env, "ORDER_WEBHOOK_SECRET");
   if (!secret) return json(503, { error: "Webhook non configuré" });
@@ -135,14 +181,8 @@ async function handleOrderCreated(request: Request, env: unknown, deps: PushRout
   }
   if (!order) return json(404, { error: "Commande introuvable" });
 
-  const { data: devices } = await supabase
-    .from("admin_push_subscriptions")
-    .select("id, endpoint, p256dh, auth, failures")
-    .lt("failures", MAX_FAILURES)
-    .limit(100);
-
-  const summary = await sendToDevices(supabase, (devices ?? []) as Subscription[], orderMessage(order), vapid, deps.fetchImpl);
-  return json(200, summary);
+  const summary = await notifyAllAdmins(env, supabase, orderMessage(order), deps.fetchImpl);
+  return json(200, summary ?? { sent: 0, removed: 0, failed: 0 });
 }
 
 export async function routePush(request: Request, env: unknown, deps: PushRouteDeps): Promise<Response | null> {

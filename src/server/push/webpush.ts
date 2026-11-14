@@ -127,7 +127,14 @@ export async function vapidAuthorization(
   return `vapid t=${unsigned}.${b64uEncode(signature)}, k=${vapid.publicKey}`;
 }
 
-export type PushMessage = { title: string; body: string; orderId?: string; tag?: string };
+export type PushMessage = {
+  title: string;
+  body: string;
+  orderId?: string;
+  /** Conversation WhatsApp à ouvrir au clic. */
+  conversationId?: string;
+  tag?: string;
+};
 
 export type SendResult = { status: number; ok: boolean; gone: boolean };
 

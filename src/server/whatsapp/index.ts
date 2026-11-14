@@ -1,5 +1,6 @@
 /** Point d'entrée des routes WhatsApp de Ballech, branché dans src/server.ts. */
 import type { R2StorageAdapter } from "../../lib/r2-backend";
+import { notifyAllAdmins, whatsappAlertMessage } from "../push";
 import { adminPreflight, handleAdminMedia, handleAdminSend, type AdminRouteDeps } from "./admin";
 import { createWhatsAppClient } from "./client";
 import { whatsappConfig } from "./env";
@@ -40,6 +41,8 @@ export async function routeWhatsApp(
         client,
         provider: () => providerFromEnv(env),
         storage: deps.storage,
+        notifyTeam: (alert) =>
+          notifyAllAdmins(env, deps.supabaseAdminOrNull(), whatsappAlertMessage(alert)),
       }),
     });
   }
