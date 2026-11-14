@@ -1,5 +1,7 @@
 import "@testing-library/jest-dom/vitest";
 
+// Les tests serveur tournent sous « @vitest-environment node » : pas de window.
+if (typeof window !== "undefined") {
 Object.defineProperty(window, "scrollTo", {
   writable: true,
   value: () => {},
@@ -18,3 +20,4 @@ Object.defineProperty(window, "matchMedia", {
     dispatchEvent: () => {},
   }),
 });
+}
