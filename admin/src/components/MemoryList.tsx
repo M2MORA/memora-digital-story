@@ -1,9 +1,9 @@
 import { useState } from "react";
 import { Check, Copy, Download, ExternalLink, Eye, Nfc, Search } from "lucide-react";
 import type { Memory } from "../lib/supabase";
-import { nfcLinkFor, type AdminData } from "../lib/useAdminData";
+import { nfcLinkFor, type MemoriesData } from "../lib/useMemories";
 
-export default function MemoryList({ data }: { data: AdminData }) {
+export default function MemoryList({ data }: { data: MemoriesData }) {
   const { memories, copiedSlug, downloadingUrl } = data;
   const [search, setSearch] = useState("");
   const q = search.trim().toLowerCase();

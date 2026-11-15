@@ -1,33 +1,11 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { supabase, type WaConversation, type WaMessage } from "./supabase";
-import { publicSiteUrl } from "./useAdminData";
+import { callApi } from "./api";
 
 // Boîte WhatsApp ouverte : rafraîchissement rapide. Fermée : un simple compteur, toutes les minutes.
 const CONVERSATIONS_POLL_MS = 10_000;
 const MESSAGES_POLL_MS = 5_000;
 const WAITING_POLL_MS = 60_000;
-
-async function accessToken(): Promise<string> {
-  const { data } = await supabase.auth.getSession();
-  if (!data.session) throw new Error("Session expirée, reconnecte-toi.");
-  return data.session.access_token;
-}
-
-async function callApi<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const token = await accessToken();
-  let res: Response;
-  try {
-    res = await fetch(`${publicSiteUrl}${path}`, {
-      ...init,
-      headers: { ...(init.headers ?? {}), Authorization: `Bearer ${token}` },
-    });
-  } catch {
-    throw new Error("Serveur injoignable.");
-  }
-  const data = (await res.json().catch(() => null)) as (T & { error?: string }) | null;
-  if (!res.ok) throw new Error(data?.error || `Erreur serveur (code ${res.status}).`);
-  return data as T;
-}
 
 /** Lien signé (1 h) vers un média WhatsApp ; gardé 50 min pour éviter de re-signer. */
 const mediaUrlCache = new Map<string, { url: string; at: number }>();
@@ -144,7 +122,6 @@ export function useWhatsApp(options: { inboxOpen: boolean }) {
     try {
       await callApi("/api/admin/whatsapp/send", {
         method: "POST",
-        headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ conversation_id: id, text }),
       });
       await Promise.all([loadMessages(id), loadConversations()]);

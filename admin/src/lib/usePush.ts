@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useState } from "react";
-import { supabase } from "./supabase";
-import { publicSiteUrl } from "./useAdminData";
+import { callApi } from "./api";
 
 /**
  * unsupported   : ce navigateur ne sait pas faire de notifications push
@@ -8,27 +7,6 @@ import { publicSiteUrl } from "./useAdminData";
  * denied        : l'utilisateur a refusé (à réactiver dans les réglages du navigateur)
  */
 export type PushState = "checking" | "unsupported" | "needs-install" | "denied" | "off" | "on";
-
-async function callApi<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const { data } = await supabase.auth.getSession();
-  if (!data.session) throw new Error("Session expirée, reconnecte-toi.");
-  let res: Response;
-  try {
-    res = await fetch(`${publicSiteUrl}${path}`, {
-      ...init,
-      headers: {
-        "Content-Type": "application/json",
-        ...(init.headers ?? {}),
-        Authorization: `Bearer ${data.session.access_token}`,
-      },
-    });
-  } catch {
-    throw new Error("Serveur injoignable.");
-  }
-  const body = (await res.json().catch(() => null)) as (T & { error?: string }) | null;
-  if (!res.ok) throw new Error(body?.error || `Erreur serveur (code ${res.status}).`);
-  return body as T;
-}
 
 function keyToBytes(base64Url: string): Uint8Array<ArrayBuffer> {
   const base64 = base64Url.replace(/-/g, "+").replace(/_/g, "/");

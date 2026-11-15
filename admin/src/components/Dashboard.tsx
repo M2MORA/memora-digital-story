@@ -1,7 +1,10 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { BarChart3, Menu, MessageCircle, Nfc, Package, PanelLeftClose, PanelLeftOpen, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
 import { fmt } from "../lib/format";
-import { useAdminData } from "../lib/useAdminData";
+import type { OrderStatus } from "../lib/supabase";
+import { useOrders } from "../lib/useOrders";
+import { useMemories } from "../lib/useMemories";
+import { useSummaryStats } from "../lib/useSummaryStats";
 import { useWhatsApp } from "../lib/useWhatsApp";
 import OrderList from "./OrderList";
 import OrderDetail from "./OrderDetail";
@@ -23,7 +26,11 @@ const TABS = [
 const COLLAPSE_KEY = "memora_admin_sidebar_collapsed";
 
 export default function Dashboard({ email }: { email: string }) {
-  const data = useAdminData();
+  const orders = useOrders();
+  const memories = useMemories();
+  const summary = useSummaryStats(orders.orders, memories.memories);
+  const [loading, setLoading] = useState(true);
+  const error = [orders.error, memories.error].filter(Boolean).join(" · ");
   const [tab, setTab] = useState<Tab>("orders");
   const wa = useWhatsApp({ inboxOpen: tab === "whatsapp" });
   const [openId, setOpenId] = useState<string | null>(null);
@@ -50,6 +57,39 @@ export default function Dashboard({ email }: { email: string }) {
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
   }, [drawerOpen]);
+
+  const { load: loadOrders } = orders;
+  const { load: loadMemories, loadIntentsFor } = memories;
+  const { refresh: refreshStats } = summary;
+  const load = useCallback(async () => {
+    setLoading(true);
+    const [firstPage] = await Promise.all([loadOrders(), loadMemories(), refreshStats()]);
+    await loadIntentsFor(firstPage, "replace");
+    setLoading(false);
+  }, [loadOrders, loadMemories, loadIntentsFor, refreshStats]);
+
+  useEffect(() => {
+    void load();
+  }, [load]);
+
+  const loadMoreOrders = async () => {
+    const page = await orders.loadMoreOrders();
+    if (page.length) await memories.loadIntentsFor(page, "append");
+  };
+
+  /** Statut validé par la base : on rafraîchit les chiffres et les souvenirs archivés. */
+  const updateStatus = async (id: string, status: OrderStatus) => {
+    const archived = await orders.updateStatus(id, status);
+    if (!archived) return;
+    void refreshStats();
+    memories.markArchived(archived);
+  };
+
+  const deleteOrder = async (id: string, orderNumber: string) => {
+    const ok = await orders.deleteOrder(id, orderNumber);
+    if (ok) void refreshStats();
+    return ok;
+  };
 
   const toggleCollapsed = () => {
     setCollapsed((c) => {
@@ -85,7 +125,7 @@ export default function Dashboard({ email }: { email: string }) {
   const showOrder = (id: string) => {
     setTab("orders");
     // Commande créée par Ballech depuis le dernier chargement : on recharge la liste.
-    if (!data.orders.some((o) => o.id === id)) void data.load();
+    if (!orders.orders.some((o) => o.id === id)) void load();
     openOrder(id);
   };
 
@@ -121,7 +161,7 @@ export default function Dashboard({ email }: { email: string }) {
     return () => navigator.serviceWorker?.removeEventListener("message", onMessage);
   }, []);
 
-  const openOrderData = openId ? data.orders.find((o) => o.id === openId) : undefined;
+  const openOrderData = openId ? orders.orders.find((o) => o.id === openId) : undefined;
   const current = TABS.find((t) => t.value === tab)!;
 
   return (
@@ -145,7 +185,7 @@ export default function Dashboard({ email }: { email: string }) {
             >
               <Icon size={20} strokeWidth={1.75} aria-hidden />
               <span className="nav-label">{label}</span>
-              {value === "orders" && data.stats.todo > 0 && <span className="nav-count">{data.stats.todo}</span>}
+              {value === "orders" && summary.stats.todo > 0 && <span className="nav-count">{summary.stats.todo}</span>}
               {value === "whatsapp" && wa.waitingCount > 0 && <span className="nav-count">{wa.waitingCount}</span>}
             </button>
           ))}
@@ -174,20 +214,29 @@ export default function Dashboard({ email }: { email: string }) {
           <button
             type="button"
             className="icon-btn"
-            onClick={() => void (tab === "whatsapp" ? wa.reload() : data.load())}
+            onClick={() => void (tab === "whatsapp" ? wa.reload() : load())}
             aria-label="Actualiser"
             title="Actualiser"
-            disabled={data.loading}
+            disabled={loading}
           >
-            <RefreshCw size={18} className={data.loading ? "spin" : ""} />
+            <RefreshCw size={18} className={loading ? "spin" : ""} />
           </button>
         </header>
 
         <main className="content">
-          {data.error && (
+          {error && (
             <div className="banner" role="alert">
-              <span>{data.error}</span>
-              <button type="button" className="link" onClick={() => data.setError("")}>Fermer</button>
+              <span>{error}</span>
+              <button
+                type="button"
+                className="link"
+                onClick={() => {
+                  orders.setError("");
+                  memories.setError("");
+                }}
+              >
+                Fermer
+              </button>
             </div>
           )}
 
@@ -195,29 +244,31 @@ export default function Dashboard({ email }: { email: string }) {
             <>
               {!openOrderData && (
                 <dl className="summary">
-                  <div><dt>À faire</dt><dd>{data.stats.todo}</dd></div>
-                  <div><dt>Encaissé</dt><dd>{fmt(data.stats.collected)}</dd></div>
-                  <div><dt>À encaisser</dt><dd>{fmt(data.stats.toCollect)}</dd></div>
-                  <div><dt>Scans NFC</dt><dd>{data.stats.views}</dd></div>
+                  <div><dt>À faire</dt><dd>{summary.stats.todo}</dd></div>
+                  <div><dt>Encaissé</dt><dd>{fmt(summary.stats.collected)}</dd></div>
+                  <div><dt>À encaisser</dt><dd>{fmt(summary.stats.toCollect)}</dd></div>
+                  <div><dt>Scans NFC</dt><dd>{summary.stats.views}</dd></div>
                 </dl>
               )}
 
               <div className={`orders-layout ${openOrderData ? "has-detail" : ""}`}>
                 <OrderList
-                  orders={data.orders}
-                  loading={data.loading}
+                  orders={orders.orders}
+                  loading={loading}
                   selectedId={openId}
                   onOpen={openOrder}
-                  counts={data.statusCounts}
-                  hasMore={data.hasMoreOrders}
-                  loadingMore={data.loadingMore}
-                  onLoadMore={() => void data.loadMoreOrders()}
+                  counts={summary.statusCounts}
+                  hasMore={orders.hasMoreOrders}
+                  loadingMore={orders.loadingMore}
+                  onLoadMore={() => void loadMoreOrders()}
                 />
                 {openOrderData ? (
                   <OrderDetail
                     key={openOrderData.id}
                     order={openOrderData}
-                    data={data}
+                    memories={memories}
+                    onUpdateStatus={updateStatus}
+                    onDelete={deleteOrder}
                     onBack={closeOrder}
                     onOpenConversation={showConversation}
                   />
@@ -232,8 +283,8 @@ export default function Dashboard({ email }: { email: string }) {
           )}
 
           {tab === "stats" && <Stats enabled />}
-          {tab === "whatsapp" && <WhatsAppInbox wa={wa} orders={data.orders} onOpenOrder={showOrder} />}
-          {tab === "memories" && <MemoryList data={data} />}
+          {tab === "whatsapp" && <WhatsAppInbox wa={wa} orders={orders.orders} onOpenOrder={showOrder} />}
+          {tab === "memories" && <MemoryList data={memories} />}
           {tab === "settings" && <Settings email={email} />}
         </main>
       </div>
