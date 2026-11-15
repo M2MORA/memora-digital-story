@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import serverEntry, { extendReadyUploadIntent, handleUploadIntentRoute } from "@/server";
-import { sha256Hex } from "@/lib/r2-backend";
+import serverEntry, { handleUploadIntentRoute } from "@/server";
+import { S3CompatibleR2Adapter } from "@/lib/r2-backend";
+import type { UploadIntentDependencies } from "@/server/upload-intents";
+import { sha256Hex } from "@/server/crypto";
 import { getOrCreateDraftOrderNumber, clearDraftOrderNumber } from "@/lib/draft-manager";
 
 type RecordedUpdate = { patch: Record<string, unknown>; filters: Array<[string, string, unknown]> };
@@ -39,13 +41,19 @@ function createSupabaseMock() {
   return { supabaseAdmin, updates, calls };
 }
 
-const s3Adapter: any = {
-  getPresignedPutUrl: vi.fn(async () => ({
-    url: "https://r2.example.com/put",
-    requiredHeaders: { "Content-Type": "video/mp4" },
-    expiresAt: new Date().toISOString(),
-  })),
-};
+const s3Adapter = new S3CompatibleR2Adapter({
+  accountId: "0123456789abcdef0123456789abcdef",
+  accessKeyId: "validaccesskey1234",
+  secretAccessKey: "validsecretaccesskey12345678",
+  bucketName: "memora-videos",
+});
+
+const deps = (supabaseAdmin: unknown): UploadIntentDependencies => ({
+  db: () => supabaseAdmin,
+  storage: () => s3Adapter,
+  uploadSigner: () => s3Adapter,
+  now: Date.now,
+});
 
 function intentRequest() {
   return new Request("https://memora.tn/api/upload/intent", {
@@ -86,7 +94,7 @@ describe("Maintenance des intentions d'upload", () => {
     const { supabaseAdmin, updates, calls } = createSupabaseMock();
     const tokenHash = await sha256Hex("tok_12345678");
 
-    const res = await handleUploadIntentRoute(intentRequest(), {}, { supabaseAdmin, s3Adapter });
+    const res = await handleUploadIntentRoute(intentRequest(), deps(supabaseAdmin));
 
     expect(res.status).toBe(200);
     expect(calls).toEqual(["update", "update", "rpc"]);
@@ -115,21 +123,8 @@ describe("Maintenance des intentions d'upload", () => {
     };
     vi.spyOn(console, "warn").mockImplementation(() => {});
 
-    const res = await handleUploadIntentRoute(intentRequest(), {}, { supabaseAdmin, s3Adapter });
+    const res = await handleUploadIntentRoute(intentRequest(), deps(supabaseAdmin));
     expect(res.status).toBe(200);
-  });
-
-  it("prolonge de 24 h uniquement une intention prête et non rattachée", async () => {
-    const { supabaseAdmin, updates } = createSupabaseMock();
-    const before = Date.now();
-
-    await extendReadyUploadIntent(supabaseAdmin, "intent_1");
-
-    const [update] = updates;
-    const expiresAt = new Date(update?.patch["expires_at"] as string).getTime();
-    expect(expiresAt).toBeGreaterThanOrEqual(before + 24 * 60 * 60 * 1000);
-    expect(hasFilter(update, "eq", "status", "ready")).toBe(true);
-    expect(hasFilter(update, "is", "order_id", null)).toBe(true);
   });
 
   it("accepte le GET de Vercel Cron, reste fermé sans secret et refuse un mauvais secret", async () => {
@@ -149,6 +144,13 @@ describe("Maintenance des intentions d'upload", () => {
 
     vi.stubEnv("CRON_SECRET", "le-bon-secret");
     expect((await call("Bearer mauvais-secret")).status).toBe(401);
+
+    // PURGE_CRON_SECRET prime : l'authentification passe, puis la base non configurée donne 500
+    vi.stubEnv("PURGE_CRON_SECRET", "secret-purge");
+    expect((await call("Bearer le-bon-secret")).status).toBe(401);
+    expect(await (await call("Bearer secret-purge")).json()).toEqual({
+      error: "Erreur lors du traitement de la purge",
+    });
   });
 
   it("garde le même numéro de commande pour un même panier jusqu'à sa remise à zéro", () => {

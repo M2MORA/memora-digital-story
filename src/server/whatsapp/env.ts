@@ -1,13 +1,4 @@
-/** Lecture d'une variable d'environnement : binding Cloudflare (env) puis process.env (Vercel/Node). */
-export function readEnv(env: unknown, name: string): string {
-  const fromBinding = (env as Record<string, unknown> | null | undefined)?.[name];
-  if (typeof fromBinding === "string" && fromBinding.trim()) return fromBinding.trim();
-  if (typeof process !== "undefined") {
-    const fromProcess = process.env?.[name];
-    if (typeof fromProcess === "string" && fromProcess.trim()) return fromProcess.trim();
-  }
-  return "";
-}
+import { readEnv } from "../config";
 
 export type WhatsAppConfig = {
   verifyToken: string;

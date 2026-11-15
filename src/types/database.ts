@@ -2,14 +2,9 @@
  * Types TypeScript pour les schémas de base de données MÉMORA - Phase 1.1 (Corrigée)
  */
 
-export type UploadIntentStatus =
-  | "pending"
-  | "uploading"
-  | "ready"
-  | "consumed"
-  | "purging"
-  | "cancelled"
-  | "expired";
+import type { UploadIntentStatus } from "../server/upload-intents";
+
+export type { UploadIntentStatus };
 
 export type FileKind = "video" | "photo";
 

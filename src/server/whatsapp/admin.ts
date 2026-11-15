@@ -4,26 +4,15 @@
  * GET  /api/admin/whatsapp/media?key=whatsapp/…              → { url } signée (1 h)
  */
 import { requireAdmin } from "../admin-auth";
+import { corsJson } from "../http";
 import type { WhatsAppClient } from "./client";
 import type { BallechStore } from "./store";
-
-/** Hors de cette fenêtre après le dernier message du client, WhatsApp exige un modèle validé. */
-export const CUSTOMER_SERVICE_WINDOW_MS = 24 * 60 * 60 * 1000;
+import { CUSTOMER_SERVICE_WINDOW_MS } from "./window";
 const MEDIA_KEY = /^whatsapp\/[0-9a-f-]{36}\/[0-9a-f-]{36}\.[a-z0-9]{2,5}$/;
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type",
-};
+const { json, preflight } = corsJson("GET, POST, OPTIONS");
 
-const json = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), {
-    status,
-    headers: { "content-type": "application/json", ...CORS },
-  });
-
-export const adminPreflight = () => new Response(null, { status: 204, headers: CORS });
+export const adminPreflight = preflight;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseAdmin = any;

@@ -127,6 +127,21 @@ describe("DELETE /api/admin/orders authorization", () => {
     expect(sb.deleteEq).not.toHaveBeenCalled();
   });
 
+  it("returns 400 with the database message when the delete guard trigger refuses", async () => {
+    const sb = fakeSupabase({ user: admin });
+    const message = "Order M-1 is printing: only cancelled orders can be deleted";
+    sb.deleteEq.mockResolvedValueOnce({ error: { code: "23514", message } } as never);
+
+    const res = await handleDeleteOrderRoute(
+      deleteRequest("Bearer tok"),
+      {},
+      { supabaseAdmin: sb.client },
+    );
+
+    expect(res.status).toBe(400);
+    expect(await res.json()).toEqual({ error: message });
+  });
+
   it("requires an order id from an authorized admin", async () => {
     const sb = fakeSupabase({ user: admin });
 

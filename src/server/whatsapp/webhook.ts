@@ -4,7 +4,7 @@
  * POST → signature vérifiée, message dédupliqué et enregistré, 200 immédiat,
  *        puis traitement (média + agent) en arrière-plan.
  */
-import { timingSafeCompare } from "../../lib/r2-backend";
+import { timingSafeCompare } from "../crypto";
 import { processInbound, type AgentDeps, type InboundJob } from "./agent";
 import type { WhatsAppConfig } from "./env";
 import type { BallechStore, MessageType } from "./store";
