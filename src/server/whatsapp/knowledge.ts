@@ -31,7 +31,7 @@ export function buildKnowledge(): string {
   const tiers = TIERS_10X15.map(
     (t) => `- à partir de ${t.minQty} exemplaire(s) : ${formatTND(t.unitPriceTND)} l'unité`,
   ).join("\n");
-  const shipping = getShippingOptions("TN", 0)
+  const shipping = getShippingOptions(0)
     .map((o) => `- ${o.name} (${o.id}) : ${formatTND(o.priceTND)}, ${o.etaDays} — ${o.description}`)
     .join("\n");
   const shippingPolicy = fr.legal.shipping.sections.map(([k, v]) => `- ${k} : ${v}`).join("\n");

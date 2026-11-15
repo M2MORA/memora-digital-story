@@ -1,5 +1,11 @@
 import { useSyncExternalStore } from "react";
-import { Format, calculateQuote, QuoteResult } from "./pricing";
+import {
+  Format,
+  calculateQuote,
+  getPromoDiscountPercent,
+  QuoteResult,
+  ShippingMode,
+} from "./pricing";
 import { getOrCreateDraftCredentials, resetDraftCredentials } from "./draft-manager";
 
 export type RecipientAllocation = {
@@ -54,7 +60,6 @@ type State = {
   wishlist: string[];
   promoCode?: string;
   giftCardCode?: string;
-  discountPercent: number;
   draftId: string;
   draftToken: string;
 };
@@ -66,7 +71,6 @@ const initialCreds = getOrCreateDraftCredentials();
 let state: State = {
   items: [],
   wishlist: [],
-  discountPercent: 0,
   draftId: initialCreds.draftId,
   draftToken: initialCreds.draftToken,
 };
@@ -115,7 +119,6 @@ function set(next: State) {
 const EMPTY: State = {
   items: [],
   wishlist: [],
-  discountPercent: 0,
   draftId: "",
   draftToken: "",
 };
@@ -235,13 +238,10 @@ export const cart = {
   applyPromoCode(code: string): { success: boolean; message: string } {
     load();
     const cleanCode = code.trim().toUpperCase();
-    if (cleanCode === "MEMORA10" || cleanCode === "BIENVENUE") {
-      set({ ...state, promoCode: cleanCode, discountPercent: 10 });
-      return { success: true, message: "Code appliqué : -10% de réduction immédiate" };
-    }
-    if (cleanCode === "VIP20") {
-      set({ ...state, promoCode: cleanCode, discountPercent: 20 });
-      return { success: true, message: "Code appliqué : -20% de réduction VIP" };
+    const percent = getPromoDiscountPercent(cleanCode);
+    if (percent > 0) {
+      set({ ...state, promoCode: cleanCode });
+      return { success: true, message: `Code appliqué : -${percent}% de réduction` };
     }
     return { success: false, message: "Code promo invalide ou expiré" };
   },
@@ -264,15 +264,15 @@ export const cart = {
     set({ ...state, wishlist: w });
   },
 
-  getQuote(country: string = "TN", carrier?: any): QuoteResult {
+  getQuote(shipping?: ShippingMode): QuoteResult {
     load();
-    const quoteItems = state.items.map((i) => ({
+    const lines = state.items.map((i) => ({
       format: i.format,
       quantity: i.qty,
       withFrame: i.withFrame,
       videoDurationSec: i.videoDurationSec,
     }));
-    return calculateQuote(quoteItems, country, carrier, state.discountPercent);
+    return calculateQuote(lines, state.promoCode, shipping);
   },
 
   clear() {
@@ -280,7 +280,6 @@ export const cart = {
     set({
       items: [],
       wishlist: state.wishlist,
-      discountPercent: 0,
       draftId: nextCreds.draftId,
       draftToken: nextCreds.draftToken,
     });

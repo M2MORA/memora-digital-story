@@ -4,10 +4,13 @@ import {
   INCLUDED_VIDEO_SECONDS,
   MAX_VIDEO_SECONDS,
   SURCHARGE_TND_PER_MIN,
+  TIERS_10X15,
 } from "@/lib/pricing";
 
 const INCL = INCLUDED_VIDEO_SECONDS / 60;
 const MAX = MAX_VIDEO_SECONDS / 60;
+const BASE = TIERS_10X15[0]!.unitPriceTND;
+const TIER2 = TIERS_10X15[1]!.minQty;
 const money = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(2).replace(".", ",")} DT`;
 
 /** Textes du site en français. Les autres langues suivent exactement cette forme. */
@@ -230,7 +233,7 @@ export const fr = {
           {
             id: "price",
             q: "Combien ça coûte ?",
-            a: "49 DT la photo, enveloppe et carte comprises. Moins cher dès 5 exemplaires.",
+            a: `${money(BASE)} la photo, enveloppe et carte comprises. Moins cher dès ${TIER2} exemplaires.`,
           },
           {
             id: "delivery",

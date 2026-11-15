@@ -14,6 +14,7 @@ import {
 import { toast } from "sonner";
 import { cart, useStore, type CartItem } from "@/lib/cart";
 import { finalizeOrderWithIntents } from "@/lib/supabase";
+import { resumeUploads, submitOrder, type CheckoutDeps } from "@/lib/checkout";
 import {
   putCachedMedia,
   getCachedMedia,
@@ -54,11 +55,13 @@ import { FrameSheet } from "@/components/order/FrameSheet";
 import { TapPreview } from "@/components/order/TapPreview";
 import { whatsappLink } from "@/lib/contact";
 import { TUNISIAN_GOVERNORATES } from "@/lib/governorates";
+import { validateCustomer } from "@/lib/customer";
+import { acceptAttribute, checkBrowserFile } from "@/lib/file-rules";
 import { dictFromMatches, useT } from "@/i18n";
 import hero from "@/assets/hero-v2.jpg";
 
-const VIDEO_ACCEPT = ".mp4,.mov,.webm,video/mp4,video/quicktime,video/webm";
-const PHOTO_ACCEPT = "image/jpeg,image/png,image/webp";
+const VIDEO_ACCEPT = acceptAttribute("video");
+const PHOTO_ACCEPT = acceptAttribute("photo");
 
 type CommanderSearch = {
   stage?:
@@ -124,13 +127,9 @@ function formatClock(seconds: number): string {
   return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, "0")}`;
 }
 
-/** 8 chiffres tunisiens, avec ou sans l'indicatif 216 tapé par le client */
-function normalizePhone(raw: string): string {
-  return raw.replace(/\D/g, "").replace(/^216(?=\d{8}$)/, "");
-}
-
-function formatPhone(digits: string): string {
-  return digits.replace(/^(\d{2})(\d{3})(\d{3})$/, "$1 $2 $3");
+/** « +216 98765432 » → « +216 98 765 432 » */
+function formatPhone(phone: string): string {
+  return phone.replace(/(\d{2})(\d{3})(\d{3})$/, "$1 $2 $3");
 }
 
 function cropSettingsOf(crop: PhotoCrop): CartItem["cropSettings"] {
@@ -192,6 +191,16 @@ export const Route = createFileRoute("/commander")({
   },
   component: CommanderPage,
 });
+
+// Dépendances réelles de l'envoi de commande (les tests passent des faux)
+const checkoutDeps: CheckoutDeps = {
+  finalizeOrder: finalizeOrderWithIntents,
+  resolveUploadIntent: startBackgroundUpload,
+  forgetUploads: forgetDraftUploads,
+  media: { get: getCachedMedia, clearDraft: clearDraftMedia },
+  draft: { getOrderNumber: getOrCreateDraftOrderNumber, clearOrderNumber: clearDraftOrderNumber },
+  clearCart: () => cart.clear(),
+};
 
 function CommanderPage() {
   const t = useT();
@@ -264,37 +273,19 @@ function CommanderPage() {
   const hasUploadError = mediaUploads.some((upload) => upload.status === "error");
 
   // Dès que l'article est au panier, ses médias partent sans attendre la confirmation
-  useEffect(() => {
-    if (!draftId || !["cart", "delivery"].includes(stage)) return;
-
-    let isCurrent = true;
-    void (async () => {
-      for (const item of items) {
-        for (const kind of ["photo", "video"] as const) {
-          const file = await getCachedMedia(getMediaCacheKey(draftId, item.key, kind));
-          if (!isCurrent) return;
-          if (file) {
-            startBackgroundUpload({ draftId, draftToken, itemId: item.key, kind, file }).catch(
-              () => {},
-            );
-          }
-        }
-      }
-    })();
-
-    return () => {
-      isCurrent = false;
-    };
-  }, [draftId, draftToken, items, stage]);
+  useEffect(
+    () => resumeUploads({ stage, items, draftId, draftToken }, checkoutDeps),
+    [draftId, draftToken, items, stage],
+  );
 
   // Chaque écran commence en haut de page
   useEffect(() => {
     window.scrollTo({ top: 0 });
   }, [stage]);
 
-  const quote = cart.getQuote("TN", "aramex");
+  const quote = cart.getQuote("aramex");
   const count = quote.totalQuantity;
-  const merchandiseTotal = Number((quote.total - quote.shippingCost).toFixed(2));
+  const merchandiseTotal = Number((quote.subtotal - quote.discount).toFixed(2));
   const remainingForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD_TND - merchandiseTotal);
   const freeShippingProgress = Math.min(
     100,
@@ -304,12 +295,13 @@ function CommanderPage() {
   const videoSurcharge = getVideoSurcharge(videoDuration, 1);
   const stageBox = isNarrow ? STAGE_BOX_NARROW : STAGE_BOX;
 
-  const phoneDigits = normalizePhone(customer.phone);
-  const formOk =
-    customer.name.trim().length >= 2 &&
-    /^\d{8}$/.test(phoneDigits) &&
-    Boolean(shipping.city) &&
-    shipping.address.trim().length >= 4;
+  const customerCheck = validateCustomer({
+    name: customer.name,
+    phone: customer.phone,
+    governorate: shipping.city,
+    address: shipping.address,
+  });
+  const formOk = customerCheck.ok;
 
   // ---------- Vidéo ----------
   const handleVideoUpload = async (e: ChangeEvent<HTMLInputElement>) => {
@@ -323,22 +315,16 @@ function CommanderPage() {
       toast.error(message);
     };
 
-    const ext = file.name.split(".").pop()?.toLowerCase() || "";
-    if (!["mp4", "mov", "webm"].includes(ext)) {
-      rejectFile(o.video.errors.format);
-      return;
-    }
-    const mimeType = file.type.trim().toLowerCase();
-    if (mimeType && !mimeType.startsWith("video/") && mimeType !== "application/octet-stream") {
-      rejectFile(o.video.errors.notVideo);
-      return;
-    }
-    if (file.size > 5 * 1024 * 1024 * 1024) {
-      rejectFile(o.video.errors.tooBig);
-      return;
-    }
-    if (file.size <= 0) {
-      rejectFile(o.video.errors.empty);
+    const fileError = checkBrowserFile("video", file);
+    if (fileError) {
+      rejectFile(
+        {
+          extension: o.video.errors.format,
+          mime: o.video.errors.notVideo,
+          size: o.video.errors.tooBig,
+          empty: o.video.errors.empty,
+        }[fileError],
+      );
       return;
     }
 
@@ -407,20 +393,16 @@ function CommanderPage() {
     if (!file) return;
     input.value = "";
 
-    const ext = file.name.split(".").pop()?.toLowerCase() || "";
-    if (
-      !["jpg", "jpeg", "png", "webp"].includes(ext) ||
-      (file.type && !file.type.startsWith("image/"))
-    ) {
-      toast.error(o.photo.errors.format);
-      return;
-    }
-    if (file.size > 25 * 1024 * 1024) {
-      toast.error(o.photo.errors.tooBig);
-      return;
-    }
-    if (file.size <= 0) {
-      toast.error(o.photo.errors.empty);
+    const fileError = checkBrowserFile("photo", file);
+    if (fileError) {
+      toast.error(
+        {
+          extension: o.photo.errors.format,
+          mime: o.photo.errors.format,
+          size: o.photo.errors.tooBig,
+          empty: o.photo.errors.empty,
+        }[fileError],
+      );
       return;
     }
     await applyPhotoFile(file);
@@ -520,167 +502,64 @@ function CommanderPage() {
       toast.error(o.delivery.errors.empty);
       return;
     }
-    const fullName = customer.name.trim();
-    if (fullName.length < 2) {
-      toast.error(o.delivery.errors.name);
+    if (!customerCheck.ok) {
+      const { field } = customerCheck;
+      toast.error(
+        field === "name"
+          ? o.delivery.errors.name
+          : field === "phone"
+            ? o.delivery.errors.phone
+            : o.delivery.errors.address,
+      );
       return;
     }
-    if (!/^\d{8}$/.test(phoneDigits)) {
-      toast.error(o.delivery.errors.phone);
-      return;
-    }
-    const customerPhone = `+216 ${phoneDigits}`;
-    if (!shipping.city || shipping.address.trim().length < 4) {
-      toast.error(o.delivery.errors.address);
-      return;
-    }
-
     setIsSubmitting(true);
     setCheckoutError(null);
-    const newOrderNum = getOrCreateDraftOrderNumber(draftId);
-    setOrderNumber(newOrderNum);
+    const result = await submitOrder(
+      {
+        items,
+        promoCode,
+        draftId,
+        draftToken,
+        customer: customerCheck.customer,
+        onStep: (step) => {
+          setCheckoutStep(step);
+          setCheckoutMessage(
+            step === "preparing"
+              ? o.delivery.msgPreparing
+              : step === "uploading_media"
+                ? o.delivery.msgUploading
+                : o.delivery.msgSaving,
+          );
+        },
+      },
+      checkoutDeps,
+    );
+    setIsSubmitting(false);
 
-    try {
-      // Étape A — Récupération des médias depuis IndexedDB pour chaque article
-      setCheckoutStep("preparing");
-      setCheckoutMessage(o.delivery.msgPreparing);
-
-      const preparedMedia: Array<{ item: CartItem; photoFile: File; videoFile: File }> = [];
-
-      for (const [i, it] of items.entries()) {
-        const photoFile = await getCachedMedia(getMediaCacheKey(draftId, it.key, "photo"));
-        const itemVideoFile = await getCachedMedia(getMediaCacheKey(draftId, it.key, "video"));
-
-        if (!photoFile || !itemVideoFile) {
-          const errMsg = o.delivery.errors.missing(!photoFile ? "photo" : "video", i + 1);
-          setCheckoutStep("error");
-          setCheckoutError(errMsg);
-          toast.error(errMsg);
-          setIsSubmitting(false);
-          return;
-        }
-
-        preparedMedia.push({ item: it, photoFile, videoFile: itemVideoFile });
-      }
-
-      // Les fichiers déjà envoyés sont réutilisés ; seul ce qui manque est attendu
-      const resolveIntentMappings = async () => {
-        setCheckoutStep("uploading_media");
-        setCheckoutMessage(o.delivery.msgUploading);
-
-        const media = preparedMedia.flatMap(({ item, photoFile, videoFile: itemVideoFile }) => [
-          { item_id: item.key, file_kind: "photo" as const, file: photoFile },
-          { item_id: item.key, file_kind: "video" as const, file: itemVideoFile },
-        ]);
-
-        return Promise.all(
-          media.map(async ({ item_id, file_kind, file }) => ({
-            item_id,
-            file_kind,
-            intent_id: await startBackgroundUpload({
-              draftId,
-              draftToken,
-              itemId: item_id,
-              kind: file_kind,
-              file,
-            }),
-          })),
-        );
-      };
-
-      // Clé stable par panier : une nouvelle tentative est reconnue par le serveur
-      const idempotencyKey = `idem_${draftId}`;
-      const normalizedItems = items.map((it) => ({
-        id: it.key,
-        productId: it.productId,
-        format: it.format,
-        withFrame: it.withFrame ?? false,
-        videoDurationSec: it.videoDurationSec,
-        cardMessage: it.cardMessage,
-        personalization: it.personalization,
-        qty: it.qty,
-      }));
-
-      // Finalisation atomique & idempotente de la commande
-      const finalizeOrder = async (
-        intentMappings: Awaited<ReturnType<typeof resolveIntentMappings>>,
-      ) => {
-        setCheckoutStep("finalizing");
-        setCheckoutMessage(o.delivery.msgSaving);
-
-        return finalizeOrderWithIntents({
-          orderPayload: {
-            order_number: newOrderNum,
-            customer_name: fullName,
-            customer_email: "client@memora.tn",
-            customer_phone: customerPhone,
-            shipping_address: {
-              address: shipping.address.trim(),
-              postalCode: "",
-              city: shipping.city,
-              country: "TN",
-              carrier: "aramex",
-              recipient: fullName,
-            },
-            items: normalizedItems,
-            promo_code: promoCode || undefined,
-            shipping_carrier: "aramex",
-          },
-          draftId,
-          draftToken,
-          intentMappings,
-          idempotencyKey,
-        });
-      };
-
-      let finalizeResult = await finalizeOrder(await resolveIntentMappings());
-
-      // Fichiers devenus trop anciens côté serveur : un seul renvoi complet
-      if (!finalizeResult.success && /expir/i.test(finalizeResult.error ?? "")) {
-        forgetDraftUploads(draftId);
-        finalizeResult = await finalizeOrder(await resolveIntentMappings());
-      }
-
-      if (!finalizeResult.success) {
-        throw new Error(finalizeResult.error || o.delivery.errors.generic);
-      }
-
-      // Le total vient du serveur (recalculé), avant de vider le panier
+    if (result.ok) {
+      const { name: fullName, phone: customerPhone } = customerCheck.customer;
+      setOrderNumber(result.orderNumber);
       setConfirmed({
-        total: typeof finalizeResult.total === "number" ? finalizeResult.total : quote.total,
+        total: result.total,
         firstName: fullName.split(/\s+/)[0] ?? fullName,
-        phone: phoneDigits,
+        phone: customerPhone,
       });
-
-      forgetDraftUploads(draftId);
-      clearDraftOrderNumber(draftId);
-
-      // Cleanup policy : suppression des fichiers locaux UNIQUEMENT après succès.
-      // Non attendue : effacer une grosse vidéo ne doit pas retarder la confirmation.
-      void clearDraftMedia(draftId);
-      cart.clear();
-
       setCheckoutStep("confirmed");
       setStage("confirmation");
-    } catch (err: unknown) {
-      console.error("Erreur commande R2 / Finalisation:", err);
-      const rawMessage = err instanceof Error ? err.message : "";
-      // Coupure réseau : un message clair plutôt que « Failed to fetch »
-      const isNetworkError =
-        err instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(rawMessage);
-      const msg = isNetworkError
-        ? o.delivery.errors.network
-        : rawMessage || o.delivery.errors.generic;
-      // Numéro déjà attribué à une autre commande : en tirer un nouveau au prochain essai
-      if (rawMessage.includes("order_number")) {
-        clearDraftOrderNumber(draftId);
-      }
-      setCheckoutStep("error");
-      setCheckoutError(msg);
-      toast.error(msg);
-    } finally {
-      setIsSubmitting(false);
+      return;
     }
+
+    const { error } = result;
+    const msg =
+      error.type === "missing_media"
+        ? o.delivery.errors.missing(error.kind, error.index)
+        : error.type === "network"
+          ? o.delivery.errors.network
+          : error.message || o.delivery.errors.generic;
+    setCheckoutStep("error");
+    setCheckoutError(msg);
+    toast.error(msg);
   };
 
   // ---------- Navigation ----------
@@ -1183,9 +1062,7 @@ function CommanderPage() {
                 <div className={`${BOX} text-[15px]`}>
                   <div className="flex justify-between py-1">
                     <span className="text-m-muted">{o.cart.count(count)}</span>
-                    <span>
-                      {money(quote.itemsSubtotal + quote.framesSubtotal + quote.videoSurcharges)}
-                    </span>
+                    <span>{money(quote.subtotal)}</span>
                   </div>
                   {quote.discount > 0 && (
                     <div className="flex justify-between py-1">
@@ -1196,7 +1073,7 @@ function CommanderPage() {
                   <div className="flex justify-between py-1">
                     <span className="text-m-muted">{o.delivery.shipping}</span>
                     <span>
-                      {quote.shippingCost > 0 ? money(quote.shippingCost) : o.delivery.free}
+                      {quote.shippingFee > 0 ? money(quote.shippingFee) : o.delivery.free}
                     </span>
                   </div>
                   <div className="mt-1.5 flex justify-between border-t border-m-line pt-2.5 text-[17px] font-bold">
@@ -1287,7 +1164,7 @@ function CommanderPage() {
                 {o.done.received}{" "}
                 {/* Le numéro reste lisible de gauche à droite au milieu d'une phrase en arabe */}
                 {confirmed
-                  ? o.done.call(`\u2066+216 ${formatPhone(confirmed.phone)}\u2069`)
+                  ? o.done.call(`\u2066${formatPhone(confirmed.phone)}\u2069`)
                   : o.done.callNoPhone}
               </p>
               {confirmed && (

@@ -113,10 +113,12 @@ export function getVideoSurcharge(durationSec: number, qty: number = 1): number 
   return Number((extraMinutes * SURCHARGE_TND_PER_MIN * qty).toFixed(2));
 }
 
-export type CarrierMode = "lettre" | "colissimo" | "mondial_relay" | "aramex" | "international";
+// Mémora delivers within Tunisia only.
+export const SHIPPING_MODES = ["aramex", "mondial_relay"] as const;
+export type ShippingMode = (typeof SHIPPING_MODES)[number];
 
 export interface ShippingOption {
-  id: CarrierMode;
+  id: ShippingMode;
   name: string;
   description: string;
   priceTND: number;
@@ -124,10 +126,9 @@ export interface ShippingOption {
 }
 
 /**
- * Computes available shipping options based on country and subtotal.
+ * Shipping options for a subtotal (after discount): free from FREE_SHIPPING_THRESHOLD_TND.
  */
-export function getShippingOptions(_country: string, subtotalTND: number): ShippingOption[] {
-  // Mémora delivers within Tunisia only.
+export function getShippingOptions(subtotalTND: number): ShippingOption[] {
   const isFree = subtotalTND >= FREE_SHIPPING_THRESHOLD_TND;
   return [
     {
@@ -147,7 +148,19 @@ export function getShippingOptions(_country: string, subtotalTND: number): Shipp
   ];
 }
 
-export interface QuoteItem {
+// Promo codes: percent off the subtotal (items + frames + video). Codes are matched trimmed and upper-cased.
+export const PROMO_CODES: Record<string, number> = {
+  MEMORA10: 10,
+  BIENVENUE: 10,
+  VIP20: 20,
+};
+
+/** Discount percent for a promo code, or 0 when the code is empty or unknown. */
+export function getPromoDiscountPercent(code: string | null | undefined): number {
+  return PROMO_CODES[(code ?? "").trim().toUpperCase()] ?? 0;
+}
+
+export interface QuoteLine {
   format: Format;
   quantity: number;
   withFrame?: boolean | undefined;
@@ -158,63 +171,58 @@ export interface QuoteResult {
   itemsSubtotal: number;
   framesSubtotal: number;
   videoSurcharges: number;
-  shippingCost: number;
+  subtotal: number; // items + frames + video, before discount
   discount: number;
-  total: number;
+  shippingFee: number;
+  total: number; // subtotal - discount + shippingFee
   totalQuantity: number;
   isFreeShipping: boolean;
-  unitPrice: number;
 }
 
 /**
- * Quotes total order cost including volume discounts, video surcharges, frames, and shipping.
+ * The storefront Quote: cart lines, an optional promo code and a shipping mode in; totals out.
+ * Same inputs/outputs as the SQL calculate_order_quote(p_items, p_promo_code, p_shipping_carrier).
  */
 export function calculateQuote(
-  items: QuoteItem[],
-  country: string = "TN",
-  shippingCarrierId?: CarrierMode,
-  promoDiscountPercent: number = 0,
+  lines: QuoteLine[],
+  promoCode?: string | null,
+  shipping: ShippingMode = "aramex",
 ): QuoteResult {
-  const totalQuantity = items.reduce((sum, item) => sum + item.quantity, 0);
+  const totalQuantity = lines.reduce((sum, line) => sum + line.quantity, 0);
 
   let itemsSubtotal = 0;
   let framesSubtotal = 0;
   let videoSurcharges = 0;
 
-  for (const item of items) {
-    const unitPrice = getUnitPrice(item.format, totalQuantity);
-    itemsSubtotal += unitPrice * item.quantity;
+  for (const line of lines) {
+    itemsSubtotal += getUnitPrice(line.format, totalQuantity) * line.quantity;
 
-    if (item.withFrame) {
-      framesSubtotal += (FRAME_PRICES[item.format] || 0) * item.quantity;
+    if (line.withFrame) {
+      framesSubtotal += (FRAME_PRICES[line.format] || 0) * line.quantity;
     }
 
-    if (item.videoDurationSec && item.videoDurationSec > INCLUDED_VIDEO_SECONDS) {
-      videoSurcharges += getVideoSurcharge(item.videoDurationSec, item.quantity);
+    if (line.videoDurationSec && line.videoDurationSec > INCLUDED_VIDEO_SECONDS) {
+      videoSurcharges += getVideoSurcharge(line.videoDurationSec, line.quantity);
     }
   }
 
-  const subtotalBeforeShipping = itemsSubtotal + framesSubtotal + videoSurcharges;
-  const discount = Number(((subtotalBeforeShipping * promoDiscountPercent) / 100).toFixed(2));
-  const discountedSubtotal = subtotalBeforeShipping - discount;
+  const subtotal = Number((itemsSubtotal + framesSubtotal + videoSurcharges).toFixed(2));
+  const discount = Number(((subtotal * getPromoDiscountPercent(promoCode)) / 100).toFixed(2));
+  const discountedSubtotal = subtotal - discount;
 
-  const shippingOptions = getShippingOptions(country, discountedSubtotal);
-  const selectedShipping =
-    shippingOptions.find((opt) => opt.id === shippingCarrierId) ?? shippingOptions[0];
-  const shippingCost = selectedShipping?.priceTND ?? 0;
-
-  const total = Number((discountedSubtotal + shippingCost).toFixed(2));
+  const shippingFee =
+    getShippingOptions(discountedSubtotal).find((opt) => opt.id === shipping)?.priceTND ?? 0;
 
   return {
     itemsSubtotal: Number(itemsSubtotal.toFixed(2)),
     framesSubtotal: Number(framesSubtotal.toFixed(2)),
     videoSurcharges: Number(videoSurcharges.toFixed(2)),
-    shippingCost: Number(shippingCost.toFixed(2)),
+    subtotal,
     discount,
-    total,
+    shippingFee,
+    total: Number((discountedSubtotal + shippingFee).toFixed(2)),
     totalQuantity,
     isFreeShipping: discountedSubtotal >= FREE_SHIPPING_THRESHOLD_TND,
-    unitPrice: items[0] ? getUnitPrice(items[0].format, totalQuantity) : 49,
   };
 }
 
