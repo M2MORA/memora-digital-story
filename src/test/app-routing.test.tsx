@@ -29,7 +29,6 @@ describe("App routing", () => {
     "/product/memora-classique",
     "/product/memora-magnet",
     "/product/memora-20x30-encadre",
-    "/create/p1",
     "/m/demo-leila-and-sami",
   ];
 

@@ -28,7 +28,6 @@ import { Route as RefundPolicyRouteImport } from './routes/refund-policy'
 import { Route as ShippingPolicyRouteImport } from './routes/shipping-policy'
 import { Route as ShopRouteImport } from './routes/shop'
 import { Route as TermsRouteImport } from './routes/terms'
-import { Route as CreateProductIdRouteImport } from './routes/create.$productId'
 import { Route as MMemorySlugRouteImport } from './routes/m.$memorySlug'
 import { Route as ProductSlugRouteImport } from './routes/product.$slug'
 
@@ -127,11 +126,6 @@ const TermsRoute = TermsRouteImport.update({
   path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
-const CreateProductIdRoute = CreateProductIdRouteImport.update({
-  id: '/$productId',
-  path: '/$productId',
-  getParentRoute: () => CreateRoute,
-} as any)
 const MMemorySlugRoute = MMemorySlugRouteImport.update({
   id: '/$memorySlug',
   path: '/$memorySlug',
@@ -148,7 +142,7 @@ export interface FileRoutesByFullPath {
   '/cart': typeof CartRoute
   '/commander': typeof CommanderRoute
   '/contact': typeof ContactRoute
-  '/create': typeof CreateRouteWithChildren
+  '/create': typeof CreateRoute
   '/digital-memories': typeof DigitalMemoriesRoute
   '/editeasy': typeof EditeasyRoute
   '/espace-entreprise': typeof EspaceEntrepriseRoute
@@ -163,7 +157,6 @@ export interface FileRoutesByFullPath {
   '/shipping-policy': typeof ShippingPolicyRoute
   '/shop': typeof ShopRoute
   '/terms': typeof TermsRoute
-  '/create/$productId': typeof CreateProductIdRoute
   '/m/$memorySlug': typeof MMemorySlugRoute
   '/product/$slug': typeof ProductSlugRoute
 }
@@ -172,7 +165,7 @@ export interface FileRoutesByTo {
   '/cart': typeof CartRoute
   '/commander': typeof CommanderRoute
   '/contact': typeof ContactRoute
-  '/create': typeof CreateRouteWithChildren
+  '/create': typeof CreateRoute
   '/digital-memories': typeof DigitalMemoriesRoute
   '/editeasy': typeof EditeasyRoute
   '/espace-entreprise': typeof EspaceEntrepriseRoute
@@ -187,7 +180,6 @@ export interface FileRoutesByTo {
   '/shipping-policy': typeof ShippingPolicyRoute
   '/shop': typeof ShopRoute
   '/terms': typeof TermsRoute
-  '/create/$productId': typeof CreateProductIdRoute
   '/m/$memorySlug': typeof MMemorySlugRoute
   '/product/$slug': typeof ProductSlugRoute
 }
@@ -197,7 +189,7 @@ export interface FileRoutesById {
   '/cart': typeof CartRoute
   '/commander': typeof CommanderRoute
   '/contact': typeof ContactRoute
-  '/create': typeof CreateRouteWithChildren
+  '/create': typeof CreateRoute
   '/digital-memories': typeof DigitalMemoriesRoute
   '/editeasy': typeof EditeasyRoute
   '/espace-entreprise': typeof EspaceEntrepriseRoute
@@ -212,7 +204,6 @@ export interface FileRoutesById {
   '/shipping-policy': typeof ShippingPolicyRoute
   '/shop': typeof ShopRoute
   '/terms': typeof TermsRoute
-  '/create/$productId': typeof CreateProductIdRoute
   '/m/$memorySlug': typeof MMemorySlugRoute
   '/product/$slug': typeof ProductSlugRoute
 }
@@ -238,7 +229,6 @@ export interface FileRouteTypes {
     | '/shipping-policy'
     | '/shop'
     | '/terms'
-    | '/create/$productId'
     | '/m/$memorySlug'
     | '/product/$slug'
   fileRoutesByTo: FileRoutesByTo
@@ -262,7 +252,6 @@ export interface FileRouteTypes {
     | '/shipping-policy'
     | '/shop'
     | '/terms'
-    | '/create/$productId'
     | '/m/$memorySlug'
     | '/product/$slug'
   id:
@@ -286,7 +275,6 @@ export interface FileRouteTypes {
     | '/shipping-policy'
     | '/shop'
     | '/terms'
-    | '/create/$productId'
     | '/m/$memorySlug'
     | '/product/$slug'
   fileRoutesById: FileRoutesById
@@ -296,7 +284,7 @@ export interface RootRouteChildren {
   CartRoute: typeof CartRoute
   CommanderRoute: typeof CommanderRoute
   ContactRoute: typeof ContactRoute
-  CreateRoute: typeof CreateRouteWithChildren
+  CreateRoute: typeof CreateRoute
   DigitalMemoriesRoute: typeof DigitalMemoriesRoute
   EditeasyRoute: typeof EditeasyRoute
   EspaceEntrepriseRoute: typeof EspaceEntrepriseRoute
@@ -448,13 +436,6 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
-    '/create/$productId': {
-      id: '/create/$productId'
-      path: '/$productId'
-      fullPath: '/create/$productId'
-      preLoaderRoute: typeof CreateProductIdRouteImport
-      parentRoute: typeof CreateRoute
-    }
     '/m/$memorySlug': {
       id: '/m/$memorySlug'
       path: '/$memorySlug'
@@ -471,17 +452,6 @@ declare module '@tanstack/react-router' {
     }
   }
 }
-
-interface CreateRouteChildren {
-  CreateProductIdRoute: typeof CreateProductIdRoute
-}
-
-const CreateRouteChildren: CreateRouteChildren = {
-  CreateProductIdRoute: CreateProductIdRoute,
-}
-
-const CreateRouteWithChildren =
-  CreateRoute._addFileChildren(CreateRouteChildren)
 
 interface MRouteChildren {
   MMemorySlugRoute: typeof MMemorySlugRoute
@@ -509,7 +479,7 @@ const rootRouteChildren: RootRouteChildren = {
   CartRoute: CartRoute,
   CommanderRoute: CommanderRoute,
   ContactRoute: ContactRoute,
-  CreateRoute: CreateRouteWithChildren,
+  CreateRoute: CreateRoute,
   DigitalMemoriesRoute: DigitalMemoriesRoute,
   EditeasyRoute: EditeasyRoute,
   EspaceEntrepriseRoute: EspaceEntrepriseRoute,
