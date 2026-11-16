@@ -1,7 +1,9 @@
 import { Link } from "@tanstack/react-router";
 import { MessageCircle } from "lucide-react";
 import { whatsappLink } from "@/lib/contact";
-import { PRODUCTS } from "@/lib/products";
+import { useProducts } from "@/hooks/use-products";
+import { getUnitPrice } from "@/lib/pricing";
+import { usePricing } from "@/hooks/use-pricing";
 import { useT } from "@/i18n";
 import { useHeroPassed } from "@/hooks/use-hero-passed";
 import { cn } from "@/lib/utils";
@@ -12,6 +14,8 @@ import { cn } from "@/lib/utils";
  */
 export function MobileOrderBar() {
   const t = useT();
+  const pricing = usePricing();
+  const product = useProducts()[0];
   const shown = useHeroPassed({ immediateElsewhere: true });
   return (
     <div
@@ -27,7 +31,11 @@ export function MobileOrderBar() {
           className="flex min-h-14 flex-1 items-center justify-between rounded-full bg-m-wine pe-5 ps-6 text-base font-semibold text-m-linen"
         >
           <span>{t.common.create}</span>
-          <span className="text-m-linen/80">{t.money(PRODUCTS[0]!.priceTND)}</span>
+          {product && (
+            <span className="text-m-linen/80">
+              {t.money(getUnitPrice(pricing, product.formatCode, 1))}
+            </span>
+          )}
         </Link>
         <a
           href={whatsappLink(t.common.whatsappHello)}

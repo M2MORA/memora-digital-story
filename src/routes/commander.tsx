@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cart, useStore, type CartItem } from "@/lib/cart";
-import { finalizeOrderWithIntents } from "@/lib/supabase";
+import { finalizeOrderWithIntents, supabase } from "@/lib/supabase";
 import { resumeUploads, submitOrder, type CheckoutDeps } from "@/lib/checkout";
 import {
   putCachedMedia,
@@ -28,14 +28,10 @@ import {
   useBackgroundUploads,
 } from "@/lib/background-uploads";
 import { clearDraftOrderNumber, getOrCreateDraftOrderNumber } from "@/lib/draft-manager";
-import {
-  type Format,
-  FREE_SHIPPING_THRESHOLD_TND,
-  getVideoSurcharge,
-  INCLUDED_VIDEO_SECONDS,
-  MAX_VIDEO_SECONDS,
-  SURCHARGE_TND_PER_MIN,
-} from "@/lib/pricing";
+import { checkPromoCode, type Format, getVideoSurcharge } from "@/lib/pricing";
+import { usePricing } from "@/hooks/use-pricing";
+import { useProducts } from "@/hooks/use-products";
+import { orderableProduct } from "@/lib/products";
 import {
   defaultCrop,
   loadImage,
@@ -204,11 +200,20 @@ const checkoutDeps: CheckoutDeps = {
 
 function CommanderPage() {
   const t = useT();
+  const pricing = usePricing();
+  const {
+    free_shipping_threshold,
+    included_video_seconds,
+    max_video_seconds,
+    surcharge_per_minute,
+  } = pricing.settings;
   const o = t.order;
   const money = t.money;
   const whatsappUrl = whatsappLink(o.whatsappMessage);
   const search = Route.useSearch();
-  const { items, promoCode, draftId, draftToken } = useStore();
+  // ?product=<slug> (page produit) ; sans slug, le premier article de la boutique
+  const product = orderableProduct(useProducts(), search.product);
+  const { items, promoCode, promoPercent, draftId, draftToken } = useStore();
   const isNarrow = useIsNarrowScreen();
 
   const [stage, setStage] = useState<Stage>(() => initialStage(search.stage));
@@ -238,6 +243,8 @@ function CommanderPage() {
   // Livraison
   const [customer, setCustomer] = useState({ name: "", phone: "" });
   const [shipping, setShipping] = useState({ city: "", address: "" });
+  const [promoInput, setPromoInput] = useState("");
+  const [isCheckingPromo, setIsCheckingPromo] = useState(false);
 
   // Commande
   type CheckoutStep =
@@ -283,16 +290,16 @@ function CommanderPage() {
     window.scrollTo({ top: 0 });
   }, [stage]);
 
-  const quote = cart.getQuote("aramex");
+  const quote = cart.getQuote(pricing, "aramex");
   const count = quote.totalQuantity;
   const merchandiseTotal = Number((quote.subtotal - quote.discount).toFixed(2));
-  const remainingForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD_TND - merchandiseTotal);
+  const remainingForFreeShipping = Math.max(0, free_shipping_threshold - merchandiseTotal);
   const freeShippingProgress = Math.min(
     100,
-    Math.round((merchandiseTotal / FREE_SHIPPING_THRESHOLD_TND) * 100),
+    Math.round((merchandiseTotal / free_shipping_threshold) * 100),
   );
   const isInCart = items.some((item) => item.key === currentItemKey);
-  const videoSurcharge = getVideoSurcharge(videoDuration, 1);
+  const videoSurcharge = getVideoSurcharge(pricing, videoDuration, 1);
   const stageBox = isNarrow ? STAGE_BOX_NARROW : STAGE_BOX;
 
   const customerCheck = validateCustomer({
@@ -452,8 +459,12 @@ function CommanderPage() {
   // ---------- Panier ----------
   const handleAddToCart = () => {
     if (!crop) return;
+    if (!product) {
+      toast.error(o.cart.unavailable);
+      return;
+    }
     const data = {
-      format: "10x15" as Format,
+      format: product.formatCode,
       withFrame,
       videoDurationSec: videoDuration,
       photoPreviewUrl: photoThumbUrl || undefined,
@@ -463,7 +474,7 @@ function CommanderPage() {
     };
     // Revenir en arrière puis rajouter ne crée pas de doublon : on met à jour la même création
     if (isInCart) cart.update(currentItemKey, data);
-    else cart.add("p1", { key: currentItemKey, qty: 1, ...data });
+    else cart.add(product.id, { key: currentItemKey, qty: 1, ...data });
     setStage("cart");
   };
 
@@ -496,6 +507,19 @@ function CommanderPage() {
   };
 
   // ---------- Commande : pipeline direct Cloudflare R2 ----------
+  // Le pourcentage sert à l'affichage ; le montant facturé vient du devis SQL à la finalisation
+  const applyPromo = async () => {
+    setIsCheckingPromo(true);
+    const result = await cart.applyPromoCode(promoInput, (code) => checkPromoCode(supabase, code));
+    setIsCheckingPromo(false);
+    if (result.ok) {
+      setPromoInput("");
+      toast.success(o.delivery.promoApplied(result.percent));
+    } else {
+      toast.error(result.reason === "invalid" ? o.delivery.promoInvalid : o.delivery.promoError);
+    }
+  };
+
   const handleConfirmOrder = async () => {
     if (isSubmitting) return;
     if (items.length === 0) {
@@ -518,7 +542,9 @@ function CommanderPage() {
     const result = await submitOrder(
       {
         items,
+        pricing,
         promoCode,
+        promoPercent,
         draftId,
         draftToken,
         customer: customerCheck.customer,
@@ -662,9 +688,9 @@ function CommanderPage() {
                         }
                         const rounded = Math.ceil(duration);
                         setVideoDuration(rounded);
-                        if (rounded > MAX_VIDEO_SECONDS) {
+                        if (rounded > max_video_seconds) {
                           setVideoStatus("error");
-                          setVideoError(o.video.errors.tooLong(MAX_VIDEO_SECONDS / 60));
+                          setVideoError(o.video.errors.tooLong(max_video_seconds / 60));
                           return;
                         }
                         setVideoStatus("ready");
@@ -717,12 +743,12 @@ function CommanderPage() {
                     {videoStatus === "loading" && (
                       <p className="text-sm text-m-muted">{o.video.checking}</p>
                     )}
-                    {videoStatus === "ready" && videoDuration > INCLUDED_VIDEO_SECONDS && (
+                    {videoStatus === "ready" && videoDuration > included_video_seconds && (
                       <p className="text-sm text-m-muted">
                         {o.video.surcharge(
                           money(videoSurcharge),
-                          money(SURCHARGE_TND_PER_MIN),
-                          INCLUDED_VIDEO_SECONDS / 60,
+                          money(surcharge_per_minute),
+                          included_video_seconds / 60,
                         )}
                       </p>
                     )}
@@ -1058,6 +1084,41 @@ function CommanderPage() {
                     className={FIELD}
                   />
                 </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void applyPromo();
+                  }}
+                >
+                  <label htmlFor="cmd-promo" className={FIELD_LABEL}>
+                    {o.delivery.promo}
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id="cmd-promo"
+                      autoComplete="off"
+                      autoCapitalize="characters"
+                      value={promoInput}
+                      onChange={(e) => setPromoInput(e.target.value)}
+                      className={FIELD}
+                    />
+                    <button
+                      type="submit"
+                      disabled={isCheckingPromo || !promoInput.trim()}
+                      className="h-[54px] shrink-0 rounded-2xl border border-m-line-strong bg-m-paper px-5 text-[15px] font-semibold text-m-ink transition-colors hover:bg-m-blush disabled:opacity-50"
+                    >
+                      {isCheckingPromo ? (
+                        <Loader2
+                          className="h-5 w-5 animate-spin"
+                          aria-label={o.delivery.promoApply}
+                        />
+                      ) : (
+                        o.delivery.promoApply
+                      )}
+                    </button>
+                  </div>
+                </form>
 
                 <div className={`${BOX} text-[15px]`}>
                   <div className="flex justify-between py-1">

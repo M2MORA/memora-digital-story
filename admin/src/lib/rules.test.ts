@@ -1,12 +1,24 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   chunk,
+  cleanArticle,
+  compactCopy,
   computeStats,
   displayMediaUrl,
   mediaPath,
+  MAX_IMAGE_BYTES,
   mergeById,
+  moveItem,
+  normalizePromoCode,
   olderThanCursor,
   parseServerStats,
+  validateArticle,
+  validateFramePrice,
+  validateImageFile,
+  validateNewPromoCode,
+  validatePromoPercent,
+  validateShippingVideo,
+  validateTierGrid,
 } from "./rules";
 
 const key = "staging/dft_abc/11111111-2222-3333-4444-555555555555.jpg";
@@ -82,5 +94,233 @@ describe("pagination helpers", () => {
     ).toEqual({ count: 3, todo: 2, collected: 90.5, toCollect: 10, views: 7, byStatus: { pending: 2 } });
     expect(parseServerStats(null)).toBeNull();
     expect(parseServerStats({ todo: 1 })).toBeNull();
+  });
+});
+
+describe("validateTierGrid", () => {
+  const grid = [
+    { min_qty: 1, unit_price: 49 },
+    { min_qty: 5, unit_price: 42 },
+    { min_qty: 10, unit_price: 42 },
+  ];
+
+  it("accepte une grille dégressive (prix égaux permis) et un prix fixe à un seul palier", () => {
+    expect(validateTierGrid(grid)).toBeNull();
+    expect(validateTierGrid([{ min_qty: 1, unit_price: 89 }])).toBeNull();
+  });
+
+  it("accepte les paliers dans le désordre", () => {
+    expect(validateTierGrid([...grid].reverse())).toBeNull();
+  });
+
+  it("refuse une grille vide ou sans palier à 1", () => {
+    expect(validateTierGrid([])).toMatch(/au moins un palier/);
+    expect(validateTierGrid([{ min_qty: 2, unit_price: 10 }])).toMatch(/commencer à 1/);
+  });
+
+  it("refuse deux paliers à la même quantité", () => {
+    expect(validateTierGrid([...grid, { min_qty: 5, unit_price: 40 }])).toMatch(/Deux paliers commencent à 5/);
+  });
+
+  it("refuse un prix unitaire qui augmente avec la quantité", () => {
+    expect(validateTierGrid([{ min_qty: 1, unit_price: 40 }, { min_qty: 5, unit_price: 42 }])).toMatch(
+      /ne peut pas augmenter.*palier 5/,
+    );
+  });
+
+  it("refuse les valeurs négatives, non numériques ou les quantités non entières", () => {
+    expect(validateTierGrid([{ min_qty: 1, unit_price: -1 }])).toMatch(/Prix unitaire invalide/);
+    expect(validateTierGrid([{ min_qty: 1, unit_price: NaN }])).toMatch(/Prix unitaire invalide/);
+    expect(validateTierGrid([{ min_qty: 1, unit_price: 5 }, { min_qty: 2.5, unit_price: 4 }])).toMatch(/Quantité minimale/);
+    expect(validateTierGrid([{ min_qty: 0, unit_price: 5 }])).toMatch(/Quantité minimale/);
+  });
+});
+
+describe("validateFramePrice", () => {
+  it("accepte zéro et un prix positif, refuse le reste", () => {
+    expect(validateFramePrice(0)).toBeNull();
+    expect(validateFramePrice(50)).toBeNull();
+    expect(validateFramePrice(-5)).toMatch(/cadre invalide/);
+    expect(validateFramePrice(NaN)).toMatch(/cadre invalide/);
+  });
+});
+
+describe("validateShippingVideo", () => {
+  const ok = {
+    shipping_fee_aramex: 8,
+    shipping_fee_mondial_relay: 6,
+    free_shipping_threshold: 250,
+    included_video_minutes: 8,
+    surcharge_per_minute: 1.5,
+  };
+
+  it("accepte des valeurs positives ou nulles", () => {
+    expect(validateShippingVideo(ok, 1800)).toBeNull();
+    expect(validateShippingVideo({ ...ok, shipping_fee_aramex: 0, included_video_minutes: 0 }, 1800)).toBeNull();
+  });
+
+  it("refuse une valeur négative ou vide en nommant le champ", () => {
+    expect(validateShippingVideo({ ...ok, shipping_fee_mondial_relay: -1 }, 1800)).toMatch(/Mondial Relay invalide/);
+    expect(validateShippingVideo({ ...ok, surcharge_per_minute: NaN }, 1800)).toMatch(/Supplément par minute invalide/);
+  });
+
+  it("refuse plus de minutes incluses que la durée maximale d'une vidéo", () => {
+    expect(validateShippingVideo({ ...ok, included_video_minutes: 31 }, 1800)).toMatch(/30 min au maximum/);
+    expect(validateShippingVideo({ ...ok, included_video_minutes: 30 }, 1800)).toBeNull();
+  });
+});
+
+describe("codes promo", () => {
+  it("normalise le code comme la base : sans espaces, en majuscules", () => {
+    expect(normalizePromoCode("  ete-2027 ")).toBe("ETE-2027");
+  });
+
+  it("accepte un pourcentage de 0 à 100, refuse le reste", () => {
+    expect(validatePromoPercent(0)).toBeNull();
+    expect(validatePromoPercent(12.5)).toBeNull();
+    expect(validatePromoPercent(100)).toBeNull();
+    expect(validatePromoPercent(-1)).toMatch(/entre 0 et 100/);
+    expect(validatePromoPercent(101)).toMatch(/entre 0 et 100/);
+    expect(validatePromoPercent(NaN)).toMatch(/entre 0 et 100/);
+  });
+
+  it("refuse un code vide, trop court, trop long ou avec des caractères spéciaux", () => {
+    expect(validateNewPromoCode("ete_2027", 10, [])).toBeNull();
+    expect(validateNewPromoCode("", 10, [])).toMatch(/Code invalide/);
+    expect(validateNewPromoCode("AB", 10, [])).toMatch(/Code invalide/);
+    expect(validateNewPromoCode("A".repeat(33), 10, [])).toMatch(/Code invalide/);
+    expect(validateNewPromoCode("ÉTÉ", 10, [])).toMatch(/Code invalide/);
+    expect(validateNewPromoCode("NOEL 10", 10, [])).toMatch(/Code invalide/);
+  });
+
+  it("refuse un code déjà utilisé, même écrit autrement ou désactivé", () => {
+    expect(validateNewPromoCode(" vip20", 10, ["VIP20"])).toMatch(/VIP20 existe déjà/);
+  });
+
+  it("refuse un nouveau code avec un pourcentage hors limites", () => {
+    expect(validateNewPromoCode("NOEL", 150, [])).toMatch(/entre 0 et 100/);
+  });
+});
+
+describe("validateArticle", () => {
+  const article = {
+    id: "p1",
+    slug: "memora-photo",
+    format: "10x15",
+    sort_order: 0,
+    included_video_min: 8,
+    name: { fr: "MÉMORA, la photo" },
+    tagline: { fr: "Une photo qui ouvre votre vidéo." },
+    description: { fr: "Un tirage d'art." },
+    materials: { fr: ["Photo 10 × 15"] },
+  };
+  const others = [{ id: "p1", slug: "memora-photo" }, { id: "p2", slug: "memora-cadre" }];
+  const formats = ["10x15", "a5"];
+  const check = (patch: Partial<typeof article>) => validateArticle({ ...article, ...patch }, others, formats);
+
+  it("accepte un article valide, y compris son propre slug", () => {
+    expect(check({})).toBeNull();
+  });
+
+  it("refuse un slug hors format", () => {
+    for (const slug of ["", "Memora", "memora photo", "memora--photo", "-memora", "memora-", "mémora"])
+      expect(check({ slug })).toMatch(/Slug invalide/);
+  });
+
+  it("refuse un slug déjà pris par un autre article", () => {
+    expect(check({ slug: "memora-cadre" })).toBe("Le slug memora-cadre est déjà utilisé.");
+  });
+
+  it("refuse un format qui n'existe pas", () => {
+    expect(check({ format: "a3" })).toBe("Format inconnu : a3.");
+  });
+
+  it("à la création (id vide) : refuse un slug déjà pris, même par l'article p1, et un format manquant", () => {
+    expect(check({ id: "", slug: "memora-photo" })).toBe("Le slug memora-photo est déjà utilisé.");
+    expect(check({ id: "", slug: "memora-coffret", format: "" })).toBe("Choisis le format de l'article.");
+    expect(check({ id: "", slug: "memora-coffret" })).toBeNull();
+  });
+
+  it("exige le texte français", () => {
+    expect(check({ name: { fr: "  " } })).toMatch(/nom en français/);
+    expect(check({ tagline: { fr: "" } })).toMatch(/accroche/);
+    expect(check({ description: { fr: "" } })).toMatch(/description/);
+    expect(check({ materials: { fr: [] } })).toMatch(/contenu/);
+  });
+
+  it("exige des minutes de vidéo entières positives ou nulles", () => {
+    expect(check({ included_video_min: 0 })).toBeNull();
+    expect(check({ included_video_min: -1 })).toMatch(/Minutes/);
+    expect(check({ included_video_min: 1.5 })).toMatch(/Minutes/);
+    expect(check({ included_video_min: NaN })).toMatch(/Minutes/);
+  });
+
+  it("exige un ordre d'affichage entier", () => {
+    expect(check({ sort_order: -3 })).toBeNull();
+    expect(check({ sort_order: 1.5 })).toMatch(/Ordre/);
+    expect(check({ sort_order: NaN })).toMatch(/Ordre/);
+  });
+});
+
+describe("compactCopy", () => {
+  it("retire les langues facultatives vides pour que la boutique affiche le français", () => {
+    expect(compactCopy({ fr: " Bonjour ", en: "  ", ar: "" })).toEqual({ fr: "Bonjour" });
+    expect(compactCopy({ fr: "Bonjour", en: "Hello" })).toEqual({ fr: "Bonjour", en: "Hello" });
+  });
+
+  it("nettoie les listes et retire les lignes vides", () => {
+    expect(compactCopy({ fr: [" Photo ", "", "Carte"], en: ["", " "] })).toEqual({ fr: ["Photo", "Carte"] });
+  });
+});
+
+describe("cleanArticle", () => {
+  it("retire les espaces et met un badge vide à aucun", () => {
+    const a = cleanArticle({
+      slug: " memora-photo ",
+      badge: "  ",
+      dimensions: " 10 × 15 cm ",
+      name: { fr: "Nom", en: "" },
+      tagline: { fr: "Accroche" },
+      description: { fr: "Texte", ar: " نص " },
+      materials: { fr: ["Photo", " "] },
+    });
+    expect(a).toEqual({
+      slug: "memora-photo",
+      badge: null,
+      dimensions: "10 × 15 cm",
+      name: { fr: "Nom" },
+      tagline: { fr: "Accroche" },
+      description: { fr: "Texte", ar: "نص" },
+      materials: { fr: ["Photo"] },
+    });
+  });
+});
+
+describe("validateImageFile", () => {
+  it("accepte JPEG, PNG et WebP jusqu'à 5 Mo", () => {
+    expect(validateImageFile({ type: "image/jpeg", size: 1000 })).toBeNull();
+    expect(validateImageFile({ type: "image/png", size: MAX_IMAGE_BYTES })).toBeNull();
+    expect(validateImageFile({ type: "image/webp", size: 1 })).toBeNull();
+  });
+  it("refuse les autres formats et les fichiers trop lourds", () => {
+    expect(validateImageFile({ type: "image/gif", size: 1000 })).toMatch(/Format/);
+    expect(validateImageFile({ type: "", size: 1000 })).toMatch(/Format/);
+    expect(validateImageFile({ type: "image/jpeg", size: MAX_IMAGE_BYTES + 1 })).toMatch(/5 Mo/);
+  });
+});
+
+describe("moveItem", () => {
+  it("déplace un élément vers le haut ou le bas sans toucher la liste d'origine", () => {
+    const list = ["a", "b", "c"];
+    expect(moveItem(list, 2, -2)).toEqual(["c", "b", "a"]);
+    expect(moveItem(list, 2, -1)).toEqual(["a", "c", "b"]);
+    expect(moveItem(list, 0, 1)).toEqual(["b", "a", "c"]);
+    expect(list).toEqual(["a", "b", "c"]);
+  });
+  it("ne fait rien hors de la liste", () => {
+    const list = ["a", "b"];
+    expect(moveItem(list, 0, -1)).toBe(list);
+    expect(moveItem(list, 1, 1)).toBe(list);
+    expect(moveItem(list, 5, -1)).toBe(list);
   });
 });

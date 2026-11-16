@@ -3,6 +3,7 @@ import { whatsappLink } from "@/lib/contact";
 import { FaqList } from "@/components/site/FaqList";
 import { PageHero, buttonStyles } from "@/components/site/kit";
 import { dictFromMatches, useT } from "@/i18n";
+import { usePricing } from "@/hooks/use-pricing";
 
 export const Route = createFileRoute("/faq")({
   head: ({ matches }) => {
@@ -16,11 +17,12 @@ export const Route = createFileRoute("/faq")({
 
 function Faq() {
   const t = useT();
+  const pricing = usePricing();
   return (
     <>
       <PageHero title={t.faq.title} intro={t.faq.lead} />
       <div className="container-x max-w-4xl space-y-14 pb-20">
-        {t.faq.groups.map((group, i) => (
+        {t.faq.groups(pricing).map((group, i) => (
           <section key={group.title} aria-labelledby={`faq-groupe-${i}`}>
             <h2
               id={`faq-groupe-${i}`}

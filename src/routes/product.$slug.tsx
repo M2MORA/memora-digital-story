@@ -1,27 +1,62 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState } from "react";
 import { Check } from "lucide-react";
-import { getProduct } from "@/lib/products";
+import { getProduct, resolveProduct } from "@/lib/products";
+import { supabase } from "@/lib/supabase";
 import { PriceTiers } from "@/components/site/PriceTiers";
 import { buttonStyles } from "@/components/site/kit";
-import { dictFromMatches, useT } from "@/i18n";
+import { langFromMatches, useLang, useT } from "@/i18n";
 import { Img } from "@/components/site/Img";
-import { IMAGES } from "@/lib/images.gen";
+import { IMAGES, type OptimizedImage } from "@/lib/images.gen";
+import { getUnitPrice } from "@/lib/pricing";
+import { usePricing } from "@/hooks/use-pricing";
 
-const GALLERY = [IMAGES.envelope, IMAGES.moments, IMAGES.hero];
+// Article sans photo en base (l'article d'origine) : galerie livrée avec le site, à l'identique.
+const BUNDLED_GALLERY = [IMAGES.envelope, IMAGES.moments, IMAGES.hero];
+
+/** Photo de la galerie : optimisée si livrée avec le site, simple URL si envoyée depuis l'admin. */
+function GalleryImage({
+  image,
+  alt,
+  sizes,
+  className,
+  priority = false,
+}: {
+  image: OptimizedImage | string;
+  alt: string;
+  sizes: string;
+  className: string;
+  priority?: boolean;
+}) {
+  if (typeof image !== "string")
+    return <Img image={image} alt={alt} sizes={sizes} priority={priority} className={className} />;
+  return (
+    <img
+      src={image}
+      alt={alt}
+      width={1200}
+      height={1200}
+      decoding="async"
+      {...(priority ? { fetchPriority: "high" as const } : { loading: "lazy" as const })}
+      className={className}
+    />
+  );
+}
 
 export const Route = createFileRoute("/product/$slug")({
-  loader: ({ params }) => {
-    const product = getProduct(params.slug);
+  // Article inconnu ou désactivé : page introuvable. Base illisible : page d'erreur.
+  loader: async ({ params }) => {
+    const product = await getProduct(supabase, params.slug);
     if (!product) throw notFound();
     return { product };
   },
-  head: ({ matches }) => {
-    const t = dictFromMatches(matches);
+  head: ({ matches, loaderData }) => {
+    if (!loaderData) return {};
+    const product = resolveProduct(loaderData.product, langFromMatches(matches));
     return {
       meta: [
-        { title: `${t.product.name} — MÉMORA` },
-        { name: "description", content: t.product.short },
+        { title: `${product.name} — MÉMORA` },
+        { name: "description", content: product.tagline },
       ],
     };
   },
@@ -31,15 +66,20 @@ export const Route = createFileRoute("/product/$slug")({
 function ProductPage() {
   const t = useT();
   const p = t.productPage;
-  const { product } = Route.useLoaderData();
+  const product = resolveProduct(Route.useLoaderData().product, useLang());
+  const pricing = usePricing();
   const [img, setImg] = useState(0);
+  const uploaded = product.images.length > 0;
+  const gallery: (OptimizedImage | string)[] = uploaded ? product.images : BUNDLED_GALLERY;
+  const label = (i: number) => (uploaded ? `${product.name} ${i + 1}` : (p.imageLabels[i] ?? product.name));
+  const shown = img < gallery.length ? img : 0;
 
   const specs: [string, string][] = [
     [p.specs.format, product.dimensions],
-    [p.specs.included, t.product.materials.join(", ")],
-    [p.specs.video, p.videoSpec],
+    [p.specs.included, product.materials.join(", ")],
+    [p.specs.video, p.videoSpec(pricing)],
     [p.specs.phones, p.phonesSpec],
-    [p.specs.delivery, p.deliverySpec],
+    [p.specs.delivery, p.deliverySpec(pricing)],
     [p.specs.payment, p.paymentSpec],
   ];
 
@@ -47,28 +87,28 @@ function ProductPage() {
     <section className="container-x grid gap-10 pb-20 pt-8 md:grid-cols-[1.15fr_1fr] md:gap-14 md:pt-14">
       <div>
         <div className="overflow-hidden rounded-[4px] bg-m-stage shadow-paper">
-          <Img
-            key={img}
-            image={GALLERY[img] ?? IMAGES.envelope}
-            alt={t.product.imageLabels[img] ?? t.product.name}
+          <GalleryImage
+            key={shown}
+            image={gallery[shown]!}
+            alt={label(shown)}
             sizes="(min-width: 768px) 55vw, 100vw"
             priority
             className="aspect-square w-full object-cover"
           />
         </div>
         <div className="mt-4 flex gap-3" role="group" aria-label={p.chooseImage}>
-          {GALLERY.map((image, i) => (
+          {gallery.map((image, i) => (
             <button
-              key={image.src}
+              key={typeof image === "string" ? image : image.src}
               type="button"
               onClick={() => setImg(i)}
-              aria-label={p.imageN(i + 1, t.product.imageLabels[i] ?? t.product.name)}
-              aria-pressed={i === img}
+              aria-label={p.imageN(i + 1, label(i))}
+              aria-pressed={i === shown}
               className={`h-20 w-20 overflow-hidden rounded-[4px] border-2 transition-colors ${
-                i === img ? "border-m-wine" : "border-transparent opacity-75 hover:opacity-100"
+                i === shown ? "border-m-wine" : "border-transparent opacity-75 hover:opacity-100"
               }`}
             >
-              <Img image={image} alt="" sizes="80px" className="h-full w-full object-cover" />
+              <GalleryImage image={image} alt="" sizes="80px" className="h-full w-full object-cover" />
             </button>
           ))}
         </div>
@@ -76,16 +116,16 @@ function ProductPage() {
 
       <div className="md:sticky md:top-24 md:self-start">
         <h1 className="font-serif text-[40px] leading-[1.05] text-m-ink sm:text-[52px]">
-          {t.product.name}
+          {product.name}
         </h1>
         <p className="mt-3 font-serif text-[32px] font-semibold text-m-wine">
-          {t.money(product.priceTND)}
+          {t.money(getUnitPrice(pricing, product.formatCode, 1))}
         </p>
-        <p className="mt-3 text-[17px] text-m-muted">{t.product.short}</p>
+        <p className="mt-3 text-[17px] text-m-muted">{product.tagline}</p>
 
         <Link
           to="/commander"
-          search={{ format: product.formatCode, stage: "video" }}
+          search={{ product: product.slug, stage: "video" }}
           className={buttonStyles({ className: "mt-8 w-full sm:w-auto" })}
         >
           {t.common.create}

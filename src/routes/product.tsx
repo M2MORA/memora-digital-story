@@ -1,12 +1,15 @@
-import { createFileRoute, Outlet, redirect } from "@tanstack/react-router";
-import { PRODUCTS } from "@/lib/products";
+import { createFileRoute, notFound, Outlet, redirect } from "@tanstack/react-router";
+import { fetchProducts } from "@/lib/products";
+import { supabase } from "@/lib/supabase";
 
 export const Route = createFileRoute("/product")({
   // Parent de /product/$slug : beforeLoad tourne aussi pour la fiche produit.
   // On ne redirige que /product nu, sinon la fiche produit devient inaccessible.
-  beforeLoad: ({ location }) => {
+  beforeLoad: async ({ location }) => {
     if (location.pathname.replace(/\/+$/, "") === "/product") {
-      throw redirect({ to: "/product/$slug", params: { slug: PRODUCTS[0]!.slug } });
+      const [first] = await fetchProducts(supabase);
+      if (!first) throw notFound();
+      throw redirect({ to: "/product/$slug", params: { slug: first.slug } });
     }
   },
   component: Outlet,

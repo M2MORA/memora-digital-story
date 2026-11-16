@@ -1,18 +1,15 @@
 import { orderEn } from "./order.en";
-import {
-  FREE_SHIPPING_THRESHOLD_TND as FREE,
-  INCLUDED_VIDEO_SECONDS,
-  MAX_VIDEO_SECONDS,
-  SURCHARGE_TND_PER_MIN,
-  TIERS_10X15,
-} from "@/lib/pricing";
+import { getTiers, type Pricing } from "@/lib/pricing";
 import type { Dict } from "./fr";
 
-const INCL = INCLUDED_VIDEO_SECONDS / 60;
-const MAX = MAX_VIDEO_SECONDS / 60;
-const BASE = TIERS_10X15[0]!.unitPriceTND;
-const TIER2 = TIERS_10X15[1]!.minQty;
 const money = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(2)} TND`;
+// Chiffres de la grille tarifaire (base de données) cités dans les textes
+const INCL = (p: Pricing) => p.settings.included_video_seconds / 60;
+const MAX = (p: Pricing) => p.settings.max_video_seconds / 60;
+const FREE = (p: Pricing) => money(p.settings.free_shipping_threshold);
+const PER_MIN = (p: Pricing) => money(p.settings.surcharge_per_minute);
+const BASE = (p: Pricing) => money(getTiers(p, "10x15")[0]!.unit_price);
+const TIER2 = (p: Pricing) => getTiers(p, "10x15")[1]?.min_qty;
 
 export const en: Dict = {
   money,
@@ -67,21 +64,6 @@ export const en: Dict = {
     text: "Please try again in a moment.",
     retry: "Try again",
   },
-  product: {
-    name: "MÉMORA, the photo",
-    short: "A 10 × 15 photo that opens your video.",
-    materials: [
-      "10 × 15 photo on 300 g paper",
-      "Hidden chip inside",
-      "Textured envelope",
-      "Card with your note",
-    ],
-    imageLabels: [
-      "The photo in its envelope, with its card",
-      "Three MÉMORA photos on a table",
-      "A MÉMORA photo next to a phone",
-    ],
-  },
   tiers: {
     caption: "Price per photo by quantity",
     qty: "Quantity",
@@ -132,14 +114,14 @@ export const en: Dict = {
     businessLead: "From 50 copies. Free sample.",
     businessCta: "Request a sample",
     finalTitle: "A photo to keep. A voice to hear again.",
-    finalLead: `Free delivery from ${money(FREE)}.`,
+    finalLead: (p: Pricing) => `Free delivery from ${FREE(p)}.`,
   },
   how: {
     title: "How it works",
     lead: "No app, no account, no QR code.",
     orderTitle: "You order",
-    orderSteps: [
-      ["Your video", `${INCL} minutes included.`],
+    orderSteps: (p: Pricing): [string, string][] => [
+      ["Your video", `${INCL(p)} minutes included.`],
       ["Your photo", "Crop it, check the preview."],
       ["Your cart", "Add a note for the card."],
       ["Delivery", "Made in 48 h. Pay the courier."],
@@ -162,6 +144,11 @@ export const en: Dict = {
     otherQuestions: "More questions",
   },
   productPage: {
+    imageLabels: [
+      "The photo in its envelope, with its card",
+      "Three MÉMORA photos on a table",
+      "A MÉMORA photo next to a phone",
+    ],
     reassure: ["Paid on delivery", "Replaced if faulty"],
     specs: {
       format: "Size",
@@ -171,9 +158,10 @@ export const en: Dict = {
       delivery: "Delivery",
       payment: "Payment",
     },
-    videoSpec: `${INCL} min included, then ${money(SURCHARGE_TND_PER_MIN)} per minute, up to ${MAX} min`,
+    videoSpec: (p: Pricing) =>
+      `${INCL(p)} min included, then ${PER_MIN(p)} per minute, up to ${MAX(p)} min`,
     phonesSpec: "iPhone XS and later, Android with NFC",
-    deliverySpec: `3 to 5 working days. Free from ${money(FREE)}.`,
+    deliverySpec: (p: Pricing) => `3 to 5 working days. Free from ${FREE(p)}.`,
     paymentSpec: "Cash, on delivery",
     tiersNote: "Same photo or different photos.",
     chooseImage: "Choose an image",
@@ -185,7 +173,7 @@ export const en: Dict = {
     notFoundTitle: "Didn't find it?",
     notFoundLead: "We answer on WhatsApp, Monday to Friday.",
     otherContact: "Other contacts",
-    groups: [
+    groups: (p: Pricing) => [
       {
         title: "How it works",
         items: [
@@ -217,7 +205,7 @@ export const en: Dict = {
           {
             id: "length",
             q: "How long?",
-            a: `${INCL} minutes included. Then ${money(SURCHARGE_TND_PER_MIN)} per minute, up to ${MAX} minutes.`,
+            a: `${INCL(p)} minutes included. Then ${PER_MIN(p)} per minute, up to ${MAX(p)} minutes.`,
           },
           { id: "files", q: "Which files?", a: "MP4, MOV (iPhone) and WebM." },
           {
@@ -233,12 +221,12 @@ export const en: Dict = {
           {
             id: "price",
             q: "How much is it?",
-            a: `${money(BASE)} per photo, envelope and card included. Cheaper from ${TIER2} copies.`,
+            a: `${BASE(p)} per photo, envelope and card included.${TIER2(p) ? ` Cheaper from ${TIER2(p)} copies.` : ""}`,
           },
           {
             id: "delivery",
             q: "How long does delivery take?",
-            a: `Made in 48 h, delivered in 3 to 5 working days. Free from ${money(FREE)}.`,
+            a: `Made in 48 h, delivered in 3 to 5 working days. Free from ${FREE(p)}.`,
           },
           { id: "pay", q: "How do I pay?", a: "Cash, to the courier." },
         ],
@@ -330,7 +318,7 @@ export const en: Dict = {
     shipping: "Delivery",
     free: "Free",
     toPay: "To pay on delivery",
-    freeFrom: `Free delivery from ${money(FREE)}.`,
+    freeFrom: (p: Pricing) => `Free delivery from ${FREE(p)}.`,
     checkout: "Choose delivery",
   },
   memory: {
@@ -384,10 +372,10 @@ export const en: Dict = {
     },
     shipping: {
       title: "Delivery",
-      sections: [
+      sections: (p: Pricing): [string, string][] => [
         ["Timing", "Made in 48 working hours, then delivered in 3 to 5 working days."],
         ["Shipping", "Anywhere in Tunisia, with a tracking link."],
-        ["Cost", `Free delivery from ${money(FREE)}.`],
+        ["Cost", `Free delivery from ${FREE(p)}.`],
         ["Packaging", "Reinforced card sleeve and tissue paper."],
       ],
     },

@@ -440,3 +440,29 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
   .kpi.skeleton { animation: none; }
   .chart-bar { transition: none; }
 }
+
+/* Catalogue : grille de paliers */
+.catalogue { max-width: 640px; }
+.tier-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tier-table th { text-align: left; font-size: 13px; font-weight: 500; color: var(--ink-2); padding: 0 8px 6px 0; }
+.tier-table td { padding: 0 8px 8px 0; }
+.tier-table td:last-child, .tier-table th:last-child { width: 44px; padding-right: 0; }
+
+/* Catalogue : formulaire d'article */
+.catalogue fieldset { margin: 0; padding: 12px; border: 1px solid var(--line); border-radius: var(--r-sm); min-width: 0; }
+.catalogue fieldset.copy { display: flex; flex-direction: column; gap: 12px; }
+.catalogue legend { padding: 0 4px; font-size: 13px; font-weight: 600; }
+.catalogue .check { display: flex; align-items: center; gap: 8px; min-height: 36px; font-size: 14px; }
+.catalogue .check input { width: 18px; min-height: 18px; height: 18px; padding: 0; }
+.catalogue .field textarea {
+  font: inherit; font-size: 16px; padding: 10px 12px; resize: vertical; width: 100%;
+  border: 1px solid var(--line-strong); border-radius: var(--r-sm); background: var(--surface); color: var(--ink);
+}
+.catalogue .field textarea:focus { outline: none; border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-tint); }
+
+/* Catalogue : photos d'un article */
+.catalogue fieldset.photos { display: flex; flex-direction: column; gap: 8px; }
+.photo-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.photo-list li { display: flex; align-items: center; gap: 8px; font-size: 14px; }
+.photo-list li span { flex: 1; }
+.photo-list img { width: 64px; height: 64px; object-fit: cover; border-radius: var(--r-sm); background: var(--line); }

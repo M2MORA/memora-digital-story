@@ -19,6 +19,7 @@ import { storeWhatsAppMedia } from "../server/whatsapp/media";
 import type { BallechStore, Conversation, OrderRow, StoredMessage } from "../server/whatsapp/store";
 import { normalizeTunisianPhone } from "../lib/customer";
 import { orderRecap, validateOrderRequest } from "../server/whatsapp/tools";
+import { TODAY_PRICING } from "./pricing-fixture";
 import {
   handleWhatsAppWebhook,
   verifyMetaSignature,
@@ -114,6 +115,9 @@ function fakeStore() {
           m.direction === "in" &&
           !m.order_id,
       );
+    },
+    async getPricing() {
+      return TODAY_PRICING;
     },
   };
   return { store, conversations, messages, orders };
@@ -361,7 +365,7 @@ describe("webhook WhatsApp : sécurité et dédoublonnage", () => {
 
 describe("create_order_request", () => {
   it("prend le numéro WhatsApp par défaut et calcule le prix côté serveur", () => {
-    const result = validateOrderRequest(ORDER_ARGS, WA_PHONE);
+    const result = validateOrderRequest(ORDER_ARGS, WA_PHONE, TODAY_PRICING);
     expect(result.ok).toBe(true);
     if (!result.ok) return;
     expect(result.order.customer_phone).toBe("+216 98765432");
@@ -370,21 +374,30 @@ describe("create_order_request", () => {
   });
 
   it("accepte un autre numéro seulement s'il a 8 chiffres", () => {
-    const other = validateOrderRequest({ ...ORDER_ARGS, phone: "22 111 333" }, WA_PHONE);
+    const other = validateOrderRequest(
+      { ...ORDER_ARGS, phone: "22 111 333" },
+      WA_PHONE,
+      TODAY_PRICING,
+    );
     expect(other.ok && other.order.customer_phone).toBe("+216 22111333");
-    expect(validateOrderRequest({ ...ORDER_ARGS, phone: "12345" }, WA_PHONE).ok).toBe(false);
+    expect(
+      validateOrderRequest({ ...ORDER_ARGS, phone: "12345" }, WA_PHONE, TODAY_PRICING).ok,
+    ).toBe(false);
     expect(normalizeTunisianPhone("+216 98 765 432")).toBe("+216 98765432");
   });
 
   it("refuse un gouvernorat inconnu ou une commande non confirmée", () => {
-    expect(validateOrderRequest({ ...ORDER_ARGS, governorate: "Paris" }, WA_PHONE).ok).toBe(false);
-    expect(validateOrderRequest({ ...ORDER_ARGS, confirmed_by_customer: false }, WA_PHONE).ok).toBe(
-      false,
-    );
+    expect(
+      validateOrderRequest({ ...ORDER_ARGS, governorate: "Paris" }, WA_PHONE, TODAY_PRICING).ok,
+    ).toBe(false);
+    expect(
+      validateOrderRequest({ ...ORDER_ARGS, confirmed_by_customer: false }, WA_PHONE, TODAY_PRICING)
+        .ok,
+    ).toBe(false);
   });
 
   it("rédige le récapitulatif dans la langue du client", () => {
-    const base = validateOrderRequest(ORDER_ARGS, WA_PHONE);
+    const base = validateOrderRequest(ORDER_ARGS, WA_PHONE, TODAY_PRICING);
     if (!base.ok) throw new Error("commande invalide");
     expect(orderRecap(base.order, "WA-1", true)).toMatch(/tsajlet/);
     expect(orderRecap({ ...base.order, language: "en" }, "WA-1", true)).toMatch(

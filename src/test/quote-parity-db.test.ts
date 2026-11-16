@@ -3,21 +3,28 @@
  * Skipped unless LOCAL_DB_TEST is set. Usage:
  *   npx supabase start && LOCAL_DB_TEST=1 npx vitest run src/test/quote-parity-db.test.ts
  * Each cart is sent in the shape the checkout sends (src/routes/commander.tsx,
- * normalizedItems) to calculate_order_quote, and compared with calculateQuote.
+ * normalizedItems) to calculate_order_quote, and compared with calculateQuote fed
+ * with get_pricing() and the percent check_promo_code() gives for the cart's code. The raw SQL answers are also compared with
+ * quote-parity-snapshot.json, recorded from the SQL Quote before prices moved to the
+ * database (20261116120000): same bytes, lines included. To record it again on purpose:
+ *   WRITE_QUOTE_SNAPSHOT=1 LOCAL_DB_TEST=1 npx vitest run src/test/quote-parity-db.test.ts
  */
+import { readFileSync, writeFileSync } from "node:fs";
 import { createClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
 import {
   calculateQuote,
-  FRAME_PRICES,
+  checkPromoCode,
+  fetchPricing,
+  getFramePrice,
+  getTiers,
   getUnitPrice,
-  PROMO_CODES,
   SHIPPING_MODES,
-  TIERS,
   type Format,
   type QuoteLine,
   type ShippingMode,
 } from "@/lib/pricing";
+import { TODAY_PRICING } from "./pricing-fixture";
 
 const LOCAL_URL = "http://127.0.0.1:54321";
 // Default service key of every local Supabase stack (public demo value, not a secret).
@@ -28,7 +35,8 @@ const service = createClient(LOCAL_URL, SERVICE_KEY, {
   auth: { persistSession: false, autoRefreshToken: false },
 });
 
-const FORMATS = Object.keys(TIERS) as Format[];
+const SNAPSHOT = "src/test/quote-parity-snapshot.json"; // vitest runs from the repo root
+const FORMATS = TODAY_PRICING.formats.map((f) => f.code);
 
 // Same mapping as the checkout's normalizedItems (cardMessage/personalization do not affect price).
 const toPayloadItems = (lines: QuoteLine[]) =>
@@ -52,7 +60,9 @@ function buildMatrix(): Case[] {
   const cases: Case[] = [];
   // Every format x every tier boundary (and one below it) x frame on/off, both carriers.
   for (const format of FORMATS) {
-    const qtys = new Set(TIERS[format].flatMap((t) => [t.minQty, Math.max(1, t.minQty - 1)]));
+    const qtys = new Set(
+      getTiers(TODAY_PRICING, format).flatMap((t) => [t.min_qty, Math.max(1, t.min_qty - 1)]),
+    );
     for (const quantity of qtys) {
       for (const withFrame of [false, true]) {
         for (const shipping of SHIPPING_MODES) {
@@ -74,7 +84,8 @@ function buildMatrix(): Case[] {
     });
   }
   // Each promo code (plus messy casing, unknown and empty), below and above free shipping.
-  const promos = [...Object.keys(PROMO_CODES), " vip20 ", "bienvenue", "NOPE", ""];
+  // The codes seeded by 20261118120000 (hardcoded until then).
+  const promos = ["MEMORA10", "BIENVENUE", "VIP20", " vip20 ", "bienvenue", "NOPE", ""];
   for (const promo of promos) {
     for (const quantity of [1, 3]) {
       for (const shipping of SHIPPING_MODES) {
@@ -143,23 +154,69 @@ function buildMatrix(): Case[] {
   return cases;
 }
 
+const quoteArgs = (c: Case) => ({
+  p_items: toPayloadItems(c.lines),
+  p_promo_code: c.promo ?? null,
+  p_shipping_carrier: c.shipping,
+});
+
 async function sqlQuote(c: Case) {
-  const { data, error } = await service.rpc("calculate_order_quote", {
-    p_items: toPayloadItems(c.lines),
-    p_promo_code: c.promo ?? null,
-    p_shipping_carrier: c.shipping,
-  });
+  const { data, error } = await service.rpc("calculate_order_quote", quoteArgs(c));
   if (error) throw new Error(`${c.name}: ${error.message}`);
   return data as Record<string, number | unknown[]>;
+}
+
+/** The SQL answer exactly as the database writes it (numeric scale included, e.g. 49.00). */
+async function sqlQuoteText(c: Case): Promise<string> {
+  const res = await fetch(`${LOCAL_URL}/rest/v1/rpc/calculate_order_quote`, {
+    method: "POST",
+    headers: {
+      apikey: SERVICE_KEY,
+      Authorization: `Bearer ${SERVICE_KEY}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(quoteArgs(c)),
+  });
+  const text = await res.text();
+  if (!res.ok) throw new Error(`${c.name}: ${text}`);
+  return text;
+}
+
+async function setTierPrice(format: Format, minQty: number, unitPrice: number) {
+  const { error } = await service
+    .from("price_tiers")
+    .update({ unit_price: unitPrice })
+    .eq("format", format)
+    .eq("min_qty", minQty);
+  if (error) throw error;
 }
 
 describe.skipIf(!process.env["LOCAL_DB_TEST"])("Quote parity TS vs SQL (local Supabase)", () => {
   const matrix = buildMatrix();
 
+  it("get_pricing() returns exactly the grid hardcoded before the migration", async () => {
+    expect(await fetchPricing(service)).toEqual(TODAY_PRICING);
+  });
+
+  it(`answers byte for byte as before the migration for ${matrix.length} carts`, async () => {
+    const actual: Record<string, string> = {};
+    for (const c of matrix) actual[c.name] = await sqlQuoteText(c);
+    expect(Object.keys(actual)).toHaveLength(matrix.length);
+    if (process.env["WRITE_QUOTE_SNAPSHOT"])
+      writeFileSync(
+        SNAPSHOT,
+        `${JSON.stringify(actual, null, 2)}
+`,
+      );
+    expect(actual).toEqual(JSON.parse(readFileSync(SNAPSHOT, "utf8")));
+  });
+
   it(`agrees on subtotal, discount, shipping fee and total for ${matrix.length} carts`, async () => {
+    const pricing = await fetchPricing(service);
     const mismatches: string[] = [];
     for (const c of matrix) {
-      const ts = calculateQuote(c.lines, c.promo, c.shipping);
+      const percent = await checkPromoCode(service, c.promo ?? "");
+      const ts = calculateQuote(c.lines, pricing, percent, c.shipping);
       const sql = await sqlQuote(c);
       const pairs: [string, number, unknown][] = [
         ["itemsSubtotal", ts.itemsSubtotal, sql["items_subtotal"]],
@@ -238,7 +295,8 @@ describe.skipIf(!process.env["LOCAL_DB_TEST"])("Quote parity TS vs SQL (local Su
     });
     if (error) throw error;
 
-    const ts = calculateQuote(lines, "MEMORA10", "aramex");
+    const pricing = await fetchPricing(service);
+    const ts = calculateQuote(lines, pricing, await checkPromoCode(service, "MEMORA10"), "aramex");
     const { data: order, error: orderError } = await service
       .from("orders")
       .select("subtotal, shipping_fee, total, items")
@@ -259,9 +317,30 @@ describe.skipIf(!process.env["LOCAL_DB_TEST"])("Quote parity TS vs SQL (local Su
     expect(stored).toEqual(
       lines.map((l) => ({
         format: l.format,
-        unit: getUnitPrice(l.format, ts.totalQuantity),
-        frame: l.withFrame ? FRAME_PRICES[l.format] : 0,
+        unit: getUnitPrice(pricing, l.format, ts.totalQuantity),
+        frame: l.withFrame ? getFramePrice(pricing, l.format) : 0,
       })),
     );
+  });
+
+  it("a tier price changed in the table shows in the SQL Quote and in the TS Quote fed with get_pricing()", async () => {
+    const cart: Case = {
+      name: "10x15 x5",
+      lines: [{ format: "10x15", quantity: 5 }],
+      shipping: "aramex",
+    };
+    await setTierPrice("10x15", 5, 45);
+    try {
+      const changed = await fetchPricing(service);
+      expect(getUnitPrice(changed, "10x15", 5)).toBe(45);
+      const ts = calculateQuote(cart.lines, changed, 0, cart.shipping);
+      const sql = await sqlQuote(cart);
+      expect(ts.itemsSubtotal).toBe(225);
+      expect(Number(sql["items_subtotal"])).toBe(225);
+      expect(Number(sql["total"])).toBe(ts.total);
+    } finally {
+      await setTierPrice("10x15", 5, 42);
+    }
+    expect(Number((await sqlQuote(cart))["items_subtotal"])).toBe(210);
   });
 });

@@ -2,7 +2,7 @@ import { useSyncExternalStore } from "react";
 import {
   Format,
   calculateQuote,
-  getPromoDiscountPercent,
+  Pricing,
   QuoteResult,
   ShippingMode,
 } from "./pricing";
@@ -59,6 +59,8 @@ type State = {
   items: CartItem[];
   wishlist: string[];
   promoCode?: string;
+  /** Percent from check_promo_code when the code was applied (display only; the SQL Quote charges). */
+  promoPercent?: number;
   giftCardCode?: string;
   draftId: string;
   draftToken: string;
@@ -92,6 +94,12 @@ function load() {
         draftId: creds.draftId,
         draftToken: creds.draftToken,
       };
+      // Code saved before check_promo_code existed: its percent is unknown, so it is dropped
+      // rather than charged without being shown.
+      if (typeof state.promoPercent !== "number") {
+        const { promoCode: _dropped, ...rest } = state;
+        state = rest;
+      }
     } else {
       state = {
         ...state,
@@ -139,12 +147,12 @@ export function useStore() {
 export const cart = {
   add(productId: string, itemData?: Partial<CartItem>) {
     load();
-    const format: Format = "10x15";
+    const format: Format = itemData?.format ?? "10x15";
 
     const key = itemData?.key ?? `item_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const newItem: CartItem = {
       key,
-      productId: "p1",
+      productId,
       format,
       qty: itemData?.qty ?? 1,
       withFrame: itemData?.withFrame ?? (productId.includes("encadre") || productId.includes("galerie")),
@@ -235,15 +243,25 @@ export const cart = {
     });
   },
 
-  applyPromoCode(code: string): { success: boolean; message: string } {
+  /**
+   * Checks a code with `check` (check_promo_code) and keeps it with its percent when it gives a discount.
+   * "error": the check failed, the cart is unchanged and the customer must be told.
+   */
+  async applyPromoCode(
+    code: string,
+    check: (code: string) => Promise<number>,
+  ): Promise<{ ok: true; percent: number } | { ok: false; reason: "invalid" | "error" }> {
     load();
     const cleanCode = code.trim().toUpperCase();
-    const percent = getPromoDiscountPercent(cleanCode);
-    if (percent > 0) {
-      set({ ...state, promoCode: cleanCode });
-      return { success: true, message: `Code appliqué : -${percent}% de réduction` };
+    let percent: number;
+    try {
+      percent = await check(cleanCode);
+    } catch {
+      return { ok: false, reason: "error" };
     }
-    return { success: false, message: "Code promo invalide ou expiré" };
+    if (!(percent > 0)) return { ok: false, reason: "invalid" };
+    set({ ...state, promoCode: cleanCode, promoPercent: percent });
+    return { ok: true, percent };
   },
 
   applyGiftCard(code: string): { success: boolean; message: string } {
@@ -264,7 +282,7 @@ export const cart = {
     set({ ...state, wishlist: w });
   },
 
-  getQuote(shipping?: ShippingMode): QuoteResult {
+  getQuote(pricing: Pricing, shipping?: ShippingMode): QuoteResult {
     load();
     const lines = state.items.map((i) => ({
       format: i.format,
@@ -272,7 +290,7 @@ export const cart = {
       withFrame: i.withFrame,
       videoDurationSec: i.videoDurationSec,
     }));
-    return calculateQuote(lines, state.promoCode, shipping);
+    return calculateQuote(lines, pricing, state.promoPercent ?? 0, shipping);
   },
 
   clear() {

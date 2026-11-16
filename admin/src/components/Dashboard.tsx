@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { BarChart3, Menu, MessageCircle, Nfc, Package, PanelLeftClose, PanelLeftOpen, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
+import { BarChart3, BookOpen, Menu, MessageCircle, Nfc, Package, PanelLeftClose, PanelLeftOpen, RefreshCw, Settings as SettingsIcon, X } from "lucide-react";
 import { fmt } from "../lib/format";
 import type { OrderStatus } from "../lib/supabase";
 import { useOrders } from "../lib/useOrders";
@@ -12,14 +12,16 @@ import MemoryList from "./MemoryList";
 import Settings from "./Settings";
 import WhatsAppInbox from "./WhatsAppInbox";
 import Stats from "./Stats";
+import Catalogue from "./Catalogue";
 
-type Tab = "orders" | "stats" | "whatsapp" | "memories" | "settings";
+type Tab = "orders" | "stats" | "whatsapp" | "memories" | "catalogue" | "settings";
 
 const TABS = [
   { value: "orders" as const, Icon: Package, label: "Commandes" },
   { value: "stats" as const, Icon: BarChart3, label: "Statistiques" },
   { value: "whatsapp" as const, Icon: MessageCircle, label: "WhatsApp" },
   { value: "memories" as const, Icon: Nfc, label: "Souvenirs" },
+  { value: "catalogue" as const, Icon: BookOpen, label: "Catalogue" },
   { value: "settings" as const, Icon: SettingsIcon, label: "Réglages" },
 ];
 
@@ -285,6 +287,7 @@ export default function Dashboard({ email }: { email: string }) {
           {tab === "stats" && <Stats enabled />}
           {tab === "whatsapp" && <WhatsAppInbox wa={wa} orders={orders.orders} onOpenOrder={showOrder} />}
           {tab === "memories" && <MemoryList data={memories} />}
+          {tab === "catalogue" && <Catalogue />}
           {tab === "settings" && <Settings email={email} />}
         </main>
       </div>

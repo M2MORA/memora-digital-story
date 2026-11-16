@@ -1,18 +1,15 @@
 import { orderAr } from "./order.ar";
-import {
-  FREE_SHIPPING_THRESHOLD_TND as FREE,
-  INCLUDED_VIDEO_SECONDS,
-  MAX_VIDEO_SECONDS,
-  SURCHARGE_TND_PER_MIN,
-  TIERS_10X15,
-} from "@/lib/pricing";
+import { getTiers, type Pricing } from "@/lib/pricing";
 import type { Dict } from "./fr";
 
-const INCL = INCLUDED_VIDEO_SECONDS / 60;
-const MAX = MAX_VIDEO_SECONDS / 60;
-const BASE = TIERS_10X15[0]!.unitPriceTND;
-const TIER2 = TIERS_10X15[1]!.minQty;
 const money = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(2).replace(".", ",")} د.ت`;
+// Chiffres de la grille tarifaire (base de données) cités dans les textes
+const INCL = (p: Pricing) => p.settings.included_video_seconds / 60;
+const MAX = (p: Pricing) => p.settings.max_video_seconds / 60;
+const FREE = (p: Pricing) => money(p.settings.free_shipping_threshold);
+const PER_MIN = (p: Pricing) => money(p.settings.surcharge_per_minute);
+const BASE = (p: Pricing) => money(getTiers(p, "10x15")[0]!.unit_price);
+const TIER2 = (p: Pricing) => getTiers(p, "10x15")[1]?.min_qty;
 
 /** عربية بسيطة، مع لمسة خفيفة من الدارجة التونسية */
 export const ar: Dict = {
@@ -68,21 +65,6 @@ export const ar: Dict = {
     text: "عاود بعد شوية.",
     retry: "عاود",
   },
-  product: {
-    name: "MÉMORA، الصورة",
-    short: "صورة 10 × 15 تحلّ الفيديو متاعك.",
-    materials: [
-      "صورة 10 × 15 على ورق 300 غ",
-      "شريحة مخفية في الصورة",
-      "ظرف فاخر",
-      "كارت فيه كلمتك",
-    ],
-    imageLabels: [
-      "الصورة في الظرف متاعها مع الكارت",
-      "ثلاثة صور MÉMORA على طاولة",
-      "صورة MÉMORA بحذا تليفون",
-    ],
-  },
   tiers: {
     caption: "سوم الصورة حسب الكمية",
     qty: "الكمية",
@@ -133,14 +115,14 @@ export const ar: Dict = {
     businessLead: "من 50 نسخة. عيّنة مجانية.",
     businessCta: "اطلب عيّنة",
     finalTitle: "صورة تتحطّ. وصوت يتعاود.",
-    finalLead: `التوصيل مجاني من ${money(FREE)}.`,
+    finalLead: (p: Pricing) => `التوصيل مجاني من ${FREE(p)}.`,
   },
   how: {
     title: "كيفاش تخدم",
     lead: "بلاش تطبيق، بلاش حساب، بلاش QR code.",
     orderTitle: "إنت تطلب",
-    orderSteps: [
-      ["الفيديو", `${INCL} دقائق مضمّنة.`],
+    orderSteps: (p: Pricing): [string, string][] => [
+      ["الفيديو", `${INCL(p)} دقائق مضمّنة.`],
       ["الصورة", "قصّها وشوف كيفاش تجي."],
       ["السلة", "زيد كلمة للكارت."],
       ["التوصيل", "تتصنع في 48 ساعة. تخلّص للموزّع."],
@@ -163,6 +145,11 @@ export const ar: Dict = {
     otherQuestions: "أسئلة أخرى",
   },
   productPage: {
+    imageLabels: [
+      "الصورة في الظرف متاعها مع الكارت",
+      "ثلاثة صور MÉMORA على طاولة",
+      "صورة MÉMORA بحذا تليفون",
+    ],
     reassure: ["تخلّص عند الاستلام", "نبدّلوها إذا فيها عيب"],
     specs: {
       format: "القياس",
@@ -172,9 +159,10 @@ export const ar: Dict = {
       delivery: "التوصيل",
       payment: "الخلاص",
     },
-    videoSpec: `${INCL} دقائق مضمّنة، وبعدها ${money(SURCHARGE_TND_PER_MIN)} للدقيقة، حتى ${MAX} دقيقة`,
+    videoSpec: (p: Pricing) =>
+      `${INCL(p)} دقائق مضمّنة، وبعدها ${PER_MIN(p)} للدقيقة، حتى ${MAX(p)} دقيقة`,
     phonesSpec: "آيفون XS واللي بعدو، وأندرويد فيه NFC",
-    deliverySpec: `من 3 إلى 5 أيام عمل. مجاني من ${money(FREE)}.`,
+    deliverySpec: (p: Pricing) => `من 3 إلى 5 أيام عمل. مجاني من ${FREE(p)}.`,
     paymentSpec: "كاش، عند الاستلام",
     tiersNote: "نفس الصورة ولا صور مختلفة.",
     chooseImage: "اختار صورة",
@@ -186,7 +174,7 @@ export const ar: Dict = {
     notFoundTitle: "ما لقيتش؟",
     notFoundLead: "نجاوبو على واتساب، من الاثنين للجمعة.",
     otherContact: "طرق أخرى",
-    groups: [
+    groups: (p: Pricing) => [
       {
         title: "كيفاش تخدم",
         items: [
@@ -210,7 +198,7 @@ export const ar: Dict = {
           {
             id: "length",
             q: "قدّاش طول الفيديو؟",
-            a: `${INCL} دقائق مضمّنة. وبعدها ${money(SURCHARGE_TND_PER_MIN)} للدقيقة، حتى ${MAX} دقيقة.`,
+            a: `${INCL(p)} دقائق مضمّنة. وبعدها ${PER_MIN(p)} للدقيقة، حتى ${MAX(p)} دقيقة.`,
           },
           { id: "files", q: "أما ملفات؟", a: "MP4 و MOV (آيفون) و WebM." },
           {
@@ -226,12 +214,12 @@ export const ar: Dict = {
           {
             id: "price",
             q: "قدّاش السوم؟",
-            a: `${money(BASE)} للصورة، بالظرف والكارت. يرخص من ${TIER2} نسخ.`,
+            a: `${BASE(p)} للصورة، بالظرف والكارت.${TIER2(p) ? ` يرخص من ${TIER2(p)} نسخ.` : ""}`,
           },
           {
             id: "delivery",
             q: "قدّاش ياخو وقت؟",
-            a: `تتصنع في 48 ساعة، وتوصل في 3 إلى 5 أيام عمل. مجاني من ${money(FREE)}.`,
+            a: `تتصنع في 48 ساعة، وتوصل في 3 إلى 5 أيام عمل. مجاني من ${FREE(p)}.`,
           },
           { id: "pay", q: "كيفاش نخلّص؟", a: "كاش، للموزّع." },
         ],
@@ -323,7 +311,7 @@ export const ar: Dict = {
     shipping: "التوصيل",
     free: "مجاني",
     toPay: "تخلّص عند الاستلام",
-    freeFrom: `التوصيل مجاني من ${money(FREE)}.`,
+    freeFrom: (p: Pricing) => `التوصيل مجاني من ${FREE(p)}.`,
     checkout: "اختار التوصيل",
   },
   memory: {
@@ -358,10 +346,7 @@ export const ar: Dict = {
       title: "الخصوصية",
       sections: [
         ["شنوة نجمعو", "عنوان التوصيل، الإيميل، والصور والفيديوهات اللي تبعثهم."],
-        [
-          "كيفاش نحميوهم",
-          "الفيديوهات متاعك مخبّية في سيرفرات آمنة، وما تتنشرش وما تبانش في البحث.",
-        ],
+        ["كيفاش نحميوهم", "الفيديوهات متاعك مخبّية في سيرفرات آمنة، وما تتنشرش وما تبانش في البحث."],
         ["شنوة نعملو بيهم", "كان الطلبية متاعك. عمرنا ما نبيعو ولا نعطيو المعطيات متاعك."],
         [
           "حقوقك",
@@ -371,10 +356,10 @@ export const ar: Dict = {
     },
     shipping: {
       title: "التوصيل",
-      sections: [
+      sections: (p: Pricing): [string, string][] => [
         ["الوقت", "التصنيع في 48 ساعة عمل، والتوصيل من 3 إلى 5 أيام عمل."],
         ["الإرسال", "في كامل تونس، مع رابط تتبّع."],
-        ["المصاريف", `التوصيل مجاني من ${money(FREE)}.`],
+        ["المصاريف", `التوصيل مجاني من ${FREE(p)}.`],
         ["التغليف", "علبة كرتون مقوّاة وورق رقيق."],
       ],
     },

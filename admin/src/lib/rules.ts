@@ -119,3 +119,184 @@ export function parseServerStats(raw: unknown) {
     byStatus: r.by_status ?? {},
   };
 }
+
+export type PriceTier = { min_qty: number; unit_price: number };
+
+const isPrice = (n: number) => Number.isFinite(n) && n >= 0;
+
+/**
+ * Grille de prix d'un format, vérifiée avant l'envoi. La base reste le vrai garde-fou
+ * (palier à 1 obligatoire, unicité, valeurs positives) ; ici on donne un message clair.
+ * Un seul palier (prix fixe) est accepté.
+ */
+export function validateTierGrid(tiers: PriceTier[]): string | null {
+  if (tiers.length === 0) return "Il faut au moins un palier.";
+  for (const t of tiers) {
+    if (!Number.isInteger(t.min_qty) || t.min_qty < 1) return "Quantité minimale invalide : un nombre entier à partir de 1.";
+    if (!isPrice(t.unit_price)) return `Prix unitaire invalide (palier ${t.min_qty}) : un nombre positif ou nul.`;
+  }
+  const sorted = [...tiers].sort((a, b) => a.min_qty - b.min_qty);
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1]!;
+    const cur = sorted[i]!;
+    if (cur.min_qty === prev.min_qty) return `Deux paliers commencent à ${cur.min_qty} exemplaires.`;
+    if (cur.unit_price > prev.unit_price)
+      return `Le prix unitaire ne peut pas augmenter avec la quantité (palier ${cur.min_qty} : ${cur.unit_price} > ${prev.unit_price}).`;
+  }
+  if (sorted[0]!.min_qty !== 1) return "Le premier palier doit commencer à 1 exemplaire.";
+  return null;
+}
+
+/** Prix d'un cadre : positif ou nul. */
+export function validateFramePrice(price: number): string | null {
+  return isPrice(price) ? null : "Prix du cadre invalide : un nombre positif ou nul.";
+}
+
+export type ShippingVideoSettings = {
+  shipping_fee_aramex: number;
+  shipping_fee_mondial_relay: number;
+  free_shipping_threshold: number;
+  included_video_minutes: number;
+  surcharge_per_minute: number;
+};
+
+/** Livraison et vidéo. Les minutes incluses ne peuvent pas dépasser la durée maximale d'une vidéo. */
+export function validateShippingVideo(s: ShippingVideoSettings, maxVideoSeconds: number): string | null {
+  const labels: [keyof ShippingVideoSettings, string][] = [
+    ["shipping_fee_aramex", "Frais Aramex"],
+    ["shipping_fee_mondial_relay", "Frais Mondial Relay"],
+    ["free_shipping_threshold", "Seuil de livraison gratuite"],
+    ["included_video_minutes", "Minutes de vidéo incluses"],
+    ["surcharge_per_minute", "Supplément par minute"],
+  ];
+  for (const [key, label] of labels) {
+    if (!isPrice(s[key])) return `${label} invalide : un nombre positif ou nul.`;
+  }
+  if (Math.round(s.included_video_minutes * 60) > maxVideoSeconds)
+    return `Minutes de vidéo incluses : ${maxVideoSeconds / 60} min au maximum (durée maximale d'une vidéo).`;
+  return null;
+}
+
+export type PromoCode = { code: string; percent: number; active: boolean };
+
+/** Code promo tel que la base le stocke : sans espaces, en majuscules. */
+export const normalizePromoCode = (code: string) => code.trim().toUpperCase();
+
+/** Pourcentage de réduction : de 0 à 100. */
+export function validatePromoPercent(percent: number): string | null {
+  return Number.isFinite(percent) && percent >= 0 && percent <= 100
+    ? null
+    : "Réduction invalide : un pourcentage entre 0 et 100.";
+}
+
+/**
+ * Nouveau code promo (même format que la contrainte de la base) : 3 à 32 lettres, chiffres, - ou _,
+ * pas déjà utilisé (actif ou non : un code désactivé garde son nom).
+ */
+export function validateNewPromoCode(code: string, percent: number, existing: string[]): string | null {
+  const clean = normalizePromoCode(code);
+  if (!/^[A-Z0-9_-]{3,32}$/.test(clean))
+    return "Code invalide : 3 à 32 caractères, lettres sans accent, chiffres, - ou _.";
+  if (existing.includes(clean)) return `Le code ${clean} existe déjà.`;
+  return validatePromoPercent(percent);
+}
+
+/** Texte d'un article dans les trois langues du site : `fr` toujours là, `en` et `ar` facultatifs. */
+export type Localized<T> = { fr: T; en?: T; ar?: T };
+
+/** Article tel que l'admin le lit et l'écrit (table products). */
+export type Article = {
+  id: string;
+  slug: string;
+  format: string;
+  active: boolean;
+  sort_order: number;
+  badge: string | null;
+  dimensions: string;
+  occasions: string[];
+  style: string;
+  included_video_min: number;
+  images: string[];
+  name: Localized<string>;
+  tagline: Localized<string>;
+  description: Localized<string>;
+  materials: Localized<string[]>;
+};
+
+/** Même format que la contrainte de la base : minuscules, chiffres, mots séparés par un tiret. */
+export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+/**
+ * Texte prêt à enregistrer : espaces retirés, langue facultative vide → clé absente
+ * (la boutique affiche alors le français).
+ */
+export function compactCopy<T extends string | string[]>(copy: Localized<T>): Localized<T> {
+  const clean = (v: T | undefined) =>
+    (Array.isArray(v) ? v.map((s) => s.trim()).filter(Boolean) : String(v ?? "").trim()) as T;
+  const out: Localized<T> = { fr: clean(copy.fr) };
+  for (const lang of ["en", "ar"] as const) {
+    const v = clean(copy[lang]);
+    if (v.length > 0) out[lang] = v;
+  }
+  return out;
+}
+
+type ArticleText = Pick<Article, "slug" | "badge" | "dimensions" | "name" | "tagline" | "description" | "materials">;
+
+/** Article prêt à enregistrer : espaces retirés, badge vide → aucun, langues facultatives vides retirées. */
+export function cleanArticle<T extends ArticleText>(a: T): T {
+  return {
+    ...a,
+    slug: a.slug.trim(),
+    badge: a.badge?.trim() || null,
+    dimensions: a.dimensions.trim(),
+    name: compactCopy(a.name),
+    tagline: compactCopy(a.tagline),
+    description: compactCopy(a.description),
+    materials: compactCopy(a.materials),
+  };
+}
+
+/**
+ * Article vérifié avant l'envoi : slug valide et libre (parmi les autres articles, actifs ou non),
+ * format existant, texte français complet, minutes de vidéo et ordre entiers.
+ */
+export function validateArticle(
+  a: Pick<Article, "id" | "slug" | "format" | "sort_order" | "included_video_min" | "name" | "tagline" | "description" | "materials">,
+  others: Pick<Article, "id" | "slug">[],
+  formats: string[],
+): string | null {
+  if (!SLUG_PATTERN.test(a.slug))
+    return "Slug invalide : minuscules sans accent et chiffres, mots séparés par un tiret (ex. photo-cadre).";
+  if (others.some((o) => o.id !== a.id && o.slug === a.slug)) return `Le slug ${a.slug} est déjà utilisé.`;
+  if (!a.format) return "Choisis le format de l'article.";
+  if (!formats.includes(a.format)) return `Format inconnu : ${a.format}.`;
+  if (!a.name.fr.trim()) return "Le nom en français est obligatoire.";
+  if (!a.tagline.fr.trim()) return "L'accroche en français est obligatoire.";
+  if (!a.description.fr.trim()) return "La description en français est obligatoire.";
+  if (!a.materials.fr.some((m) => m.trim())) return "Le contenu en français est obligatoire (au moins une ligne).";
+  if (!Number.isInteger(a.included_video_min) || a.included_video_min < 0)
+    return "Minutes de vidéo incluses invalides : un nombre entier positif ou nul.";
+  if (!Number.isInteger(a.sort_order)) return "Ordre d'affichage invalide : un nombre entier.";
+  return null;
+}
+
+/** Photos de la galerie : mêmes limites que le bucket catalogue (migration catalogue_bucket). */
+export const IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/** Photo acceptée avant l'envoi : JPEG, PNG ou WebP, 5 Mo au plus. */
+export function validateImageFile(file: { type: string; size: number }): string | null {
+  if (!IMAGE_TYPES[file.type]) return "Format de photo refusé : JPEG, PNG ou WebP seulement.";
+  if (file.size > MAX_IMAGE_BYTES) return "Photo trop lourde : 5 Mo au maximum.";
+  return null;
+}
+
+/** Copie de la liste où l'élément `i` a bougé de `by` places ; inchangée si on sort de la liste. */
+export function moveItem<T>(list: T[], i: number, by: number): T[] {
+  const j = i + by;
+  if (i < 0 || i >= list.length || j < 0 || j >= list.length) return list;
+  const out = [...list];
+  [out[i], out[j]] = [out[j]!, out[i]!];
+  return out;
+}
