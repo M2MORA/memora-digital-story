@@ -30,6 +30,8 @@ import {
 import { clearDraftOrderNumber, getOrCreateDraftOrderNumber } from "@/lib/draft-manager";
 import { checkPromoCode, type Format, getVideoSurcharge } from "@/lib/pricing";
 import { usePricing } from "@/hooks/use-pricing";
+import { useProducts } from "@/hooks/use-products";
+import { orderableProduct } from "@/lib/products";
 import {
   defaultCrop,
   loadImage,
@@ -209,6 +211,8 @@ function CommanderPage() {
   const money = t.money;
   const whatsappUrl = whatsappLink(o.whatsappMessage);
   const search = Route.useSearch();
+  // ?product=<slug> (page produit) ; sans slug, le premier article de la boutique
+  const product = orderableProduct(useProducts(), search.product);
   const { items, promoCode, promoPercent, draftId, draftToken } = useStore();
   const isNarrow = useIsNarrowScreen();
 
@@ -455,8 +459,12 @@ function CommanderPage() {
   // ---------- Panier ----------
   const handleAddToCart = () => {
     if (!crop) return;
+    if (!product) {
+      toast.error(o.cart.unavailable);
+      return;
+    }
     const data = {
-      format: "10x15" as Format,
+      format: product.formatCode,
       withFrame,
       videoDurationSec: videoDuration,
       photoPreviewUrl: photoThumbUrl || undefined,
@@ -466,7 +474,7 @@ function CommanderPage() {
     };
     // Revenir en arrière puis rajouter ne crée pas de doublon : on met à jour la même création
     if (isInCart) cart.update(currentItemKey, data);
-    else cart.add("p1", { key: currentItemKey, qty: 1, ...data });
+    else cart.add(product.id, { key: currentItemKey, qty: 1, ...data });
     setStage("cart");
   };
 

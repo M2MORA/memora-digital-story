@@ -75,6 +75,7 @@ export const orderFr = {
   cart: {
     title: "Ton panier",
     empty: "Ton panier est vide pour l'instant.",
+    unavailable: "Cet article n'est plus disponible. Choisis-en un autre dans la boutique.",
     itemAlt: (n: number) => `MÉMORA n° ${n}`,
     removeItem: (n: number) => `Supprimer le MÉMORA n° ${n}`,
     less: "Retirer un exemplaire",

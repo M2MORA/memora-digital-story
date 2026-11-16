@@ -95,3 +95,14 @@ export async function getProduct(
   if (error) throw new Error(`Article indisponible : ${error.message}`);
   return data as ProductRow | null;
 }
+
+/**
+ * The article /commander orders: the one with `slug`, or the first of the shop when no slug
+ * is given. Undefined when the slug is not an active article: it must not be ordered.
+ */
+export function orderableProduct<T extends { slug: string }>(
+  products: T[],
+  slug: string | undefined,
+): T | undefined {
+  return slug === undefined ? products[0] : products.find((p) => p.slug === slug);
+}

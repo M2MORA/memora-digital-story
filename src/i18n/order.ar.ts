@@ -75,6 +75,7 @@ export const orderAr: typeof orderFr = {
   cart: {
     title: "السلة متاعك",
     empty: "السلة فارغة توّا.",
+    unavailable: "المنتوج هذا موش متوفّر توّا. اختار واحد آخر من البوتيك.",
     itemAlt: (n: number) => `MÉMORA رقم ${n}`,
     removeItem: (n: number) => `احذف MÉMORA رقم ${n}`,
     less: "نقّص نسخة",

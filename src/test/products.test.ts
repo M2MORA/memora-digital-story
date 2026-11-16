@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { localize, resolveProduct, type ProductRow } from "@/lib/products";
+import { localize, orderableProduct, resolveProduct, type ProductRow } from "@/lib/products";
 
 const row: ProductRow = {
   id: "p1",
@@ -33,5 +33,23 @@ describe("catalogue copy", () => {
 
   it("keeps the product id the cart keys lines by", () => {
     expect(resolveProduct(row, "fr")).toMatchObject({ id: "p1", formatCode: "10x15" });
+  });
+});
+
+describe("orderableProduct", () => {
+  const shop = [{ slug: "memora-simple-enveloppe" }, { slug: "coffret" }];
+
+  it("orders the article of the product page", () => {
+    expect(orderableProduct(shop, "coffret")).toBe(shop[1]);
+  });
+
+  it("orders the first article of the shop when no article is given (today's flow)", () => {
+    expect(orderableProduct(shop, undefined)).toBe(shop[0]);
+  });
+
+  it("orders nothing for an unknown or inactive article, nor when the shop is empty", () => {
+    expect(orderableProduct(shop, "retire")).toBeUndefined();
+    expect(orderableProduct(shop, "")).toBeUndefined();
+    expect(orderableProduct([], undefined)).toBeUndefined();
   });
 });

@@ -76,7 +76,7 @@ export function useArticles() {
     const clean = cleanArticle(edit);
     const invalid = validateArticle(clean, articles ?? [], formats);
     if (invalid) return invalid;
-    // Le format n'est pas écrit : le prix facturé (devis SQL) se déduit encore de l'id de l'article.
+    // Le format n'est pas écrit : il est fixé à la création (le devis SQL facture le format de l'article).
     const { id, format: _format, ...patch } = clean;
     const { data, error: err } = await supabase.from("products").update(patch).eq("id", id).select(COLUMNS);
     if (err) return err.code === "23505" ? `Le slug ${patch.slug} est déjà utilisé.` : err.message;
@@ -86,7 +86,24 @@ export function useArticles() {
     return "";
   };
 
-  return { articles, loading, error, load, update };
+  /**
+   * Nouvel article (`edit.id` vide, la base tire l'id). `formats` : codes proposés à la création.
+   * Renvoie l'id créé, ou le message à afficher.
+   */
+  const create = async (edit: ArticleEdit, formats: string[]): Promise<{ id: string } | { error: string }> => {
+    const clean = cleanArticle(edit);
+    const invalid = validateArticle(clean, articles ?? [], formats);
+    if (invalid) return { error: invalid };
+    const { id: _id, ...row } = clean;
+    const { data, error: err } = await supabase.from("products").insert(row).select(COLUMNS);
+    if (err) return { error: err.code === "23505" ? `Le slug ${row.slug} est déjà utilisé.` : err.message };
+    const created = data?.[0] as Article | undefined;
+    if (!created) return { error: NOTHING_WRITTEN };
+    setArticles((list) => [...(list ?? []), created].sort(byShopOrder));
+    return { id: created.id };
+  };
+
+  return { articles, loading, error, load, update, create };
 }
 
 export type ArticlesData = ReturnType<typeof useArticles>;

@@ -235,6 +235,12 @@ describe("validateArticle", () => {
     expect(check({ format: "a3" })).toBe("Format inconnu : a3.");
   });
 
+  it("à la création (id vide) : refuse un slug déjà pris, même par l'article p1, et un format manquant", () => {
+    expect(check({ id: "", slug: "memora-photo" })).toBe("Le slug memora-photo est déjà utilisé.");
+    expect(check({ id: "", slug: "memora-coffret", format: "" })).toBe("Choisis le format de l'article.");
+    expect(check({ id: "", slug: "memora-coffret" })).toBeNull();
+  });
+
   it("exige le texte français", () => {
     expect(check({ name: { fr: "  " } })).toMatch(/nom en français/);
     expect(check({ tagline: { fr: "" } })).toMatch(/accroche/);

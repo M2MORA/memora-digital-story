@@ -125,7 +125,7 @@ function ProductPage() {
 
         <Link
           to="/commander"
-          search={{ format: product.formatCode, stage: "video" }}
+          search={{ product: product.slug, stage: "video" }}
           className={buttonStyles({ className: "mt-8 w-full sm:w-auto" })}
         >
           {t.common.create}

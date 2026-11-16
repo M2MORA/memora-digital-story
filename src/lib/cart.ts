@@ -147,12 +147,12 @@ export function useStore() {
 export const cart = {
   add(productId: string, itemData?: Partial<CartItem>) {
     load();
-    const format: Format = "10x15";
+    const format: Format = itemData?.format ?? "10x15";
 
     const key = itemData?.key ?? `item_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const newItem: CartItem = {
       key,
-      productId: "p1",
+      productId,
       format,
       qty: itemData?.qty ?? 1,
       withFrame: itemData?.withFrame ?? (productId.includes("encadre") || productId.includes("galerie")),

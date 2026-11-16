@@ -362,7 +362,7 @@ export default function Catalogue() {
       <h2 className="sub-title">Codes promo</h2>
       <PromoCodes />
       <h2 className="sub-title">Articles</h2>
-      <Articles formats={formats.map((f) => f.code)} />
+      <Articles formats={formats} />
     </section>
   );
 }

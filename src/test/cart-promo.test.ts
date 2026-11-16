@@ -33,3 +33,16 @@ describe("cart.applyPromoCode", () => {
     expect(cart.getQuote(P).discount).toBe(0);
   });
 });
+
+describe("cart.add", () => {
+  it("keeps the ordered article and its format", () => {
+    cart.clear();
+    const item = cart.add("3f1c2b9e-uuid", { key: "k3", format: "box", videoDurationSec: 0 });
+    expect(item).toMatchObject({ productId: "3f1c2b9e-uuid", format: "box" });
+  });
+
+  it("still defaults to the 10x15 format", () => {
+    cart.clear();
+    expect(cart.add("p1", { key: "k4", videoDurationSec: 0 })).toMatchObject({ productId: "p1", format: "10x15" });
+  });
+});

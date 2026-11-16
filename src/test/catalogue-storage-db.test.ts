@@ -38,20 +38,26 @@ async function signedIn(role: "admin" | null): Promise<SupabaseClient> {
 
 // 1×1 PNG.
 const PNG = Uint8Array.from(
-  atob("iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII="),
+  atob(
+    "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=",
+  ),
   (c) => c.charCodeAt(0),
 );
 const png = () => new Blob([PNG], { type: "image/png" });
 
 const exists = async (path: string) => {
-  const { data } = await service.storage.from(BUCKET).list(FOLDER, { search: path.slice(FOLDER.length + 1) });
+  const { data } = await service.storage
+    .from(BUCKET)
+    .list(FOLDER, { search: path.slice(FOLDER.length + 1) });
   return (data ?? []).length > 0;
 };
 
 /** Seeds one object as the service role and returns its path. */
 async function seeded() {
   const path = `${FOLDER}/${crypto.randomUUID()}.png`;
-  const { error } = await service.storage.from(BUCKET).upload(path, png(), { contentType: "image/png" });
+  const { error } = await service.storage
+    .from(BUCKET)
+    .upload(path, png(), { contentType: "image/png" });
   if (error) throw error;
   return path;
 }
@@ -60,16 +66,24 @@ async function seeded() {
 async function tryWrites(client: SupabaseClient) {
   const target = await seeded();
   const newPath = `${FOLDER}/${crypto.randomUUID()}.png`;
-  const upload = await client.storage.from(BUCKET).upload(newPath, png(), { contentType: "image/png" });
-  await client.storage.from(BUCKET).upload(target, png(), { contentType: "image/png", upsert: true });
+  const upload = await client.storage
+    .from(BUCKET)
+    .upload(newPath, png(), { contentType: "image/png" });
+  await client.storage
+    .from(BUCKET)
+    .upload(target, png(), { contentType: "image/png", upsert: true });
   await client.storage.from(BUCKET).remove([target]);
-  return { uploaded: !upload.error && (await exists(newPath)), targetStillThere: await exists(target) };
+  return {
+    uploaded: !upload.error && (await exists(newPath)),
+    targetStillThere: await exists(target),
+  };
 }
 
 describe.skipIf(!process.env["LOCAL_DB_TEST"])("catalogue bucket access (local Supabase)", () => {
   afterAll(async () => {
     const { data } = await service.storage.from(BUCKET).list(FOLDER);
-    if (data?.length) await service.storage.from(BUCKET).remove(data.map((o) => `${FOLDER}/${o.name}`));
+    if (data?.length)
+      await service.storage.from(BUCKET).remove(data.map((o) => `${FOLDER}/${o.name}`));
   });
 
   it("anyone reads a photo through its public URL", async () => {
@@ -81,28 +95,43 @@ describe.skipIf(!process.env["LOCAL_DB_TEST"])("catalogue bucket access (local S
   });
 
   it("anonymous visitors cannot upload, replace or delete", async () => {
-    expect(await tryWrites(createClient(LOCAL_URL, ANON_KEY, opts))).toEqual({ uploaded: false, targetStillThere: true });
+    expect(await tryWrites(createClient(LOCAL_URL, ANON_KEY, opts))).toEqual({
+      uploaded: false,
+      targetStillThere: true,
+    });
   });
 
   it("a signed-in customer cannot upload, replace or delete", async () => {
-    expect(await tryWrites(await signedIn(null))).toEqual({ uploaded: false, targetStillThere: true });
+    expect(await tryWrites(await signedIn(null))).toEqual({
+      uploaded: false,
+      targetStillThere: true,
+    });
   });
 
   it("an admin uploads and deletes", async () => {
-    expect(await tryWrites(await signedIn("admin"))).toEqual({ uploaded: true, targetStillThere: false });
+    expect(await tryWrites(await signedIn("admin"))).toEqual({
+      uploaded: true,
+      targetStillThere: false,
+    });
   });
 
   it("the bucket refuses non-images and files over 5 MB, even for an admin", async () => {
     const admin = await signedIn("admin");
     const text = await admin.storage
       .from(BUCKET)
-      .upload(`${FOLDER}/note.txt`, new Blob(["hi"], { type: "text/plain" }), { contentType: "text/plain" });
+      .upload(`${FOLDER}/note.txt`, new Blob(["hi"], { type: "text/plain" }), {
+        contentType: "text/plain",
+      });
     expect(text.error).not.toBeNull();
     const big = await admin.storage
       .from(BUCKET)
-      .upload(`${FOLDER}/big.png`, new Blob([new Uint8Array(5 * 1024 * 1024 + 1)], { type: "image/png" }), {
-        contentType: "image/png",
-      });
+      .upload(
+        `${FOLDER}/big.png`,
+        new Blob([new Uint8Array(5 * 1024 * 1024 + 1)], { type: "image/png" }),
+        {
+          contentType: "image/png",
+        },
+      );
     expect(big.error).not.toBeNull();
   });
 });

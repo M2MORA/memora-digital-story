@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { ArrowDown, ArrowUp, Pencil, RefreshCw, Trash2, X } from "lucide-react";
+import { ArrowDown, ArrowUp, Pencil, Plus, RefreshCw, Trash2, X } from "lucide-react";
 import { uploadArticleImage, useArticles, type ArticleEdit } from "../lib/useArticles";
 import { cleanArticle, IMAGE_TYPES, moveItem } from "../lib/rules";
 import { IDLE, SaveRow, type Status } from "./SaveRow";
@@ -33,6 +33,7 @@ type CopyDraft = ReturnType<typeof copyDraft>;
 
 const toDraft = (a: ArticleEdit) => ({
   slug: a.slug,
+  format: a.format,
   active: a.active,
   sort_order: String(a.sort_order),
   badge: a.badge ?? "",
@@ -49,7 +50,7 @@ function fromDraft(d: Draft, a: ArticleEdit): ArticleEdit {
   const lines = (l: Lang) => d.copy[l].materials.split("\n");
   return {
     id: a.id,
-    format: a.format,
+    format: d.format,
     slug: d.slug,
     active: d.active,
     sort_order: int(d.sort_order),
@@ -65,19 +66,41 @@ function fromDraft(d: Draft, a: ArticleEdit): ArticleEdit {
   };
 }
 
+/** Nouvel article : invisible tant que l'admin ne coche pas « Visible dans la boutique ». */
+export const blankArticle = (sort_order: number): ArticleEdit => ({
+  id: "",
+  slug: "",
+  format: "",
+  active: false,
+  sort_order,
+  badge: null,
+  dimensions: "",
+  occasions: [],
+  included_video_min: 8,
+  name: { fr: "" },
+  tagline: { fr: "" },
+  description: { fr: "" },
+  materials: { fr: [] },
+  images: [],
+});
+
 /**
  * Formulaire d'un article. Il part de `article` et rend la main à `save`
- * ("" si enregistré, sinon le message). Le format est affiché, pas modifié.
+ * ("" si enregistré, sinon le message). Le format se choisit parmi `formats`
+ * à la création (`article.id` vide), puis il est seulement affiché.
  */
 export function ArticleForm({
   article,
+  formats = [],
   save,
   onClose,
 }: {
   article: ArticleEdit;
+  formats?: string[];
   save: (edit: ArticleEdit) => Promise<string>;
   onClose: () => void;
 }) {
+  const isNew = article.id === "";
   const [draft, setDraft] = useState(() => toDraft(article));
   const [status, setStatus] = useState<Status>(IDLE);
   const [uploading, setUploading] = useState(false);
@@ -121,7 +144,7 @@ export function ArticleForm({
   return (
     <div className="panel">
       <div className="panel-title-row">
-        <h3 className="panel-title">{article.name.fr || article.slug}</h3>
+        <h3 className="panel-title">{isNew ? "Nouvel article" : article.name.fr || article.slug}</h3>
         <button type="button" className="icon-btn" aria-label="Fermer l'article" title="Fermer" onClick={onClose}>
           <X size={16} />
         </button>
@@ -138,11 +161,25 @@ export function ArticleForm({
       </label>
       <p className="hint">Changer le slug change l'adresse de la page : les anciens liens ne marcheront plus.</p>
 
-      <div className="field">
-        Format
-        <p className="muted">{article.format}</p>
-        <p className="hint">Non modifiable : le prix facturé au paiement ne suit pas encore ce champ.</p>
-      </div>
+      {isNew ? (
+        <label className="field">
+          Format (définitif : le prix facturé est celui de ce format)
+          <select value={draft.format} onChange={(e) => set({ format: e.target.value })}>
+            <option value="">Choisir un format…</option>
+            {formats.map((code) => (
+              <option key={code} value={code}>
+                {code}
+              </option>
+            ))}
+          </select>
+        </label>
+      ) : (
+        <div className="field">
+          Format
+          <p className="muted">{article.format}</p>
+          <p className="hint">Non modifiable : le prix facturé est celui de ce format.</p>
+        </div>
+      )}
 
       <label className="field">
         Ordre d'affichage (le plus petit en premier)
@@ -263,9 +300,18 @@ export function ArticleForm({
 }
 
 /** Section « Articles » : liste (actifs et inactifs) et formulaire de l'article choisi. */
-export function Articles({ formats }: { formats: string[] }) {
+export function Articles({ formats }: { formats: { code: string; active: boolean }[] }) {
   const data = useArticles();
+  // "" : formulaire de création ouvert.
   const [openId, setOpenId] = useState<string | null>(null);
+  const [notice, setNotice] = useState("");
+  const codes = formats.map((f) => f.code);
+  // Un format désactivé ne se commande plus : on ne crée pas d'article dessus.
+  const activeCodes = formats.filter((f) => f.active).map((f) => f.code);
+  const openForm = (id: string | null) => {
+    setNotice("");
+    setOpenId(id);
+  };
 
   if (!data.articles) {
     return data.loading ? (
@@ -281,9 +327,23 @@ export function Articles({ formats }: { formats: string[] }) {
   }
 
   const open = data.articles.find((a) => a.id === openId);
+  // Après la création, le formulaire passe sur le nouvel article (photos possibles).
+  const create = async (edit: ArticleEdit) => {
+    const res = await data.create(edit, activeCodes);
+    if ("error" in res) return res.error;
+    setOpenId(res.id);
+    setNotice("Article créé. Tu peux maintenant ajouter ses photos.");
+    return "";
+  };
+  const nextOrder = Math.max(-1, ...data.articles.map((a) => a.sort_order)) + 1;
   return (
     <>
       <div className="panel">
+        <div className="actions-row">
+          <button type="button" className="btn" aria-pressed={openId === ""} onClick={() => openForm("")}>
+            <Plus size={16} aria-hidden /> Nouvel article
+          </button>
+        </div>
         <table className="tier-table">
           <thead>
             <tr>
@@ -308,7 +368,7 @@ export function Articles({ formats }: { formats: string[] }) {
                     aria-label={`Modifier ${a.name.fr}`}
                     aria-pressed={a.id === openId}
                     title="Modifier"
-                    onClick={() => setOpenId(a.id)}
+                    onClick={() => openForm(a.id)}
                   >
                     <Pencil size={16} />
                   </button>
@@ -320,12 +380,22 @@ export function Articles({ formats }: { formats: string[] }) {
         {data.articles.length === 0 && <p className="muted">Aucun article.</p>}
         <p className="hint">Un article inactif n'apparaît plus dans la boutique ; il reste dans la liste.</p>
       </div>
+      {notice && open && <p className="note is-ok" role="status">{notice}</p>}
+      {openId === "" && (
+        <ArticleForm
+          key="new"
+          article={blankArticle(nextOrder)}
+          formats={activeCodes}
+          save={create}
+          onClose={() => openForm(null)}
+        />
+      )}
       {open && (
         <ArticleForm
           key={open.id}
           article={open}
-          save={(edit) => data.update(edit, formats)}
-          onClose={() => setOpenId(null)}
+          save={(edit) => data.update(edit, codes)}
+          onClose={() => openForm(null)}
         />
       )}
     </>

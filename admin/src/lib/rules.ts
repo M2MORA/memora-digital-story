@@ -269,6 +269,7 @@ export function validateArticle(
   if (!SLUG_PATTERN.test(a.slug))
     return "Slug invalide : minuscules sans accent et chiffres, mots séparés par un tiret (ex. photo-cadre).";
   if (others.some((o) => o.id !== a.id && o.slug === a.slug)) return `Le slug ${a.slug} est déjà utilisé.`;
+  if (!a.format) return "Choisis le format de l'article.";
   if (!formats.includes(a.format)) return `Format inconnu : ${a.format}.`;
   if (!a.name.fr.trim()) return "Le nom en français est obligatoire.";
   if (!a.tagline.fr.trim()) return "L'accroche en français est obligatoire.";

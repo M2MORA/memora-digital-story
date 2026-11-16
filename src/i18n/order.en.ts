@@ -74,6 +74,7 @@ export const orderEn: typeof orderFr = {
   cart: {
     title: "Your cart",
     empty: "Your cart is empty for now.",
+    unavailable: "This item is no longer available. Pick another one in the shop.",
     itemAlt: (n: number) => `MÉMORA no. ${n}`,
     removeItem: (n: number) => `Remove MÉMORA no. ${n}`,
     less: "Remove one copy",
