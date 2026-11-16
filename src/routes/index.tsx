@@ -10,6 +10,8 @@ import { FaqList } from "@/components/site/FaqList";
 import { SectionTitle, buttonStyles } from "@/components/site/kit";
 import { Img } from "@/components/site/Img";
 import { IMAGES } from "@/lib/images.gen";
+import { getUnitPrice } from "@/lib/pricing";
+import { pricingFromMatches, usePricing } from "@/hooks/use-pricing";
 
 const PRODUCT = PRODUCTS[0]!;
 const DEMO = { memorySlug: "demo-leila-and-sami" };
@@ -23,12 +25,15 @@ const HIGHLIGHTS = ["app", "phones", "pay"];
 export const Route = createFileRoute("/")({
   head: ({ matches }) => {
     const t = dictFromMatches(matches);
+    const pricing = pricingFromMatches(matches);
     return {
       meta: [
         { title: t.home.metaTitle },
         {
           name: "description",
-          content: `${t.home.lead} ${t.home.priceLine(t.money(PRODUCT.priceTND))}`,
+          content: pricing
+            ? `${t.home.lead} ${t.home.priceLine(t.money(getUnitPrice(pricing, PRODUCT.formatCode, 1)))}`
+            : t.home.lead,
         },
       ],
     };
@@ -39,7 +44,10 @@ export const Route = createFileRoute("/")({
 function Home() {
   const t = useT();
   const h = t.home;
-  const faqHighlights = t.faq.groups
+  const pricing = usePricing();
+  const price = getUnitPrice(pricing, PRODUCT.formatCode, 1);
+  const faqHighlights = t.faq
+    .groups(pricing)
     .flatMap((g) => g.items)
     .filter((i) => HIGHLIGHTS.includes(i.id));
 
@@ -73,9 +81,7 @@ function Home() {
               {t.common.demo}
             </Link>
           </div>
-          <p className="mt-6 text-[15px] text-m-linen/80">
-            {h.priceLine(t.money(PRODUCT.priceTND))}
-          </p>
+          <p className="mt-6 text-[15px] text-m-linen/80">{h.priceLine(t.money(price))}</p>
         </div>
       </HeroReveal>
 
@@ -142,7 +148,7 @@ function Home() {
               {h.productTitle}
             </h2>
             <p className="mt-3 font-serif text-[30px] font-semibold text-m-wine">
-              {t.money(PRODUCT.priceTND)}
+              {t.money(price)}
             </p>
             <ul className="mt-6 space-y-2.5 text-[17px] text-m-ink">
               {t.product.materials.map((m) => (
@@ -217,7 +223,7 @@ function Home() {
         <h2 className="mx-auto max-w-3xl font-serif text-[36px] leading-[1.08] text-m-ink sm:text-[52px]">
           {h.finalTitle}
         </h2>
-        <p className="mt-4 text-[17px] text-m-muted">{h.finalLead}</p>
+        <p className="mt-4 text-[17px] text-m-muted">{h.finalLead(pricing)}</p>
         <Link to="/commander" className={buttonStyles({ className: "mt-8" })}>
           {t.common.create}
         </Link>

@@ -4,6 +4,7 @@
  * 2. mode « human » → Ballech se tait ;
  * 3. sinon l'agent LLM répond, avec deux outils : commande et passage à l'humain.
  */
+import type { Pricing } from "../../lib/pricing";
 import type { R2StorageAdapter } from "../../lib/r2-backend";
 import type { WhatsAppClient } from "./client";
 import { buildSystemPrompt } from "./knowledge";
@@ -265,8 +266,10 @@ async function runAgent(
   now: () => Date,
 ): Promise<void> {
   const history = toChatTurns(await deps.store.recentMessages(conversation.id, HISTORY_LIMIT));
+  // Tarifs relus à chaque message : un changement de prix s'applique aussitôt à Ballech.
+  const pricing = await deps.store.getPricing();
   const session = (await deps.provider()).createSession({
-    system: buildSystemPrompt(),
+    system: buildSystemPrompt(pricing),
     history,
     tools: TOOL_DEFINITIONS,
   });
@@ -284,7 +287,7 @@ async function runAgent(
 
     const results: ToolResult[] = [];
     for (const call of turn.toolCalls) {
-      const result = await executeTool(deps, conversation, call, now, orderCreated);
+      const result = await executeTool(deps, conversation, call, now, orderCreated, pricing);
       if (call.name === "create_order_request" && result["ok"] === true) orderCreated = true;
       if (call.name === "handoff_to_human") handedOff = true;
       results.push({ id: call.id, name: call.name, result });
@@ -309,6 +312,7 @@ async function executeTool(
   call: ToolCall,
   now: () => Date,
   alreadyOrdered: boolean,
+  pricing: Pricing,
 ): Promise<Record<string, unknown>> {
   if (call.name === "handoff_to_human") {
     const reason = String(call.args["reason"] ?? "Demande du client").slice(0, 300);
@@ -320,7 +324,7 @@ async function executeTool(
     return { ok: false, error: `Outil inconnu : ${call.name}` };
   if (alreadyOrdered) return { ok: false, error: "Commande déjà enregistrée dans ce message." };
 
-  const validation = validateOrderRequest(call.args, conversation.wa_phone);
+  const validation = validateOrderRequest(call.args, conversation.wa_phone, pricing);
   if (!validation.ok) return { ok: false, error: validation.error };
   const order = validation.order;
 

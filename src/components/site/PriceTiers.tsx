@@ -1,10 +1,12 @@
 import { Link } from "@tanstack/react-router";
-import { TIERS_10X15 } from "@/lib/pricing";
+import { getTierDiscountPercent, getTiers } from "@/lib/pricing";
+import { usePricing } from "@/hooks/use-pricing";
 import { useT } from "@/i18n";
 
-/** Prix à l'unité selon la quantité, lus directement dans le moteur de prix */
+/** Prix à l'unité selon la quantité, lus dans la grille tarifaire (base de données) */
 export function PriceTiers() {
   const t = useT();
+  const tiers = getTiers(usePricing(), "10x15");
   return (
     <table className="w-full text-start text-[15px]">
       <caption className="sr-only">{t.tiers.caption}</caption>
@@ -22,16 +24,17 @@ export function PriceTiers() {
         </tr>
       </thead>
       <tbody className="divide-y divide-m-line">
-        {TIERS_10X15.map((tier, i) => {
-          const next = TIERS_10X15[i + 1];
+        {tiers.map((tier, i) => {
+          const next = tiers[i + 1];
+          const discount = getTierDiscountPercent(tiers, tier);
           return (
-            <tr key={tier.minQty}>
+            <tr key={tier.min_qty}>
               <th scope="row" className="py-2.5 text-start font-medium text-m-ink">
-                {t.tiers.range(tier.minQty, next ? next.minQty - 1 : undefined)}
+                {t.tiers.range(tier.min_qty, next ? next.min_qty - 1 : undefined)}
               </th>
-              <td className="py-2.5 text-m-ink">{t.money(tier.unitPriceTND)}</td>
+              <td className="py-2.5 text-m-ink">{t.money(tier.unit_price)}</td>
               <td className="py-2.5 text-end text-m-muted" dir="ltr">
-                {tier.discountPercent > 0 ? `−${tier.discountPercent} %` : "—"}
+                {discount > 0 ? `−${discount} %` : "—"}
               </td>
             </tr>
           );

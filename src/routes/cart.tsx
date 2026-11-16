@@ -2,6 +2,7 @@ import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { Copy, Minus, Plus, Trash2 } from "lucide-react";
 import { cart, useStore } from "@/lib/cart";
 import { getUnitPrice } from "@/lib/pricing";
+import { usePricing } from "@/hooks/use-pricing";
 import { buttonStyles } from "@/components/site/kit";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { dictFromMatches, useT } from "@/i18n";
@@ -28,7 +29,8 @@ function CartPage() {
   const navigate = useNavigate();
   const { items } = useStore();
   const hydrated = useHydrated();
-  const quote = cart.getQuote();
+  const pricing = usePricing();
+  const quote = cart.getQuote(pricing);
 
   return (
     <section className="container-x max-w-5xl pb-20 pt-10 md:pt-16">
@@ -58,7 +60,7 @@ function CartPage() {
         <div className="mt-8 grid gap-8 lg:grid-cols-[1.6fr_1fr]">
           <ul className="space-y-4">
             {items.map((item) => {
-              const unitPrice = getUnitPrice(item.format, quote.totalQuantity);
+              const unitPrice = getUnitPrice(pricing, item.format, quote.totalQuantity);
               const minutes = Math.max(1, Math.round(item.videoDurationSec / 60));
               return (
                 <li
@@ -192,7 +194,9 @@ function CartPage() {
                 <dd className="shrink-0">{t.money(quote.total)}</dd>
               </div>
             </dl>
-            {!quote.isFreeShipping && <p className="mt-3 text-sm text-m-step">{c.freeFrom}</p>}
+            {!quote.isFreeShipping && (
+              <p className="mt-3 text-sm text-m-step">{c.freeFrom(pricing)}</p>
+            )}
             <button
               type="button"
               onClick={() => navigate({ to: "/commander", search: { stage: "delivery" } })}

@@ -7,6 +7,7 @@ import {
   type ResumeUploadsDeps,
 } from "../lib/checkout";
 import type { CartItem } from "../lib/cart";
+import { TODAY_PRICING } from "./pricing-fixture";
 import type { FinalizeOrderParams, FinalizeOrderResponse } from "../lib/supabase";
 
 // ---------------------------------------------------------------- fakes
@@ -95,6 +96,7 @@ function fakeWorld(opts: { cached?: boolean } = {}) {
 
 const input = (over: Partial<CheckoutInput> = {}): CheckoutInput => ({
   items: [item("a")],
+  pricing: TODAY_PRICING,
   promoCode: "",
   draftId: DRAFT,
   draftToken: "tok",

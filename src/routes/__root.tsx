@@ -20,6 +20,8 @@ import { RouteProgress } from "@/components/site/RouteProgress";
 import { buttonStyles } from "@/components/site/kit";
 import { LangProvider, dictFor, dirOf, effectiveLang, readLang, useT, type Lang } from "@/i18n";
 import { Toaster } from "@/components/ui/sonner";
+import { fetchPricing, type Pricing } from "@/lib/pricing";
+import { supabase } from "@/lib/supabase";
 
 function NotFoundComponent() {
   const t = useT();
@@ -76,8 +78,13 @@ const SHARE_IMAGE = "https://www.memora.tn/og/memora.jpg";
 const OG_LOCALE: Record<Lang, string> = { fr: "fr_TN", en: "en_US", ar: "ar_TN" };
 
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
-  // Langue choisie (cookie), relue à chaque navigation et après un changement de langue
-  loader: (): { lang: Lang } => ({ lang: readLang() }),
+  // Langue choisie (cookie), relue à chaque navigation et après un changement de langue.
+  // Tarifs (get_pricing) pour tout le site ; les pages souvenir /m/* n'en ont pas besoin.
+  // Un échec de lecture des tarifs affiche la page d'erreur, jamais un prix à 0.
+  loader: async ({ location }): Promise<{ lang: Lang; pricing: Pricing | null }> => ({
+    lang: readLang(),
+    pricing: location.pathname.startsWith("/m/") ? null : await fetchPricing(supabase),
+  }),
   head: ({ loaderData }) => {
     const lang = loaderData?.lang ?? "fr";
     const t = dictFor(lang);

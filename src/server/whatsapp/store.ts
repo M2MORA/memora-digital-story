@@ -1,4 +1,5 @@
 /** Accès base de données de Ballech (client Supabase service role : contourne le RLS). */
+import { fetchPricing, type Pricing } from "../../lib/pricing";
 
 export type ConversationMode = "bot" | "human";
 export type MessageType = "text" | "image" | "video" | "audio" | "document" | "other";
@@ -75,6 +76,8 @@ export interface BallechStore {
   updateOrderItems(orderId: string, items: Array<Record<string, unknown>>): Promise<void>;
   /** Médias reçus dans la conversation et pas encore rattachés à une commande. */
   unlinkedMedia(conversationId: string): Promise<StoredMessage[]>;
+  /** Grille tarifaire (get_pricing) ; lève une erreur si elle est illisible. */
+  getPricing(): Promise<Pricing>;
 }
 
 const MEDIA_TYPES: MessageType[] = ["image", "video", "audio", "document"];
@@ -231,6 +234,10 @@ export function createSupabaseStore(supabase: SupabaseLike): BallechStore {
           .order("created_at", { ascending: true }),
         "Lecture médias",
       ) as StoredMessage[];
+    },
+
+    getPricing() {
+      return fetchPricing(supabase);
     },
   };
 }

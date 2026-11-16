@@ -5,6 +5,7 @@ import { PageHero, SectionTitle, buttonStyles } from "@/components/site/kit";
 import { dictFromMatches, useT } from "@/i18n";
 import { Img } from "@/components/site/Img";
 import { IMAGES } from "@/lib/images.gen";
+import { usePricing } from "@/hooks/use-pricing";
 
 export const Route = createFileRoute("/how-it-works")({
   head: ({ matches }) => {
@@ -19,6 +20,7 @@ export const Route = createFileRoute("/how-it-works")({
 function How() {
   const t = useT();
   const h = t.how;
+  const pricing = usePricing();
   return (
     <>
       <PageHero title={h.title} intro={h.lead}>
@@ -31,7 +33,7 @@ function How() {
         <div className="container-x py-16 md:py-24">
           <SectionTitle id="commander" title={h.orderTitle} />
           <ol className="mt-10 grid gap-8 sm:grid-cols-2 lg:grid-cols-4">
-            {h.orderSteps.map(([title, text], i) => (
+            {h.orderSteps(pricing).map(([title, text], i) => (
               <li key={title} className="border-t-2 border-m-wine pt-5">
                 <p className="font-serif text-[22px] font-semibold text-m-wine">{i + 1}</p>
                 <h3 className="mt-1 font-serif text-[26px] leading-tight text-m-ink">{title}</h3>

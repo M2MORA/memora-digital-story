@@ -28,14 +28,8 @@ import {
   useBackgroundUploads,
 } from "@/lib/background-uploads";
 import { clearDraftOrderNumber, getOrCreateDraftOrderNumber } from "@/lib/draft-manager";
-import {
-  type Format,
-  FREE_SHIPPING_THRESHOLD_TND,
-  getVideoSurcharge,
-  INCLUDED_VIDEO_SECONDS,
-  MAX_VIDEO_SECONDS,
-  SURCHARGE_TND_PER_MIN,
-} from "@/lib/pricing";
+import { type Format, getVideoSurcharge } from "@/lib/pricing";
+import { usePricing } from "@/hooks/use-pricing";
 import {
   defaultCrop,
   loadImage,
@@ -204,6 +198,13 @@ const checkoutDeps: CheckoutDeps = {
 
 function CommanderPage() {
   const t = useT();
+  const pricing = usePricing();
+  const {
+    free_shipping_threshold,
+    included_video_seconds,
+    max_video_seconds,
+    surcharge_per_minute,
+  } = pricing.settings;
   const o = t.order;
   const money = t.money;
   const whatsappUrl = whatsappLink(o.whatsappMessage);
@@ -283,16 +284,16 @@ function CommanderPage() {
     window.scrollTo({ top: 0 });
   }, [stage]);
 
-  const quote = cart.getQuote("aramex");
+  const quote = cart.getQuote(pricing, "aramex");
   const count = quote.totalQuantity;
   const merchandiseTotal = Number((quote.subtotal - quote.discount).toFixed(2));
-  const remainingForFreeShipping = Math.max(0, FREE_SHIPPING_THRESHOLD_TND - merchandiseTotal);
+  const remainingForFreeShipping = Math.max(0, free_shipping_threshold - merchandiseTotal);
   const freeShippingProgress = Math.min(
     100,
-    Math.round((merchandiseTotal / FREE_SHIPPING_THRESHOLD_TND) * 100),
+    Math.round((merchandiseTotal / free_shipping_threshold) * 100),
   );
   const isInCart = items.some((item) => item.key === currentItemKey);
-  const videoSurcharge = getVideoSurcharge(videoDuration, 1);
+  const videoSurcharge = getVideoSurcharge(pricing, videoDuration, 1);
   const stageBox = isNarrow ? STAGE_BOX_NARROW : STAGE_BOX;
 
   const customerCheck = validateCustomer({
@@ -518,6 +519,7 @@ function CommanderPage() {
     const result = await submitOrder(
       {
         items,
+        pricing,
         promoCode,
         draftId,
         draftToken,
@@ -662,9 +664,9 @@ function CommanderPage() {
                         }
                         const rounded = Math.ceil(duration);
                         setVideoDuration(rounded);
-                        if (rounded > MAX_VIDEO_SECONDS) {
+                        if (rounded > max_video_seconds) {
                           setVideoStatus("error");
-                          setVideoError(o.video.errors.tooLong(MAX_VIDEO_SECONDS / 60));
+                          setVideoError(o.video.errors.tooLong(max_video_seconds / 60));
                           return;
                         }
                         setVideoStatus("ready");
@@ -717,12 +719,12 @@ function CommanderPage() {
                     {videoStatus === "loading" && (
                       <p className="text-sm text-m-muted">{o.video.checking}</p>
                     )}
-                    {videoStatus === "ready" && videoDuration > INCLUDED_VIDEO_SECONDS && (
+                    {videoStatus === "ready" && videoDuration > included_video_seconds && (
                       <p className="text-sm text-m-muted">
                         {o.video.surcharge(
                           money(videoSurcharge),
-                          money(SURCHARGE_TND_PER_MIN),
-                          INCLUDED_VIDEO_SECONDS / 60,
+                          money(surcharge_per_minute),
+                          included_video_seconds / 60,
                         )}
                       </p>
                     )}

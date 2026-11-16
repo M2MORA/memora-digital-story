@@ -1,7 +1,13 @@
 import { z } from "zod";
 import { ADDRESS_MIN, CUSTOMER_NAME_MIN, normalizeTunisianPhone } from "../../lib/customer";
 import { TUNISIAN_GOVERNORATES } from "../../lib/governorates";
-import { calculateQuote, formatTND, SHIPPING_MODES, type QuoteResult } from "../../lib/pricing";
+import {
+  calculateQuote,
+  formatTND,
+  SHIPPING_MODES,
+  type Pricing,
+  type QuoteResult,
+} from "../../lib/pricing";
 import { PRODUCT_NAME } from "./knowledge";
 import type { ToolDefinition } from "./llm/types";
 
@@ -102,6 +108,7 @@ export type OrderValidation = { ok: true; order: ValidatedOrder } | { ok: false;
 export function validateOrderRequest(
   args: Record<string, unknown>,
   waPhone: string,
+  pricing: Pricing,
 ): OrderValidation {
   const parsed = orderRequestSchema.safeParse(args);
   if (!parsed.success) {
@@ -126,6 +133,7 @@ export function validateOrderRequest(
 
   const quote = calculateQuote(
     [{ format: "10x15", quantity: data.quantity, withFrame: data.with_frame }],
+    pricing,
     null,
     data.carrier,
   );

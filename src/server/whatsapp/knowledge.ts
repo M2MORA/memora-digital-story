@@ -5,48 +5,51 @@
 import { fr } from "../../i18n/fr";
 import { ar } from "../../i18n/ar";
 import {
-  FRAME_PRICES,
-  FREE_SHIPPING_THRESHOLD_TND,
-  INCLUDED_VIDEO_SECONDS,
-  MAX_VIDEO_SECONDS,
-  SURCHARGE_TND_PER_MIN,
-  TIERS_10X15,
   formatTND,
+  getFramePrice,
   getShippingOptions,
+  getTiers,
+  type Pricing,
 } from "../../lib/pricing";
 import { CONTACT_EMAIL } from "../../lib/contact";
 import { TUNISIAN_GOVERNORATES } from "../../lib/governorates";
 
 export const PRODUCT_NAME = "Mémora Simple (Enveloppe & Carte)";
 
-function faqText(dict: typeof fr): string {
-  return dict.faq.groups
+function faqText(dict: typeof fr, pricing: Pricing): string {
+  return dict.faq
+    .groups(pricing)
     .map(
       (group) => `### ${group.title}\n${group.items.map((it) => `- ${it.q} → ${it.a}`).join("\n")}`,
     )
     .join("\n");
 }
 
-export function buildKnowledge(): string {
-  const tiers = TIERS_10X15.map(
-    (t) => `- à partir de ${t.minQty} exemplaire(s) : ${formatTND(t.unitPriceTND)} l'unité`,
-  ).join("\n");
-  const shipping = getShippingOptions(0)
+/** Prix, livraison et FAQ tirés de la grille tarifaire (get_pricing) passée en paramètre. */
+export function buildKnowledge(pricing: Pricing): string {
+  const { included_video_seconds, max_video_seconds, surcharge_per_minute } = pricing.settings;
+  const tiers = getTiers(pricing, "10x15")
+    .map((t) => `- à partir de ${t.min_qty} exemplaire(s) : ${formatTND(t.unit_price)} l'unité`)
+    .join("\n");
+  const shipping = getShippingOptions(pricing, 0)
     .map((o) => `- ${o.name} (${o.id}) : ${formatTND(o.priceTND)}, ${o.etaDays} — ${o.description}`)
     .join("\n");
-  const shippingPolicy = fr.legal.shipping.sections.map(([k, v]) => `- ${k} : ${v}`).join("\n");
+  const shippingPolicy = fr.legal.shipping
+    .sections(pricing)
+    .map(([k, v]) => `- ${k} : ${v}`)
+    .join("\n");
 
   return `## Produit (un seul produit vendu)
 ${PRODUCT_NAME} : tirage photo 10×15 cm sur papier 300 g/m² avec puce NFC invisible, dans une enveloppe texturée avec une carte et un message personnalisé. On approche le téléphone de la photo et la vidéo se lance, sans application.
-Option cadre : +${formatTND(FRAME_PRICES["10x15"])} par photo.
+Option cadre : +${formatTND(getFramePrice(pricing, "10x15"))} par photo.
 
 ## Prix (TND, prix dégressifs selon la quantité totale)
 ${tiers}
-Vidéo : ${INCLUDED_VIDEO_SECONDS / 60} minutes incluses, puis ${formatTND(SURCHARGE_TND_PER_MIN)} la minute supplémentaire, ${MAX_VIDEO_SECONDS / 60} minutes maximum.
+Vidéo : ${included_video_seconds / 60} minutes incluses, puis ${formatTND(surcharge_per_minute)} la minute supplémentaire, ${max_video_seconds / 60} minutes maximum.
 
 ## Livraison (Tunisie uniquement)
 ${shipping}
-Livraison offerte dès ${formatTND(FREE_SHIPPING_THRESHOLD_TND)} d'achat.
+Livraison offerte dès ${formatTND(pricing.settings.free_shipping_threshold)} d'achat.
 ${shippingPolicy}
 Paiement : en espèces au livreur.
 
@@ -54,16 +57,16 @@ Paiement : en espèces au livreur.
 ${TUNISIAN_GOVERNORATES.join(", ")}
 
 ## FAQ (français)
-${faqText(fr)}
+${faqText(fr, pricing)}
 
 ## FAQ (derja / arabe)
-${faqText(ar)}
+${faqText(ar, pricing)}
 
 ## Contact
 WhatsApp (ce numéro), e-mail ${CONTACT_EMAIL}. L'équipe répond du lundi au vendredi.`;
 }
 
-export function buildSystemPrompt(): string {
+export function buildSystemPrompt(pricing: Pricing): string {
   return `Tu es Ballech, l'assistant WhatsApp de Mémora (Tunisie). Tu aides les clients avec trois choses : répondre aux questions, prendre une commande, et passer la main à un humain.
 
 # Règles
@@ -83,5 +86,5 @@ export function buildSystemPrompt(): string {
 L'historique contient des marqueurs comme « [photo reçue] » ou « [vidéo reçue] » : tu ne vois pas les fichiers. Quand un média arrive, confirme la réception en une phrase (ex. « wsolt el taswira ✅ ») et continue la commande. Ne commente jamais le contenu du média.
 
 # Base de connaissance
-${buildKnowledge()}`;
+${buildKnowledge(pricing)}`;
 }

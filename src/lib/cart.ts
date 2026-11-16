@@ -3,6 +3,7 @@ import {
   Format,
   calculateQuote,
   getPromoDiscountPercent,
+  Pricing,
   QuoteResult,
   ShippingMode,
 } from "./pricing";
@@ -264,7 +265,7 @@ export const cart = {
     set({ ...state, wishlist: w });
   },
 
-  getQuote(shipping?: ShippingMode): QuoteResult {
+  getQuote(pricing: Pricing, shipping?: ShippingMode): QuoteResult {
     load();
     const lines = state.items.map((i) => ({
       format: i.format,
@@ -272,7 +273,7 @@ export const cart = {
       withFrame: i.withFrame,
       videoDurationSec: i.videoDurationSec,
     }));
-    return calculateQuote(lines, state.promoCode, shipping);
+    return calculateQuote(lines, pricing, state.promoCode, shipping);
   },
 
   clear() {

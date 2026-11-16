@@ -1,116 +1,78 @@
 // MÉMORA Pricing Engine — pure, tested, shared logic based on plan.md specifications
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export type Format = "10x15" | "box" | "magnet" | "20x30" | "30x45";
 
+/** A volume tier: from min_qty copies (cart total), each copy costs unit_price. */
 export interface Tier {
-  minQty: number;
-  unitPriceTND: number; // in Tunisian Dinars (TND)
-  discountPercent: number;
+  format: Format;
+  min_qty: number;
+  unit_price: number;
 }
 
-// Volume pricing tiers according to section 1.2 of plan.md
-export const TIERS_10X15: Tier[] = [
-  { minQty: 1, unitPriceTND: 49, discountPercent: 0 },
-  { minQty: 5, unitPriceTND: 42, discountPercent: 14 },
-  { minQty: 10, unitPriceTND: 32, discountPercent: 35 },
-  { minQty: 50, unitPriceTND: 25, discountPercent: 49 },
-  { minQty: 100, unitPriceTND: 20, discountPercent: 59 },
-];
+/**
+ * The price grid, exactly as returned by the SQL get_pricing() (amounts in TND).
+ * Every price lives in the database; nothing here is hardcoded.
+ */
+export interface Pricing {
+  formats: { code: Format; frame_price: number; active: boolean }[];
+  tiers: Tier[];
+  settings: {
+    shipping_fee_aramex: number;
+    shipping_fee_mondial_relay: number;
+    free_shipping_threshold: number;
+    included_video_seconds: number;
+    surcharge_per_minute: number;
+    max_video_seconds: number;
+  };
+}
 
-export const TIERS_BOX: Tier[] = [
-  { minQty: 1, unitPriceTND: 89, discountPercent: 0 },
-  { minQty: 5, unitPriceTND: 79, discountPercent: 11 },
-  { minQty: 10, unitPriceTND: 69, discountPercent: 22 },
-  { minQty: 50, unitPriceTND: 59, discountPercent: 34 },
-  { minQty: 100, unitPriceTND: 49, discountPercent: 45 },
-];
+/** Reads the grid with get_pricing(). Throws on failure: a page must never show a price of 0. */
+export async function fetchPricing(client: Pick<SupabaseClient, "rpc">): Promise<Pricing> {
+  const { data, error } = await client.rpc("get_pricing");
+  if (error || !data) throw new Error(`Tarifs indisponibles : ${error?.message ?? "réponse vide"}`);
+  return data as Pricing;
+}
 
-export const TIERS_MAGNET: Tier[] = [
-  { minQty: 1, unitPriceTND: 65, discountPercent: 0 },
-  { minQty: 5, unitPriceTND: 57, discountPercent: 12 },
-  { minQty: 10, unitPriceTND: 44, discountPercent: 32 },
-  { minQty: 50, unitPriceTND: 34, discountPercent: 48 },
-  { minQty: 100, unitPriceTND: 27, discountPercent: 58 },
-];
+/** The tiers of a format, smallest min_qty first. */
+export function getTiers(pricing: Pricing, format: Format): Tier[] {
+  return pricing.tiers.filter((t) => t.format === format).sort((a, b) => a.min_qty - b.min_qty);
+}
 
-export const TIERS_20X30: Tier[] = [
-  { minQty: 1, unitPriceTND: 129, discountPercent: 0 },
-  { minQty: 5, unitPriceTND: 115, discountPercent: 11 },
-  { minQty: 10, unitPriceTND: 98, discountPercent: 24 },
-  { minQty: 50, unitPriceTND: 82, discountPercent: 36 },
-];
-
-export const TIERS_30X45: Tier[] = [
-  { minQty: 1, unitPriceTND: 199, discountPercent: 0 },
-  { minQty: 5, unitPriceTND: 175, discountPercent: 12 },
-  { minQty: 10, unitPriceTND: 150, discountPercent: 25 },
-  { minQty: 50, unitPriceTND: 130, discountPercent: 35 },
-];
-
-export const TIERS: Record<Format, Tier[]> = {
-  "10x15": TIERS_10X15,
-  box: TIERS_BOX,
-  magnet: TIERS_MAGNET,
-  "20x30": TIERS_20X30,
-  "30x45": TIERS_30X45,
-};
-
-// Video duration specifications
-export const INCLUDED_VIDEO_SECONDS = 480; // 8 minutes included
-export const SURCHARGE_TND_PER_MIN = 1.5; // 1,5 DT per minute
-export const MAX_VIDEO_SECONDS = 1800; // 30 minutes max
-
-// Free shipping threshold
-export const FREE_SHIPPING_THRESHOLD_TND = 250;
-
-// Frame options surcharge
-export const FRAME_PRICES: Record<Format, number> = {
-  "10x15": 50,
-  box: 0,
-  magnet: 0, // Magnet is unframed
-  "20x30": 120,
-  "30x45": 150,
-};
+/** Discount of a tier against the format's first tier, in whole percent (display only). */
+export function getTierDiscountPercent(tiers: Tier[], tier: Tier): number {
+  const base = tiers[0]?.unit_price ?? 0;
+  return base > 0 ? Math.round(((base - tier.unit_price) / base) * 100) : 0;
+}
 
 /**
- * Returns the unit price for a given format and total quantity ordered.
+ * Unit price for a format at a total quantity: the highest tier whose min_qty is reached.
+ * Same rule as the SQL Quote.
  */
-export function getUnitPrice(format: Format, totalQty: number): number {
-  const formatTiers = TIERS[format] ?? TIERS_10X15;
-  let matched = formatTiers[0]?.unitPriceTND ?? 49;
-  for (const tier of formatTiers) {
-    if (totalQty >= tier.minQty) {
-      matched = tier.unitPriceTND;
-    }
+export function getUnitPrice(pricing: Pricing, format: Format, totalQty: number): number {
+  let matched: number | undefined;
+  for (const tier of getTiers(pricing, format)) {
+    if (totalQty >= tier.min_qty) matched = tier.unit_price;
   }
+  if (matched === undefined) throw new Error(`Aucun tarif pour le format ${format}`);
   return matched;
 }
 
-/**
- * Returns the tier details for a format and quantity.
- */
-export function getTierForQty(format: Format, qty: number): Tier {
-  const formatTiers = TIERS[format] ?? TIERS_10X15;
-  let matched: Tier = formatTiers[0] ?? TIERS_10X15[0]!;
-  for (const tier of formatTiers) {
-    if (qty >= tier.minQty) {
-      matched = tier;
-    }
-  }
-  return matched;
+/** Frame price per copy for a format (0 when the format has none). */
+export function getFramePrice(pricing: Pricing, format: Format): number {
+  return pricing.formats.find((f) => f.code === format)?.frame_price ?? 0;
 }
 
 /**
- * Calculates the video surcharge in TND.
- * Formula: ceil((duration - 480)/60) * 1.50 TND * qty
+ * Video surcharge in TND: ceil((duration - included) / 60) * surcharge per minute * qty.
  */
-export function getVideoSurcharge(durationSec: number, qty: number = 1): number {
-  if (durationSec <= INCLUDED_VIDEO_SECONDS) {
+export function getVideoSurcharge(pricing: Pricing, durationSec: number, qty: number = 1): number {
+  const { included_video_seconds, surcharge_per_minute } = pricing.settings;
+  if (durationSec <= included_video_seconds) {
     return 0;
   }
-  const extraSeconds = durationSec - INCLUDED_VIDEO_SECONDS;
-  const extraMinutes = Math.ceil(extraSeconds / 60);
-  return Number((extraMinutes * SURCHARGE_TND_PER_MIN * qty).toFixed(2));
+  const extraMinutes = Math.ceil((durationSec - included_video_seconds) / 60);
+  return Number((extraMinutes * surcharge_per_minute * qty).toFixed(2));
 }
 
 // Mémora delivers within Tunisia only.
@@ -126,23 +88,25 @@ export interface ShippingOption {
 }
 
 /**
- * Shipping options for a subtotal (after discount): free from FREE_SHIPPING_THRESHOLD_TND.
+ * Shipping options for a subtotal (after discount): free from the free-shipping threshold.
  */
-export function getShippingOptions(subtotalTND: number): ShippingOption[] {
-  const isFree = subtotalTND >= FREE_SHIPPING_THRESHOLD_TND;
+export function getShippingOptions(pricing: Pricing, subtotalTND: number): ShippingOption[] {
+  const { free_shipping_threshold, shipping_fee_aramex, shipping_fee_mondial_relay } =
+    pricing.settings;
+  const isFree = subtotalTND >= free_shipping_threshold;
   return [
     {
       id: "aramex",
       name: "Aramex Express Tunisie",
       description: "Livraison à domicile partout en Tunisie",
-      priceTND: isFree ? 0 : 8,
+      priceTND: isFree ? 0 : shipping_fee_aramex,
       etaDays: "2 à 3 jours",
     },
     {
       id: "mondial_relay",
       name: "Rapid-Poste Tunisie",
       description: "Retrait en bureau de poste le plus proche",
-      priceTND: isFree ? 0 : 6,
+      priceTND: isFree ? 0 : shipping_fee_mondial_relay,
       etaDays: "3 à 4 jours",
     },
   ];
@@ -180,11 +144,12 @@ export interface QuoteResult {
 }
 
 /**
- * The storefront Quote: cart lines, an optional promo code and a shipping mode in; totals out.
- * Same inputs/outputs as the SQL calculate_order_quote(p_items, p_promo_code, p_shipping_carrier).
+ * The storefront Quote: cart lines, the pricing (get_pricing()), an optional promo code and a
+ * shipping mode in; totals out. Same inputs/outputs as the SQL calculate_order_quote(p_items, p_promo_code, p_shipping_carrier).
  */
 export function calculateQuote(
   lines: QuoteLine[],
+  pricing: Pricing,
   promoCode?: string | null,
   shipping: ShippingMode = "aramex",
 ): QuoteResult {
@@ -195,14 +160,14 @@ export function calculateQuote(
   let videoSurcharges = 0;
 
   for (const line of lines) {
-    itemsSubtotal += getUnitPrice(line.format, totalQuantity) * line.quantity;
+    itemsSubtotal += getUnitPrice(pricing, line.format, totalQuantity) * line.quantity;
 
     if (line.withFrame) {
-      framesSubtotal += (FRAME_PRICES[line.format] || 0) * line.quantity;
+      framesSubtotal += getFramePrice(pricing, line.format) * line.quantity;
     }
 
-    if (line.videoDurationSec && line.videoDurationSec > INCLUDED_VIDEO_SECONDS) {
-      videoSurcharges += getVideoSurcharge(line.videoDurationSec, line.quantity);
+    if (line.videoDurationSec) {
+      videoSurcharges += getVideoSurcharge(pricing, line.videoDurationSec, line.quantity);
     }
   }
 
@@ -211,7 +176,8 @@ export function calculateQuote(
   const discountedSubtotal = subtotal - discount;
 
   const shippingFee =
-    getShippingOptions(discountedSubtotal).find((opt) => opt.id === shipping)?.priceTND ?? 0;
+    getShippingOptions(pricing, discountedSubtotal).find((opt) => opt.id === shipping)?.priceTND ??
+    0;
 
   return {
     itemsSubtotal: Number(itemsSubtotal.toFixed(2)),
@@ -222,7 +188,7 @@ export function calculateQuote(
     shippingFee,
     total: Number((discountedSubtotal + shippingFee).toFixed(2)),
     totalQuantity,
-    isFreeShipping: discountedSubtotal >= FREE_SHIPPING_THRESHOLD_TND,
+    isFreeShipping: discountedSubtotal >= pricing.settings.free_shipping_threshold,
   };
 }
 

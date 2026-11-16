@@ -7,6 +7,8 @@ import { buttonStyles } from "@/components/site/kit";
 import { dictFromMatches, useT } from "@/i18n";
 import { Img } from "@/components/site/Img";
 import { IMAGES } from "@/lib/images.gen";
+import { getUnitPrice } from "@/lib/pricing";
+import { usePricing } from "@/hooks/use-pricing";
 
 const GALLERY = [IMAGES.envelope, IMAGES.moments, IMAGES.hero];
 
@@ -32,14 +34,15 @@ function ProductPage() {
   const t = useT();
   const p = t.productPage;
   const { product } = Route.useLoaderData();
+  const pricing = usePricing();
   const [img, setImg] = useState(0);
 
   const specs: [string, string][] = [
     [p.specs.format, product.dimensions],
     [p.specs.included, t.product.materials.join(", ")],
-    [p.specs.video, p.videoSpec],
+    [p.specs.video, p.videoSpec(pricing)],
     [p.specs.phones, p.phonesSpec],
-    [p.specs.delivery, p.deliverySpec],
+    [p.specs.delivery, p.deliverySpec(pricing)],
     [p.specs.payment, p.paymentSpec],
   ];
 
@@ -79,7 +82,7 @@ function ProductPage() {
           {t.product.name}
         </h1>
         <p className="mt-3 font-serif text-[32px] font-semibold text-m-wine">
-          {t.money(product.priceTND)}
+          {t.money(getUnitPrice(pricing, product.formatCode, 1))}
         </p>
         <p className="mt-3 text-[17px] text-m-muted">{t.product.short}</p>
 

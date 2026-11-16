@@ -1,7 +1,7 @@
 import envelopeImg from "@/assets/product-envelope-v2.jpg";
 import moments from "@/assets/product-moments-v2.jpg";
 import hero from "@/assets/hero-v2.jpg";
-import { Format, getUnitPrice } from "./pricing";
+import type { Format } from "./pricing";
 
 export type Category = "enveloppe";
 
@@ -12,8 +12,6 @@ export type Product = {
   tagline: string;
   description: string;
   category: Category;
-  priceTND: number; // TND base price
-  price: number; // backward compatibility alias
   formatCode: Format;
   images: string[];
   materials: string[];
@@ -35,8 +33,6 @@ export const PRODUCTS: Product[] = [
     description:
       "L'émotion à l'état pur. Un tirage photographique d'art 10×15 cm sur papier noble 300g/m² avec puce invisible. Glissé délicatement dans une élégante enveloppe texturée cachetée, accompagné d'une carte avec votre message personnalisé. Approchez votre smartphone sans aucune application requise : votre vidéo se lance instantanément.",
     category: "enveloppe",
-    priceTND: getUnitPrice("10x15", 1),
-    price: getUnitPrice("10x15", 1),
     formatCode: "10x15",
     images: [envelopeImg, moments, hero],
     materials: [

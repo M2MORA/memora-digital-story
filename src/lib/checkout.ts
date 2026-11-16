@@ -9,7 +9,7 @@ import type { BackgroundUploadInput, UploadKind } from "./background-uploads";
 import type { CartItem } from "./cart";
 import type { Customer } from "./customer";
 import { getMediaCacheKey } from "./media-cache";
-import { calculateQuote } from "./pricing";
+import { calculateQuote, type Pricing } from "./pricing";
 import type { FinalizeOrderParams, FinalizeOrderResponse } from "./supabase";
 
 export type CheckoutStep = "preparing" | "uploading_media" | "finalizing";
@@ -33,6 +33,8 @@ export type CheckoutDeps = {
 
 export type CheckoutInput = {
   items: CartItem[];
+  /** Tarifs (get_pricing) : servent seulement au total de repli si le serveur n'en renvoie pas. */
+  pricing: Pricing;
   promoCode?: string | undefined;
   draftId: string;
   draftToken: string;
@@ -95,7 +97,7 @@ export async function submitOrder(
   input: CheckoutInput,
   deps: CheckoutDeps,
 ): Promise<CheckoutResult> {
-  const { items, promoCode, draftId, draftToken, customer, onStep } = input;
+  const { items, pricing, promoCode, draftId, draftToken, customer, onStep } = input;
   const orderNumber = deps.draft.getOrderNumber(draftId);
 
   try {
@@ -197,6 +199,7 @@ export async function submitOrder(
               withFrame: i.withFrame,
               videoDurationSec: i.videoDurationSec,
             })),
+            pricing,
             promoCode,
             "aramex",
           ).total;

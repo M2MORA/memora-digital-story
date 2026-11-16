@@ -1,17 +1,14 @@
 import { orderFr } from "./order.fr";
-import {
-  FREE_SHIPPING_THRESHOLD_TND as FREE,
-  INCLUDED_VIDEO_SECONDS,
-  MAX_VIDEO_SECONDS,
-  SURCHARGE_TND_PER_MIN,
-  TIERS_10X15,
-} from "@/lib/pricing";
+import { getTiers, type Pricing } from "@/lib/pricing";
 
-const INCL = INCLUDED_VIDEO_SECONDS / 60;
-const MAX = MAX_VIDEO_SECONDS / 60;
-const BASE = TIERS_10X15[0]!.unitPriceTND;
-const TIER2 = TIERS_10X15[1]!.minQty;
 const money = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(2).replace(".", ",")} DT`;
+// Chiffres de la grille tarifaire (base de données) cités dans les textes
+const INCL = (p: Pricing) => p.settings.included_video_seconds / 60;
+const MAX = (p: Pricing) => p.settings.max_video_seconds / 60;
+const FREE = (p: Pricing) => money(p.settings.free_shipping_threshold);
+const PER_MIN = (p: Pricing) => money(p.settings.surcharge_per_minute);
+const BASE = (p: Pricing) => money(getTiers(p, "10x15")[0]!.unit_price);
+const TIER2 = (p: Pricing) => getTiers(p, "10x15")[1]?.min_qty;
 
 /** Textes du site en français. Les autres langues suivent exactement cette forme. */
 export const fr = {
@@ -132,18 +129,18 @@ export const fr = {
     businessLead: "Dès 50 exemplaires. Échantillon offert.",
     businessCta: "Demander un échantillon",
     finalTitle: "Une photo à poser. Une voix à réentendre.",
-    finalLead: `Livraison offerte dès ${money(FREE)}.`,
+    finalLead: (p: Pricing) => `Livraison offerte dès ${FREE(p)}.`,
   },
   how: {
     title: "Comment ça marche",
     lead: "Ni application, ni compte, ni QR code.",
     orderTitle: "Vous commandez",
-    orderSteps: [
-      ["Votre vidéo", `${INCL} minutes incluses.`],
+    orderSteps: (p: Pricing): [string, string][] => [
+      ["Votre vidéo", `${INCL(p)} minutes incluses.`],
       ["Votre photo", "Recadrez-la, voyez l'aperçu."],
       ["Votre panier", "Ajoutez un mot pour la carte."],
       ["La livraison", "Fabriqué en 48 h. Payé au livreur."],
-    ] as [string, string][],
+    ],
     receiveTitle: "Ils reçoivent",
     receiveLead: "Touchez la carte pour la retourner.",
     receiveSteps: [
@@ -171,9 +168,10 @@ export const fr = {
       delivery: "Livraison",
       payment: "Paiement",
     },
-    videoSpec: `${INCL} min incluses, puis ${money(SURCHARGE_TND_PER_MIN)} la minute, jusqu'à ${MAX} min`,
+    videoSpec: (p: Pricing) =>
+      `${INCL(p)} min incluses, puis ${PER_MIN(p)} la minute, jusqu'à ${MAX(p)} min`,
     phonesSpec: "iPhone XS et suivants, Android avec NFC",
-    deliverySpec: `3 à 5 jours ouvrés. Offerte dès ${money(FREE)}.`,
+    deliverySpec: (p: Pricing) => `3 à 5 jours ouvrés. Offerte dès ${FREE(p)}.`,
     paymentSpec: "En espèces, à la livraison",
     tiersNote: "Même photo ou photos différentes.",
     chooseImage: "Choisir une image",
@@ -185,7 +183,7 @@ export const fr = {
     notFoundTitle: "Pas trouvé ?",
     notFoundLead: "On répond sur WhatsApp, du lundi au vendredi.",
     otherContact: "Autres contacts",
-    groups: [
+    groups: (p: Pricing) => [
       {
         title: "Comment ça marche",
         items: [
@@ -217,7 +215,7 @@ export const fr = {
           {
             id: "length",
             q: "Quelle durée ?",
-            a: `${INCL} minutes incluses. Puis ${money(SURCHARGE_TND_PER_MIN)} la minute, jusqu'à ${MAX} minutes.`,
+            a: `${INCL(p)} minutes incluses. Puis ${PER_MIN(p)} la minute, jusqu'à ${MAX(p)} minutes.`,
           },
           { id: "files", q: "Quels fichiers ?", a: "MP4, MOV (iPhone) et WebM." },
           {
@@ -233,12 +231,12 @@ export const fr = {
           {
             id: "price",
             q: "Combien ça coûte ?",
-            a: `${money(BASE)} la photo, enveloppe et carte comprises. Moins cher dès ${TIER2} exemplaires.`,
+            a: `${BASE(p)} la photo, enveloppe et carte comprises.${TIER2(p) ? ` Moins cher dès ${TIER2(p)} exemplaires.` : ""}`,
           },
           {
             id: "delivery",
             q: "Quels délais ?",
-            a: `Fabriqué en 48 h, livré en 3 à 5 jours ouvrés. Offert dès ${money(FREE)}.`,
+            a: `Fabriqué en 48 h, livré en 3 à 5 jours ouvrés. Offert dès ${FREE(p)}.`,
           },
           { id: "pay", q: "Comment je paie ?", a: "En espèces, au livreur." },
         ],
@@ -330,7 +328,7 @@ export const fr = {
     shipping: "Livraison",
     free: "Offerte",
     toPay: "À payer à la livraison",
-    freeFrom: `Livraison offerte dès ${money(FREE)}.`,
+    freeFrom: (p: Pricing) => `Livraison offerte dès ${FREE(p)}.`,
     checkout: "Choisir la livraison",
   },
   memory: {
@@ -387,12 +385,12 @@ export const fr = {
     },
     shipping: {
       title: "Livraison",
-      sections: [
+      sections: (p: Pricing): [string, string][] => [
         ["Délais", "Fabrication en 48 h ouvrées, puis livraison en 3 à 5 jours ouvrés."],
         ["Transport", "Partout en Tunisie, avec un lien de suivi."],
-        ["Frais", `Livraison offerte dès ${money(FREE)}.`],
+        ["Frais", `Livraison offerte dès ${FREE(p)}.`],
         ["Emballage", "Étui cartonné renforcé et papier de soie."],
-      ] as [string, string][],
+      ],
     },
     refund: {
       title: "Garantie et retours",
