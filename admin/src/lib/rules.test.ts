@@ -6,12 +6,15 @@ import {
   computeStats,
   displayMediaUrl,
   mediaPath,
+  MAX_IMAGE_BYTES,
   mergeById,
+  moveItem,
   normalizePromoCode,
   olderThanCursor,
   parseServerStats,
   validateArticle,
   validateFramePrice,
+  validateImageFile,
   validateNewPromoCode,
   validatePromoPercent,
   validateShippingVideo,
@@ -284,5 +287,34 @@ describe("cleanArticle", () => {
       description: { fr: "Texte", ar: "نص" },
       materials: { fr: ["Photo"] },
     });
+  });
+});
+
+describe("validateImageFile", () => {
+  it("accepte JPEG, PNG et WebP jusqu'à 5 Mo", () => {
+    expect(validateImageFile({ type: "image/jpeg", size: 1000 })).toBeNull();
+    expect(validateImageFile({ type: "image/png", size: MAX_IMAGE_BYTES })).toBeNull();
+    expect(validateImageFile({ type: "image/webp", size: 1 })).toBeNull();
+  });
+  it("refuse les autres formats et les fichiers trop lourds", () => {
+    expect(validateImageFile({ type: "image/gif", size: 1000 })).toMatch(/Format/);
+    expect(validateImageFile({ type: "", size: 1000 })).toMatch(/Format/);
+    expect(validateImageFile({ type: "image/jpeg", size: MAX_IMAGE_BYTES + 1 })).toMatch(/5 Mo/);
+  });
+});
+
+describe("moveItem", () => {
+  it("déplace un élément vers le haut ou le bas sans toucher la liste d'origine", () => {
+    const list = ["a", "b", "c"];
+    expect(moveItem(list, 2, -2)).toEqual(["c", "b", "a"]);
+    expect(moveItem(list, 2, -1)).toEqual(["a", "c", "b"]);
+    expect(moveItem(list, 0, 1)).toEqual(["b", "a", "c"]);
+    expect(list).toEqual(["a", "b", "c"]);
+  });
+  it("ne fait rien hors de la liste", () => {
+    const list = ["a", "b"];
+    expect(moveItem(list, 0, -1)).toBe(list);
+    expect(moveItem(list, 1, 1)).toBe(list);
+    expect(moveItem(list, 5, -1)).toBe(list);
   });
 });

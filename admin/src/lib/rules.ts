@@ -279,3 +279,23 @@ export function validateArticle(
   if (!Number.isInteger(a.sort_order)) return "Ordre d'affichage invalide : un nombre entier.";
   return null;
 }
+
+/** Photos de la galerie : mêmes limites que le bucket catalogue (migration catalogue_bucket). */
+export const IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
+export const MAX_IMAGE_BYTES = 5 * 1024 * 1024;
+
+/** Photo acceptée avant l'envoi : JPEG, PNG ou WebP, 5 Mo au plus. */
+export function validateImageFile(file: { type: string; size: number }): string | null {
+  if (!IMAGE_TYPES[file.type]) return "Format de photo refusé : JPEG, PNG ou WebP seulement.";
+  if (file.size > MAX_IMAGE_BYTES) return "Photo trop lourde : 5 Mo au maximum.";
+  return null;
+}
+
+/** Copie de la liste où l'élément `i` a bougé de `by` places ; inchangée si on sort de la liste. */
+export function moveItem<T>(list: T[], i: number, by: number): T[] {
+  const j = i + by;
+  if (i < 0 || i >= list.length || j < 0 || j >= list.length) return list;
+  const out = [...list];
+  [out[i], out[j]] = [out[j]!, out[i]!];
+  return out;
+}

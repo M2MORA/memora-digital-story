@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from "react";
 import { supabase } from "./supabase";
-import { cleanArticle, validateArticle, type Article } from "./rules";
+import { cleanArticle, IMAGE_TYPES, validateArticle, validateImageFile, type Article } from "./rules";
 
 // Sans droit admin, Supabase ne modifie aucune ligne et ne renvoie pas d'erreur : on vérifie le nombre.
 const NOTHING_WRITTEN = "La base n'a rien enregistré (droits admin manquants ?). Recharge la page.";
@@ -11,7 +11,7 @@ const COLUMNS =
 /** Ordre de la boutique : sort_order puis slug. */
 const byShopOrder = (a: Article, b: Article) => a.sort_order - b.sort_order || a.slug.localeCompare(b.slug);
 
-/** Ce que le formulaire d'article modifie (le style et les photos n'y sont pas). */
+/** Ce que le formulaire d'article modifie (le style n'y est pas). `images` : URL publiques, dans l'ordre de la galerie. */
 export type ArticleEdit = Pick<
   Article,
   | "id"
@@ -27,7 +27,26 @@ export type ArticleEdit = Pick<
   | "tagline"
   | "description"
   | "materials"
+  | "images"
 >;
+
+/** Bucket public des photos d'articles (lecture libre, écriture admin : migration catalogue_bucket). */
+const BUCKET = "catalogue";
+
+/**
+ * Envoie une photo dans catalogue/<id de l'article>/ et renvoie son URL publique,
+ * ou le message d'erreur. Rien n'est écrit dans products : c'est l'enregistrement de l'article qui le fait.
+ */
+export async function uploadArticleImage(articleId: string, file: File): Promise<{ url: string } | { error: string }> {
+  const invalid = validateImageFile(file);
+  if (invalid) return { error: invalid };
+  const path = `${articleId}/${crypto.randomUUID()}.${IMAGE_TYPES[file.type]}`;
+  const { error } = await supabase.storage
+    .from(BUCKET)
+    .upload(path, file, { contentType: file.type, cacheControl: "31536000", upsert: false });
+  if (error) return { error: `Photo non envoyée : ${error.message}` };
+  return { url: supabase.storage.from(BUCKET).getPublicUrl(path).data.publicUrl };
+}
 
 /**
  * Articles de l'onglet Catalogue (actifs et inactifs : la session admin lit tout), écrits

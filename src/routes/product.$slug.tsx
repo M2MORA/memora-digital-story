@@ -7,11 +7,41 @@ import { PriceTiers } from "@/components/site/PriceTiers";
 import { buttonStyles } from "@/components/site/kit";
 import { langFromMatches, useLang, useT } from "@/i18n";
 import { Img } from "@/components/site/Img";
-import { IMAGES } from "@/lib/images.gen";
+import { IMAGES, type OptimizedImage } from "@/lib/images.gen";
 import { getUnitPrice } from "@/lib/pricing";
 import { usePricing } from "@/hooks/use-pricing";
 
-const GALLERY = [IMAGES.envelope, IMAGES.moments, IMAGES.hero];
+// Article sans photo en base (l'article d'origine) : galerie livrée avec le site, à l'identique.
+const BUNDLED_GALLERY = [IMAGES.envelope, IMAGES.moments, IMAGES.hero];
+
+/** Photo de la galerie : optimisée si livrée avec le site, simple URL si envoyée depuis l'admin. */
+function GalleryImage({
+  image,
+  alt,
+  sizes,
+  className,
+  priority = false,
+}: {
+  image: OptimizedImage | string;
+  alt: string;
+  sizes: string;
+  className: string;
+  priority?: boolean;
+}) {
+  if (typeof image !== "string")
+    return <Img image={image} alt={alt} sizes={sizes} priority={priority} className={className} />;
+  return (
+    <img
+      src={image}
+      alt={alt}
+      width={1200}
+      height={1200}
+      decoding="async"
+      {...(priority ? { fetchPriority: "high" as const } : { loading: "lazy" as const })}
+      className={className}
+    />
+  );
+}
 
 export const Route = createFileRoute("/product/$slug")({
   // Article inconnu ou désactivé : page introuvable. Base illisible : page d'erreur.
@@ -39,6 +69,10 @@ function ProductPage() {
   const product = resolveProduct(Route.useLoaderData().product, useLang());
   const pricing = usePricing();
   const [img, setImg] = useState(0);
+  const uploaded = product.images.length > 0;
+  const gallery: (OptimizedImage | string)[] = uploaded ? product.images : BUNDLED_GALLERY;
+  const label = (i: number) => (uploaded ? `${product.name} ${i + 1}` : (p.imageLabels[i] ?? product.name));
+  const shown = img < gallery.length ? img : 0;
 
   const specs: [string, string][] = [
     [p.specs.format, product.dimensions],
@@ -53,28 +87,28 @@ function ProductPage() {
     <section className="container-x grid gap-10 pb-20 pt-8 md:grid-cols-[1.15fr_1fr] md:gap-14 md:pt-14">
       <div>
         <div className="overflow-hidden rounded-[4px] bg-m-stage shadow-paper">
-          <Img
-            key={img}
-            image={GALLERY[img] ?? IMAGES.envelope}
-            alt={p.imageLabels[img] ?? product.name}
+          <GalleryImage
+            key={shown}
+            image={gallery[shown]!}
+            alt={label(shown)}
             sizes="(min-width: 768px) 55vw, 100vw"
             priority
             className="aspect-square w-full object-cover"
           />
         </div>
         <div className="mt-4 flex gap-3" role="group" aria-label={p.chooseImage}>
-          {GALLERY.map((image, i) => (
+          {gallery.map((image, i) => (
             <button
-              key={image.src}
+              key={typeof image === "string" ? image : image.src}
               type="button"
               onClick={() => setImg(i)}
-              aria-label={p.imageN(i + 1, p.imageLabels[i] ?? product.name)}
-              aria-pressed={i === img}
+              aria-label={p.imageN(i + 1, label(i))}
+              aria-pressed={i === shown}
               className={`h-20 w-20 overflow-hidden rounded-[4px] border-2 transition-colors ${
-                i === img ? "border-m-wine" : "border-transparent opacity-75 hover:opacity-100"
+                i === shown ? "border-m-wine" : "border-transparent opacity-75 hover:opacity-100"
               }`}
             >
-              <Img image={image} alt="" sizes="80px" className="h-full w-full object-cover" />
+              <GalleryImage image={image} alt="" sizes="80px" className="h-full w-full object-cover" />
             </button>
           ))}
         </div>

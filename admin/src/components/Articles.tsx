@@ -1,7 +1,7 @@
 import { useState } from "react";
-import { Pencil, RefreshCw, X } from "lucide-react";
-import { useArticles, type ArticleEdit } from "../lib/useArticles";
-import { cleanArticle } from "../lib/rules";
+import { ArrowDown, ArrowUp, Pencil, RefreshCw, Trash2, X } from "lucide-react";
+import { uploadArticleImage, useArticles, type ArticleEdit } from "../lib/useArticles";
+import { cleanArticle, IMAGE_TYPES, moveItem } from "../lib/rules";
 import { IDLE, SaveRow, type Status } from "./SaveRow";
 
 const LANGS = [
@@ -39,6 +39,7 @@ const toDraft = (a: ArticleEdit) => ({
   dimensions: a.dimensions,
   occasions: a.occasions,
   included_video_min: String(a.included_video_min),
+  images: a.images,
   copy: { fr: copyDraft(a, "fr"), en: copyDraft(a, "en"), ar: copyDraft(a, "ar") },
 });
 type Draft = ReturnType<typeof toDraft>;
@@ -56,6 +57,7 @@ function fromDraft(d: Draft, a: ArticleEdit): ArticleEdit {
     dimensions: d.dimensions,
     occasions: d.occasions,
     included_video_min: int(d.included_video_min),
+    images: d.images,
     name: pick("name"),
     tagline: pick("tagline"),
     description: pick("description"),
@@ -78,6 +80,8 @@ export function ArticleForm({
 }) {
   const [draft, setDraft] = useState(() => toDraft(article));
   const [status, setStatus] = useState<Status>(IDLE);
+  const [uploading, setUploading] = useState(false);
+  const [photoError, setPhotoError] = useState("");
   const dirty = JSON.stringify(draft) !== JSON.stringify(toDraft(article));
 
   const set = (patch: Partial<Draft>) => setDraft((d) => ({ ...d, ...patch }));
@@ -88,6 +92,21 @@ export function ArticleForm({
 
   // Occasions déjà en base mais inconnues ici : gardées et affichées telles quelles.
   const occasionChoices = [...OCCASIONS, ...article.occasions.filter((o) => !OCCASIONS.some(([k]) => k === o)).map((o) => [o, o])];
+
+  // Envoi immédiat dans le bucket ; la photo n'est liée à l'article qu'à l'enregistrement.
+  const onPickPhoto = async (input: HTMLInputElement) => {
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) return;
+    setPhotoError("");
+    setUploading(true);
+    const res = await uploadArticleImage(article.id, file);
+    setUploading(false);
+    if ("error" in res) return setPhotoError(res.error);
+    setDraft((d) => ({ ...d, images: [...d.images, res.url] }));
+  };
+  const movePhoto = (i: number, by: number) => set({ images: moveItem(draft.images, i, by) });
+  const removePhoto = (i: number) => set({ images: draft.images.filter((_, j) => j !== i) });
 
   const onSave = async () => {
     setStatus({ saving: true, message: "", ok: false });
@@ -160,6 +179,52 @@ export function ArticleForm({
         ))}
       </fieldset>
 
+      <fieldset className="field photos">
+        <legend>Photos (la première est l'image principale)</legend>
+        {draft.images.length === 0 && (
+          <p className="hint">Aucune photo : la page produit affiche les photos livrées avec le site.</p>
+        )}
+        <ol className="photo-list">
+          {draft.images.map((url, i) => (
+            <li key={url}>
+              <img src={url} alt={`Photo ${i + 1}`} width={64} height={64} loading="lazy" />
+              <span>Photo {i + 1}</span>
+              <button type="button" className="icon-btn" aria-label={`Monter la photo ${i + 1}`} title="Monter" disabled={i === 0} onClick={() => movePhoto(i, -1)}>
+                <ArrowUp size={16} />
+              </button>
+              <button
+                type="button"
+                className="icon-btn"
+                aria-label={`Descendre la photo ${i + 1}`}
+                title="Descendre"
+                disabled={i === draft.images.length - 1}
+                onClick={() => movePhoto(i, 1)}
+              >
+                <ArrowDown size={16} />
+              </button>
+              <button type="button" className="icon-btn" aria-label={`Retirer la photo ${i + 1}`} title="Retirer" onClick={() => removePhoto(i)}>
+                <Trash2 size={16} />
+              </button>
+            </li>
+          ))}
+        </ol>
+        {article.id ? (
+          <label className="field">
+            Ajouter une photo (JPEG, PNG ou WebP, 5 Mo au maximum)
+            <input
+              type="file"
+              accept={Object.keys(IMAGE_TYPES).join(",")}
+              disabled={uploading || status.saving}
+              onChange={(e) => void onPickPhoto(e.currentTarget)}
+            />
+          </label>
+        ) : (
+          <p className="hint">Enregistre l'article une première fois pour pouvoir ajouter des photos.</p>
+        )}
+        {uploading && <p className="note" role="status">Envoi de la photo…</p>}
+        {photoError && <p className="note is-error" role="alert">{photoError}</p>}
+      </fieldset>
+
       {LANGS.map(([l, label]) => (
         <fieldset key={l} className="field copy" dir={l === "ar" ? "rtl" : undefined}>
           <legend>{label}</legend>
@@ -185,10 +250,12 @@ export function ArticleForm({
       <SaveRow
         dirty={dirty}
         status={status}
+        busy={uploading}
         onSave={() => void onSave()}
         onReset={() => {
           setDraft(toDraft(article));
           setStatus(IDLE);
+          setPhotoError("");
         }}
       />
     </div>
