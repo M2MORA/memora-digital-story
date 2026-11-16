@@ -440,3 +440,10 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
   .kpi.skeleton { animation: none; }
   .chart-bar { transition: none; }
 }
+
+/* Catalogue : grille de paliers */
+.catalogue { max-width: 640px; }
+.tier-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.tier-table th { text-align: left; font-size: 13px; font-weight: 500; color: var(--ink-2); padding: 0 8px 6px 0; }
+.tier-table td { padding: 0 8px 8px 0; }
+.tier-table td:last-child, .tier-table th:last-child { width: 44px; padding-right: 0; }

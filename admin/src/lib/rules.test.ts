@@ -7,6 +7,9 @@ import {
   mergeById,
   olderThanCursor,
   parseServerStats,
+  validateFramePrice,
+  validateShippingVideo,
+  validateTierGrid,
 } from "./rules";
 
 const key = "staging/dft_abc/11111111-2222-3333-4444-555555555555.jpg";
@@ -82,5 +85,78 @@ describe("pagination helpers", () => {
     ).toEqual({ count: 3, todo: 2, collected: 90.5, toCollect: 10, views: 7, byStatus: { pending: 2 } });
     expect(parseServerStats(null)).toBeNull();
     expect(parseServerStats({ todo: 1 })).toBeNull();
+  });
+});
+
+describe("validateTierGrid", () => {
+  const grid = [
+    { min_qty: 1, unit_price: 49 },
+    { min_qty: 5, unit_price: 42 },
+    { min_qty: 10, unit_price: 42 },
+  ];
+
+  it("accepte une grille dégressive (prix égaux permis) et un prix fixe à un seul palier", () => {
+    expect(validateTierGrid(grid)).toBeNull();
+    expect(validateTierGrid([{ min_qty: 1, unit_price: 89 }])).toBeNull();
+  });
+
+  it("accepte les paliers dans le désordre", () => {
+    expect(validateTierGrid([...grid].reverse())).toBeNull();
+  });
+
+  it("refuse une grille vide ou sans palier à 1", () => {
+    expect(validateTierGrid([])).toMatch(/au moins un palier/);
+    expect(validateTierGrid([{ min_qty: 2, unit_price: 10 }])).toMatch(/commencer à 1/);
+  });
+
+  it("refuse deux paliers à la même quantité", () => {
+    expect(validateTierGrid([...grid, { min_qty: 5, unit_price: 40 }])).toMatch(/Deux paliers commencent à 5/);
+  });
+
+  it("refuse un prix unitaire qui augmente avec la quantité", () => {
+    expect(validateTierGrid([{ min_qty: 1, unit_price: 40 }, { min_qty: 5, unit_price: 42 }])).toMatch(
+      /ne peut pas augmenter.*palier 5/,
+    );
+  });
+
+  it("refuse les valeurs négatives, non numériques ou les quantités non entières", () => {
+    expect(validateTierGrid([{ min_qty: 1, unit_price: -1 }])).toMatch(/Prix unitaire invalide/);
+    expect(validateTierGrid([{ min_qty: 1, unit_price: NaN }])).toMatch(/Prix unitaire invalide/);
+    expect(validateTierGrid([{ min_qty: 1, unit_price: 5 }, { min_qty: 2.5, unit_price: 4 }])).toMatch(/Quantité minimale/);
+    expect(validateTierGrid([{ min_qty: 0, unit_price: 5 }])).toMatch(/Quantité minimale/);
+  });
+});
+
+describe("validateFramePrice", () => {
+  it("accepte zéro et un prix positif, refuse le reste", () => {
+    expect(validateFramePrice(0)).toBeNull();
+    expect(validateFramePrice(50)).toBeNull();
+    expect(validateFramePrice(-5)).toMatch(/cadre invalide/);
+    expect(validateFramePrice(NaN)).toMatch(/cadre invalide/);
+  });
+});
+
+describe("validateShippingVideo", () => {
+  const ok = {
+    shipping_fee_aramex: 8,
+    shipping_fee_mondial_relay: 6,
+    free_shipping_threshold: 250,
+    included_video_minutes: 8,
+    surcharge_per_minute: 1.5,
+  };
+
+  it("accepte des valeurs positives ou nulles", () => {
+    expect(validateShippingVideo(ok, 1800)).toBeNull();
+    expect(validateShippingVideo({ ...ok, shipping_fee_aramex: 0, included_video_minutes: 0 }, 1800)).toBeNull();
+  });
+
+  it("refuse une valeur négative ou vide en nommant le champ", () => {
+    expect(validateShippingVideo({ ...ok, shipping_fee_mondial_relay: -1 }, 1800)).toMatch(/Mondial Relay invalide/);
+    expect(validateShippingVideo({ ...ok, surcharge_per_minute: NaN }, 1800)).toMatch(/Supplément par minute invalide/);
+  });
+
+  it("refuse plus de minutes incluses que la durée maximale d'une vidéo", () => {
+    expect(validateShippingVideo({ ...ok, included_video_minutes: 31 }, 1800)).toMatch(/30 min au maximum/);
+    expect(validateShippingVideo({ ...ok, included_video_minutes: 30 }, 1800)).toBeNull();
   });
 });

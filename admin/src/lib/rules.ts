@@ -119,3 +119,60 @@ export function parseServerStats(raw: unknown) {
     byStatus: r.by_status ?? {},
   };
 }
+
+export type PriceTier = { min_qty: number; unit_price: number };
+
+const isPrice = (n: number) => Number.isFinite(n) && n >= 0;
+
+/**
+ * Grille de prix d'un format, vérifiée avant l'envoi. La base reste le vrai garde-fou
+ * (palier à 1 obligatoire, unicité, valeurs positives) ; ici on donne un message clair.
+ * Un seul palier (prix fixe) est accepté.
+ */
+export function validateTierGrid(tiers: PriceTier[]): string | null {
+  if (tiers.length === 0) return "Il faut au moins un palier.";
+  for (const t of tiers) {
+    if (!Number.isInteger(t.min_qty) || t.min_qty < 1) return "Quantité minimale invalide : un nombre entier à partir de 1.";
+    if (!isPrice(t.unit_price)) return `Prix unitaire invalide (palier ${t.min_qty}) : un nombre positif ou nul.`;
+  }
+  const sorted = [...tiers].sort((a, b) => a.min_qty - b.min_qty);
+  for (let i = 1; i < sorted.length; i++) {
+    const prev = sorted[i - 1]!;
+    const cur = sorted[i]!;
+    if (cur.min_qty === prev.min_qty) return `Deux paliers commencent à ${cur.min_qty} exemplaires.`;
+    if (cur.unit_price > prev.unit_price)
+      return `Le prix unitaire ne peut pas augmenter avec la quantité (palier ${cur.min_qty} : ${cur.unit_price} > ${prev.unit_price}).`;
+  }
+  if (sorted[0]!.min_qty !== 1) return "Le premier palier doit commencer à 1 exemplaire.";
+  return null;
+}
+
+/** Prix d'un cadre : positif ou nul. */
+export function validateFramePrice(price: number): string | null {
+  return isPrice(price) ? null : "Prix du cadre invalide : un nombre positif ou nul.";
+}
+
+export type ShippingVideoSettings = {
+  shipping_fee_aramex: number;
+  shipping_fee_mondial_relay: number;
+  free_shipping_threshold: number;
+  included_video_minutes: number;
+  surcharge_per_minute: number;
+};
+
+/** Livraison et vidéo. Les minutes incluses ne peuvent pas dépasser la durée maximale d'une vidéo. */
+export function validateShippingVideo(s: ShippingVideoSettings, maxVideoSeconds: number): string | null {
+  const labels: [keyof ShippingVideoSettings, string][] = [
+    ["shipping_fee_aramex", "Frais Aramex"],
+    ["shipping_fee_mondial_relay", "Frais Mondial Relay"],
+    ["free_shipping_threshold", "Seuil de livraison gratuite"],
+    ["included_video_minutes", "Minutes de vidéo incluses"],
+    ["surcharge_per_minute", "Supplément par minute"],
+  ];
+  for (const [key, label] of labels) {
+    if (!isPrice(s[key])) return `${label} invalide : un nombre positif ou nul.`;
+  }
+  if (Math.round(s.included_video_minutes * 60) > maxVideoSeconds)
+    return `Minutes de vidéo incluses : ${maxVideoSeconds / 60} min au maximum (durée maximale d'une vidéo).`;
+  return null;
+}
