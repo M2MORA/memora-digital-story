@@ -15,25 +15,22 @@
  * 11. Absence totale de fuite de clés ou secrets dans les messages d'erreur
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { describe, it, expect, vi, beforeEach } from "vitest";
 import {
   S3CompatibleR2Adapter,
   CloudflareR2BindingAdapter,
   encodeRfc3986,
   encodeS3UriPath,
-  sha256Hex,
 } from "../lib/r2-backend";
+import { sha256Hex } from "../server/crypto";
 import { getR2Adapter } from "../server";
 
 describe("MÉMORA Phase 2.1 — R2 Backend Hardening & SigV4 Unit Tests", () => {
-  const originalFetch = globalThis.fetch;
+  const fetchMock = vi.fn();
 
   beforeEach(() => {
     vi.restoreAllMocks();
-  });
-
-  afterEach(() => {
-    globalThis.fetch = originalFetch;
+    fetchMock.mockReset();
   });
 
   // --------------------------------------------------------------------------
@@ -233,13 +230,13 @@ describe("MÉMORA Phase 2.1 — R2 Backend Hardening & SigV4 Unit Tests", () => 
         accessKeyId: "mytestaccesskey123",
         secretAccessKey: "mytestsecretaccesskey1234567890",
         bucketName: "memora-dev-bucket",
-      });
+      }, fetchMock);
 
       let capturedUrl = "";
       let capturedHeaders: Record<string, string> = {};
       let capturedBody: any = null;
 
-      globalThis.fetch = vi.fn().mockImplementation(async (url: string, init: any) => {
+      fetchMock.mockImplementation(async (url: string, init: any) => {
         capturedUrl = url;
         capturedHeaders = init.headers;
         capturedBody = init.body;
@@ -277,10 +274,10 @@ describe("MÉMORA Phase 2.1 — R2 Backend Hardening & SigV4 Unit Tests", () => 
       accessKeyId: "mytestaccesskey123",
       secretAccessKey: "mytestsecretaccesskey1234567890",
       bucketName: "memora-dev-bucket",
-    });
+    }, fetchMock);
 
     it("returns exists=true with contentLength on HTTP 200", async () => {
-      globalThis.fetch = vi.fn().mockResolvedValue(
+      fetchMock.mockResolvedValue(
         new Response(null, {
           status: 200,
           headers: { "content-length": "1048576", etag: '"head-etag"' },
@@ -294,7 +291,7 @@ describe("MÉMORA Phase 2.1 — R2 Backend Hardening & SigV4 Unit Tests", () => 
     });
 
     it("returns exists=false with contentLength=0 on HTTP 404", async () => {
-      globalThis.fetch = vi.fn().mockResolvedValue(new Response(null, { status: 404 }));
+      fetchMock.mockResolvedValue(new Response(null, { status: 404 }));
 
       const res = await adapter.headObject("missing/video.mp4");
       expect(res.exists).toBe(false);
@@ -302,7 +299,7 @@ describe("MÉMORA Phase 2.1 — R2 Backend Hardening & SigV4 Unit Tests", () => 
     });
 
     it("throws on HTTP 500 server error", async () => {
-      globalThis.fetch = vi.fn().mockResolvedValue(new Response(null, { status: 500 }));
+      fetchMock.mockResolvedValue(new Response(null, { status: 500 }));
 
       await expect(adapter.headObject("error/video.mp4")).rejects.toThrow(/HTTP 500/);
     });
@@ -317,10 +314,10 @@ describe("MÉMORA Phase 2.1 — R2 Backend Hardening & SigV4 Unit Tests", () => 
       accessKeyId: "mytestaccesskey123",
       secretAccessKey: "mytestsecretaccesskey1234567890",
       bucketName: "memora-dev-bucket",
-    });
+    }, fetchMock);
 
     it("returns success=true on HTTP 204 or 200", async () => {
-      globalThis.fetch = vi.fn().mockResolvedValue(new Response(null, { status: 204 }));
+      fetchMock.mockResolvedValue(new Response(null, { status: 204 }));
       const res = await adapter.deleteObject("videos/to-delete.mp4");
       expect(res.success).toBe(true);
     });
@@ -328,7 +325,7 @@ describe("MÉMORA Phase 2.1 — R2 Backend Hardening & SigV4 Unit Tests", () => 
     it("returns success=true on HTTP 404 with NoSuchKey (idempotent success)", async () => {
       const xmlBody =
         '<?xml version="1.0" encoding="UTF-8"?><Error><Code>NoSuchKey</Code><Message>The specified key does not exist.</Message></Error>';
-      globalThis.fetch = vi.fn().mockResolvedValue(new Response(xmlBody, { status: 404 }));
+      fetchMock.mockResolvedValue(new Response(xmlBody, { status: 404 }));
 
       const res = await adapter.deleteObject("videos/already-gone.mp4");
       expect(res.success).toBe(true);
@@ -337,7 +334,7 @@ describe("MÉMORA Phase 2.1 — R2 Backend Hardening & SigV4 Unit Tests", () => 
     it("returns success=false on HTTP 404 with NoSuchBucket (configuration failure)", async () => {
       const xmlBody =
         '<?xml version="1.0" encoding="UTF-8"?><Error><Code>NoSuchBucket</Code><Message>The specified bucket does not exist.</Message></Error>';
-      globalThis.fetch = vi.fn().mockResolvedValue(new Response(xmlBody, { status: 404 }));
+      fetchMock.mockResolvedValue(new Response(xmlBody, { status: 404 }));
 
       const res = await adapter.deleteObject("videos/test.mp4");
       expect(res.success).toBe(false);
@@ -370,9 +367,9 @@ describe("MÉMORA Phase 2.1 — R2 Backend Hardening & SigV4 Unit Tests", () => 
         accessKeyId: "mytestaccesskey123",
         secretAccessKey: "mytestsecretaccesskey1234567890",
         bucketName: "memora-dev-bucket",
-      });
+      }, fetchMock);
 
-      globalThis.fetch = vi.fn().mockRejectedValue(
+      fetchMock.mockRejectedValue(
         new TypeError("Failed to fetch from https://0123456789abcdef0123456789abcdef.r2.cloudflarestorage.com")
       );
 
@@ -453,7 +450,7 @@ describe("MÉMORA Phase 2.1 — R2 Backend Hardening & SigV4 Unit Tests", () => 
         secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
         bucketName: "memora-dev-test",
       };
-      const adapter = new S3CompatibleR2Adapter(config);
+      const adapter = new S3CompatibleR2Adapter(config, fetchMock);
 
       const objectKey = "videos/draft-1/final (test)!.mp4";
       const contentType = "video/mp4";
@@ -509,7 +506,7 @@ describe("MÉMORA Phase 2.1 — R2 Backend Hardening & SigV4 Unit Tests", () => 
       // 7. Interception de la requête émise par la classe de production
       let capturedHeaders: Record<string, string> = {};
       let capturedUrl = "";
-      globalThis.fetch = vi.fn().mockImplementation(async (url: string, init: any) => {
+      fetchMock.mockImplementation(async (url: string, init: any) => {
         capturedUrl = url;
         capturedHeaders = init.headers;
         return new Response(null, { status: 200, headers: { etag: '"test-etag"' } });
@@ -539,6 +536,102 @@ describe("MÉMORA Phase 2.1 — R2 Backend Hardening & SigV4 Unit Tests", () => 
       expect(capturedSignature).toBe(expectedSignature);
 
       vi.useRealTimers();
+    });
+  });
+
+  // --------------------------------------------------------------------------
+  // 13. LECTURES : LIEN GET SIGNÉ ET LECTURE PAR PLAGE
+  // --------------------------------------------------------------------------
+  describe("13. Lectures signées et par plage", () => {
+    const config = {
+      accountId: "0123456789abcdef0123456789abcdef",
+      accessKeyId: "AKIAIOSFODNN7EXAMPLE",
+      secretAccessKey: "wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY",
+      bucketName: "memora-dev-test",
+    };
+    const adapter = new S3CompatibleR2Adapter(config, fetchMock);
+
+    it("presigns a GET URL with an independently verified SigV4 signature", async () => {
+      const objectKey = "staging/dft_1/final (test)!.mp4";
+      const url = await adapter.getSignedGetUrl(objectKey, 3600, new Date("2026-10-19T12:00:00.000Z"));
+
+      const host = `${config.accountId}.r2.cloudflarestorage.com`;
+      const canonicalUri = `/${config.bucketName}/${encodeS3UriPath(objectKey)}`;
+      const query =
+        `X-Amz-Algorithm=AWS4-HMAC-SHA256&` +
+        `X-Amz-Credential=${config.accessKeyId}%2F20261019%2Fauto%2Fs3%2Faws4_request&` +
+        `X-Amz-Date=20261019T120000Z&X-Amz-Expires=3600&X-Amz-SignedHeaders=host`;
+      const canonicalRequest = `GET\n${canonicalUri}\n${query}\nhost:${host}\n\nhost\nUNSIGNED-PAYLOAD`;
+      const stringToSign =
+        `AWS4-HMAC-SHA256\n20261019T120000Z\n20261019/auto/s3/aws4_request\n${await sha256Hex(canonicalRequest)}`;
+
+      const key = async (k: Uint8Array | string, data: string) => {
+        const raw = typeof k === "string" ? new TextEncoder().encode(k) : k;
+        const cryptoKey = await crypto.subtle.importKey("raw", raw as BufferSource, { name: "HMAC", hash: "SHA-256" }, false, ["sign"]);
+        return new Uint8Array(await crypto.subtle.sign("HMAC", cryptoKey, new TextEncoder().encode(data)));
+      };
+      const kSigning = await key(
+        await key(await key(await key("AWS4" + config.secretAccessKey, "20261019"), "auto"), "s3"),
+        "aws4_request"
+      );
+      const signature = Array.from(await key(kSigning, stringToSign))
+        .map((b) => b.toString(16).padStart(2, "0"))
+        .join("");
+
+      expect(url).toBe(`https://${host}${canonicalUri}?${query}&X-Amz-Signature=${signature}`);
+      expect(fetchMock).not.toHaveBeenCalled();
+    });
+
+    it("rejects path traversal and out-of-range expirations", async () => {
+      await expect(adapter.getSignedGetUrl("staging/../secret.mp4")).rejects.toThrow(/Clé/);
+      await expect(adapter.getSignedGetUrl("staging/a.mp4", 0)).rejects.toThrow(/Expiration/);
+    });
+
+    it("reads a byte range with a signed GET carrying the Range header", async () => {
+      fetchMock.mockResolvedValue(new Response(new Uint8Array([20, 30]), { status: 206 }));
+
+      const body = await adapter.getObjectRange("staging/dft_1/video.mp4", { start: 1, end: 2 });
+
+      const [url, init] = fetchMock.mock.calls[0]!;
+      expect(url).toBe(`https://${config.accountId}.r2.cloudflarestorage.com/memora-dev-test/staging/dft_1/video.mp4`);
+      expect(init.method).toBe("GET");
+      expect(init.headers.range).toBe("bytes=1-2");
+      expect(init.headers.authorization).toContain("SignedHeaders=host;x-amz-content-sha256;x-amz-date");
+      expect(new Uint8Array(await new Response(body).arrayBuffer())).toEqual(new Uint8Array([20, 30]));
+    });
+
+    it("reads the whole object without a Range header, null on 404, throws on 500", async () => {
+      fetchMock.mockResolvedValueOnce(new Response("abc", { status: 200 }));
+      await adapter.getObjectRange("staging/dft_1/video.mp4");
+      expect(fetchMock.mock.calls[0]![1].headers.range).toBeUndefined();
+
+      fetchMock.mockResolvedValueOnce(new Response(null, { status: 404 }));
+      expect(await adapter.getObjectRange("staging/dft_1/missing.mp4")).toBeNull();
+
+      fetchMock.mockResolvedValueOnce(new Response(null, { status: 500 }));
+      await expect(adapter.getObjectRange("staging/dft_1/video.mp4")).rejects.toThrow(/HTTP 500/);
+    });
+
+    it("headObject exposes Last-Modified for conditional streaming", async () => {
+      fetchMock.mockResolvedValue(
+        new Response(null, {
+          status: 200,
+          headers: { "content-length": "4", "last-modified": "Sun, 25 Oct 2026 10:00:00 GMT" },
+        })
+      );
+      const head = await adapter.headObject("staging/dft_1/video.mp4");
+      expect(head.lastModified?.toISOString()).toBe("2026-10-25T10:00:00.000Z");
+    });
+
+    it("binding adapter reads ranges natively and cannot presign", async () => {
+      const get = vi.fn(async () => ({ body: "stream" }));
+      const binding = new CloudflareR2BindingAdapter({ head: vi.fn(), delete: vi.fn(), put: vi.fn(), get });
+
+      expect(await binding.getObjectRange("/staging/a.mp4", { start: 10, end: 19 })).toBe("stream");
+      expect(get).toHaveBeenCalledWith("staging/a.mp4", { range: { offset: 10, length: 10 } });
+      await binding.getObjectRange("staging/a.mp4");
+      expect(get).toHaveBeenLastCalledWith("staging/a.mp4", undefined);
+      await expect(binding.getSignedGetUrl("staging/a.mp4")).rejects.toThrow(/présignées/);
     });
   });
 });

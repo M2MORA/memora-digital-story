@@ -9,9 +9,10 @@
  * Variables d'environnement (jamais dans le dépôt) :
  * VAPID_PUBLIC_KEY, VAPID_PRIVATE_KEY, VAPID_SUBJECT (mailto:…), ORDER_WEBHOOK_SECRET.
  */
-import { timingSafeCompare } from "../../lib/r2-backend";
 import { requireAdmin } from "../admin-auth";
-import { readEnv } from "../whatsapp/env";
+import { readEnv } from "../config";
+import { timingSafeCompare } from "../crypto";
+import { corsJson } from "../http";
 import {
   isAllowedPushEndpoint,
   isValidSubscriptionKeys,
@@ -20,14 +21,7 @@ import {
   type VapidKeys,
 } from "./webpush";
 
-const CORS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-  "Access-Control-Allow-Headers": "Authorization, Content-Type",
-};
-
-const json = (status: number, body: unknown) =>
-  new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json", ...CORS } });
+const { json, preflight } = corsJson("GET, POST, DELETE, OPTIONS");
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 const MAX_DEVICES_PER_ADMIN = 10;
@@ -194,7 +188,7 @@ export async function routePush(request: Request, env: unknown, deps: PushRouteD
   }
 
   if (!pathname.startsWith("/api/admin/push/")) return null;
-  if (request.method === "OPTIONS") return new Response(null, { status: 204, headers: CORS });
+  if (request.method === "OPTIONS") return preflight();
 
   const check = await requireAdmin(request, deps.getSupabase, "[admin/push]");
   if (!check.ok) return json(check.status, { error: check.error });

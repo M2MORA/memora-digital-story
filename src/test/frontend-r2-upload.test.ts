@@ -132,6 +132,9 @@ describe("MÉMORA Phase 3.0 / Step 3 — Frontend Direct R2 Upload & Persistence
   // 3. R2 Client & Endpoint Contract Tests
   // ============================================================================
   describe("3. R2 Upload Client (Intent, Direct PUT, Verify)", () => {
+    const fetchMock = vi.fn<typeof fetch>();
+    beforeEach(() => fetchMock.mockReset());
+
     it("3.1 Creates upload intent for photo and returns presigned PUT URL", async () => {
       const mockResponse = {
         success: true,
@@ -141,7 +144,7 @@ describe("MÉMORA Phase 3.0 / Step 3 — Frontend Direct R2 Upload & Persistence
         expires_at: new Date(Date.now() + 900000).toISOString(),
       };
 
-      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      fetchMock.mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       } as Response);
@@ -155,7 +158,7 @@ describe("MÉMORA Phase 3.0 / Step 3 — Frontend Direct R2 Upload & Persistence
         mime_type: "image/jpeg",
         file_size_bytes: 1048576,
         file_extension: "jpg",
-      });
+      }, fetchMock);
 
       expect(result.success).toBe(true);
       expect(result.intent_id).toBe("11111111-2222-3333-4444-555555555555");
@@ -171,7 +174,7 @@ describe("MÉMORA Phase 3.0 / Step 3 — Frontend Direct R2 Upload & Persistence
         expires_at: new Date(Date.now() + 900000).toISOString(),
       };
 
-      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      fetchMock.mockResolvedValueOnce({
         ok: true,
         json: async () => mockResponse,
       } as Response);
@@ -185,7 +188,7 @@ describe("MÉMORA Phase 3.0 / Step 3 — Frontend Direct R2 Upload & Persistence
         mime_type: "video/mp4",
         file_size_bytes: 14582910,
         file_extension: "mp4",
-      });
+      }, fetchMock);
 
       expect(result.success).toBe(true);
       expect(result.intent_id).toBe("66666666-7777-8888-9999-000000000000");
@@ -194,12 +197,12 @@ describe("MÉMORA Phase 3.0 / Step 3 — Frontend Direct R2 Upload & Persistence
 
     it("3.3 Uploads file directly to R2 via PUT with required Content-Type and NO Authorization header", async () => {
       const file = new File(["binary-data"], "photo.png", { type: "image/png" });
-      const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      const fetchSpy = fetchMock.mockResolvedValueOnce({
         ok: true,
         status: 200,
       } as Response);
 
-      await uploadBinaryToR2("https://r2.example.com/put-target", { "Content-Type": "image/png" }, file);
+      await uploadBinaryToR2("https://r2.example.com/put-target", { "Content-Type": "image/png" }, file, { fetch: fetchMock });
 
       expect(fetchSpy).toHaveBeenCalledWith("https://r2.example.com/put-target", {
         method: "PUT",
@@ -214,18 +217,18 @@ describe("MÉMORA Phase 3.0 / Step 3 — Frontend Direct R2 Upload & Persistence
 
     it("3.4 Throws descriptive error if R2 direct PUT returns failure", async () => {
       const file = new File(["binary-data"], "photo.png", { type: "image/png" });
-      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      fetchMock.mockResolvedValueOnce({
         ok: false,
         status: 403,
       } as Response);
 
       await expect(
-        uploadBinaryToR2("https://r2.example.com/put-target", { "Content-Type": "image/png" }, file)
+        uploadBinaryToR2("https://r2.example.com/put-target", { "Content-Type": "image/png" }, file, { fetch: fetchMock })
       ).rejects.toThrow("Échec du transfert vers Cloudflare R2 (HTTP 403)");
     });
 
     it("3.5 Successfully calls /api/upload/verify and validates ready status", async () => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      fetchMock.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           success: true,
@@ -235,13 +238,13 @@ describe("MÉMORA Phase 3.0 / Step 3 — Frontend Direct R2 Upload & Persistence
         }),
       } as Response);
 
-      const res = await verifyUploadedIntent("intent_123", "tok_secret");
+      const res = await verifyUploadedIntent("intent_123", "tok_secret", fetchMock);
       expect(res.success).toBe(true);
       expect(res.status).toBe("ready");
     });
 
     it("3.6 Throws error if /api/upload/verify returns unsuccessful or non-ready status", async () => {
-      vi.spyOn(globalThis, "fetch").mockResolvedValueOnce({
+      fetchMock.mockResolvedValueOnce({
         ok: true,
         json: async () => ({
           success: false,
@@ -249,7 +252,7 @@ describe("MÉMORA Phase 3.0 / Step 3 — Frontend Direct R2 Upload & Persistence
         }),
       } as Response);
 
-      await expect(verifyUploadedIntent("intent_123", "tok_secret")).rejects.toThrow(
+      await expect(verifyUploadedIntent("intent_123", "tok_secret", fetchMock)).rejects.toThrow(
         "Objet R2 introuvable ou taille non conforme"
       );
     });
@@ -257,7 +260,7 @@ describe("MÉMORA Phase 3.0 / Step 3 — Frontend Direct R2 Upload & Persistence
     it("3.7 uploadMediaWithR2Intent runs full sequence (intent -> direct PUT -> verify)", async () => {
       const file = new File(["video-bytes"], "clip.mp4", { type: "video/mp4" });
 
-      const fetchSpy = vi.spyOn(globalThis, "fetch")
+      const fetchSpy = fetchMock
         // 1. Intent call
         .mockResolvedValueOnce({
           ok: true,
@@ -290,6 +293,7 @@ describe("MÉMORA Phase 3.0 / Step 3 — Frontend Direct R2 Upload & Persistence
         itemId: "item_seq",
         fileKind: "video",
         file,
+        fetch: fetchMock,
       });
 
       expect(intentId).toBe("intent_seq_1");

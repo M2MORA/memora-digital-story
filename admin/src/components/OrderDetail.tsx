@@ -16,9 +16,9 @@ import {
   Printer,
   Trash2,
 } from "lucide-react";
-import { STATUSES, type Order, type OrderStatus } from "../lib/supabase";
-import { NEXT_STATUS, addressOf, fmt, fmtDate, mapsLink, statusLabel, whatsappLink } from "../lib/format";
-import { nfcLinkFor, qrCodeFor, type AdminData } from "../lib/useAdminData";
+import { type Order, type OrderStatus } from "../lib/supabase";
+import { TRANSITIONS, addressOf, fmt, fmtDate, mapsLink, nextStatus, statusLabel, whatsappLink } from "../lib/format";
+import { nfcLinkFor, qrCodeFor, type MemoriesData } from "../lib/useMemories";
 import { printQr } from "../lib/print";
 import StatusBadge from "./StatusBadge";
 
@@ -41,24 +41,69 @@ function PhotoPreview({ photoUrl, orderNumber }: { photoUrl: string; orderNumber
 
 export default function OrderDetail({
   order: o,
-  data,
+  memories: data,
+  onUpdateStatus,
+  onDelete,
   onBack,
   onOpenConversation,
 }: {
   order: Order;
-  data: AdminData;
+  memories: MemoriesData;
+  onUpdateStatus: (id: string, status: OrderStatus) => Promise<void>;
+  onDelete: (id: string, orderNumber: string) => Promise<boolean>;
   onBack: () => void;
   onOpenConversation: (conversationId: string) => void;
 }) {
   const { memories, copiedSlug, downloadingUrl, slugFor, resolveMedia } = data;
-  const next = NEXT_STATUS[o.status];
+  const next = nextStatus(o.status);
   const address = addressOf(o.shipping_address);
   const mediaMissingText = data.mediaUnavailable
     ? "Fichiers des clients non chargés. Actualise pour réessayer."
     : null;
 
+  const changeStatus = (status: OrderStatus) => {
+    if (o.status === "paid") {
+      alert("Cette commande a été marquée comme 'Payée'. Elle est définitivement verrouillée et ne peut plus être modifiée ou supprimée.");
+      return;
+    }
+
+    if (status === "paid") {
+      const confirmPaid = window.confirm(
+        `Êtes-vous sûr de marquer la commande #${o.order_number || ""} comme 'Payée' ?\n\nATTENTION : Une fois marquée comme Payée, cette commande sera définitivement verrouillée : son statut ne pourra plus jamais être changé et elle ne pourra JAMAIS être supprimée.`,
+      );
+      if (!confirmPaid) return;
+    }
+
+    const activeLinks = memories.filter((m) => m.order_id === o.id && m.status === "active");
+    if (status === "cancelled" && o.status !== "cancelled") {
+      const linkNote = activeLinks.length
+        ? `\n\nSon lien NFC sera désactivé : la vidéo ne s'ouvrira plus. Tu pourras le réactiver dans Souvenirs.`
+        : "";
+      if (!window.confirm(`Annuler la commande #${o.order_number || ""} ?${linkNote}`)) return;
+    }
+
+    void onUpdateStatus(o.id, status);
+  };
+
   const remove = async () => {
-    if (await data.deleteOrder(o.id, o.order_number)) onBack();
+    if (o.status === "paid") {
+      alert("Action impossible : une commande payée ne peut JAMAIS être supprimée.");
+      return;
+    }
+    if (o.status !== "cancelled") {
+      alert("Seules les commandes ayant le statut 'Annulée' peuvent être supprimées de la base de données.");
+      return;
+    }
+    if (!window.confirm(`Voulez-vous vraiment supprimer définitivement la commande annulée #${o.order_number} de la base de données ?`)) {
+      return;
+    }
+    if (await onDelete(o.id, o.order_number)) onBack();
+  };
+
+  const addMemory = async (itemIndex: number) => {
+    if ((await data.createMemory(o, itemIndex)) === "no_video") {
+      alert("Attention : la vidéo de ce tirage n'a pas été reçue.");
+    }
   };
 
   const tryPrintQr = (link: string) => {
@@ -217,7 +262,7 @@ export default function OrderDetail({
                       type="button"
                       className="btn primary block"
                       disabled={!videoUrl}
-                      onClick={() => data.createMemory(o, i)}
+                      onClick={() => addMemory(i)}
                     >
                       <Nfc size={16} aria-hidden /> Créer le lien NFC
                     </button>
@@ -241,9 +286,9 @@ export default function OrderDetail({
         ) : (
           <label className="field">
             <span>Changer le statut</span>
-            <select value={o.status} onChange={(e) => data.updateStatus(o.id, e.target.value as OrderStatus)}>
-              {STATUSES.map((s) => (
-                <option key={s.value} value={s.value}>{s.label}</option>
+            <select value={o.status} onChange={(e) => changeStatus(e.target.value as OrderStatus)}>
+              {[o.status, ...TRANSITIONS[o.status]].map((s) => (
+                <option key={s} value={s}>{statusLabel(s)}</option>
               ))}
             </select>
           </label>
@@ -257,7 +302,7 @@ export default function OrderDetail({
 
       {next && (
         <div className="action-bar">
-          <button type="button" className="btn primary block" onClick={() => data.updateStatus(o.id, next)}>
+          <button type="button" className="btn primary block" onClick={() => changeStatus(next)}>
             Passer à : {statusLabel(next)} <ArrowRight size={16} aria-hidden />
           </button>
         </div>

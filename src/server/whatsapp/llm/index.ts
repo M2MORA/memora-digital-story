@@ -1,4 +1,4 @@
-import { readEnv } from "../env";
+import { readEnv } from "../../config";
 import { isRateLimitError, type LlmProvider } from "./types";
 
 export * from "./types";

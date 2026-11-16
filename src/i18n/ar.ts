@@ -4,11 +4,14 @@ import {
   INCLUDED_VIDEO_SECONDS,
   MAX_VIDEO_SECONDS,
   SURCHARGE_TND_PER_MIN,
+  TIERS_10X15,
 } from "@/lib/pricing";
 import type { Dict } from "./fr";
 
 const INCL = INCLUDED_VIDEO_SECONDS / 60;
 const MAX = MAX_VIDEO_SECONDS / 60;
+const BASE = TIERS_10X15[0]!.unitPriceTND;
+const TIER2 = TIERS_10X15[1]!.minQty;
 const money = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(2).replace(".", ",")} د.ت`;
 
 /** عربية بسيطة، مع لمسة خفيفة من الدارجة التونسية */
@@ -223,7 +226,7 @@ export const ar: Dict = {
           {
             id: "price",
             q: "قدّاش السوم؟",
-            a: `${money(49)} للصورة، بالظرف والكارت. يرخص من 5 نسخ.`,
+            a: `${money(BASE)} للصورة، بالظرف والكارت. يرخص من ${TIER2} نسخ.`,
           },
           {
             id: "delivery",

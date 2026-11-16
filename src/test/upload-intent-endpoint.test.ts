@@ -24,6 +24,7 @@
 
 import { describe, it, expect, vi } from "vitest";
 import server, { handleUploadIntentRoute } from "../server";
+import type { UploadIntentDependencies } from "../server/upload-intents";
 import { S3CompatibleR2Adapter } from "../lib/r2-backend";
 
 describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", () => {
@@ -36,7 +37,19 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
 
   const s3Adapter = new S3CompatibleR2Adapter(dummyR2Config);
 
-  const createMockSupabase = (customRpcHandler?: (args: any) => Promise<{ data: any; error: any }>) => ({
+  const deps = (
+    supabaseAdmin: unknown,
+    uploadSigner: UploadIntentDependencies["uploadSigner"] = () => s3Adapter,
+  ): UploadIntentDependencies => ({
+    db: () => supabaseAdmin,
+    storage: () => s3Adapter,
+    uploadSigner,
+    now: Date.now,
+  });
+
+  const createMockSupabase = (
+    customRpcHandler?: (args: any) => Promise<{ data: any; error: any }>,
+  ) => ({
     rpc: vi.fn().mockImplementation(async (fn: string, args: any) => {
       if (fn === "create_upload_intent") {
         if (customRpcHandler) return customRpcHandler(args);
@@ -88,7 +101,7 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
       body: JSON.stringify(validVideoPayload),
     });
 
-    const res = await handleUploadIntentRoute(req, {}, { supabaseAdmin, s3Adapter });
+    const res = await handleUploadIntentRoute(req, deps(supabaseAdmin));
     expect(res.status).toBe(200);
 
     const data = await res.json();
@@ -118,7 +131,7 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
       body: JSON.stringify(validPhotoPayload),
     });
 
-    const res = await handleUploadIntentRoute(req, {}, { supabaseAdmin, s3Adapter });
+    const res = await handleUploadIntentRoute(req, deps(supabaseAdmin));
     expect(res.status).toBe(200);
 
     const data = await res.json();
@@ -137,7 +150,7 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
       body: "{invalid-json-body",
     });
 
-    const res = await handleUploadIntentRoute(req, {}, { supabaseAdmin, s3Adapter });
+    const res = await handleUploadIntentRoute(req, deps(supabaseAdmin));
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toMatch(/JSON invalide/);
@@ -152,7 +165,7 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
       body: JSON.stringify(missingToken),
     });
 
-    const res = await handleUploadIntentRoute(req, {}, { supabaseAdmin, s3Adapter });
+    const res = await handleUploadIntentRoute(req, deps(supabaseAdmin));
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toMatch(/draft_token/);
@@ -170,7 +183,7 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
       body: JSON.stringify(badDraftId),
     });
 
-    const res = await handleUploadIntentRoute(req, {}, { supabaseAdmin, s3Adapter });
+    const res = await handleUploadIntentRoute(req, deps(supabaseAdmin));
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toMatch(/draft_id/);
@@ -185,7 +198,7 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
       body: JSON.stringify(badKind),
     });
 
-    const res = await handleUploadIntentRoute(req, {}, { supabaseAdmin, s3Adapter });
+    const res = await handleUploadIntentRoute(req, deps(supabaseAdmin));
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toMatch(/file_kind/);
@@ -203,7 +216,7 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
       body: JSON.stringify(badMime),
     });
 
-    const res = await handleUploadIntentRoute(req, {}, { supabaseAdmin, s3Adapter });
+    const res = await handleUploadIntentRoute(req, deps(supabaseAdmin));
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toMatch(/MIME/);
@@ -218,7 +231,7 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
       body: JSON.stringify(badExt),
     });
 
-    const res = await handleUploadIntentRoute(req, {}, { supabaseAdmin, s3Adapter });
+    const res = await handleUploadIntentRoute(req, deps(supabaseAdmin));
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toMatch(/Extension/);
@@ -236,7 +249,7 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
       body: JSON.stringify(bigVideo),
     });
 
-    const res = await handleUploadIntentRoute(req, {}, { supabaseAdmin, s3Adapter });
+    const res = await handleUploadIntentRoute(req, deps(supabaseAdmin));
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toMatch(/Fichier vidéo trop volumineux/);
@@ -251,7 +264,7 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
       body: JSON.stringify(bigPhoto),
     });
 
-    const res = await handleUploadIntentRoute(req, {}, { supabaseAdmin, s3Adapter });
+    const res = await handleUploadIntentRoute(req, deps(supabaseAdmin));
     expect(res.status).toBe(400);
     const data = await res.json();
     expect(data.error).toMatch(/Fichier photo trop volumineux/);
@@ -272,7 +285,7 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
       body: JSON.stringify(validVideoPayload),
     });
 
-    const res = await handleUploadIntentRoute(req, {}, { supabaseAdmin, s3Adapter });
+    const res = await handleUploadIntentRoute(req, deps(supabaseAdmin));
     expect(res.status).toBe(500);
     const data = await res.json();
     expect(data.error).toBe("Erreur lors de la création de l'intention d'upload");
@@ -291,7 +304,7 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
       body: JSON.stringify(validVideoPayload),
     });
 
-    const res = await handleUploadIntentRoute(req, {}, { supabaseAdmin, s3Adapter });
+    const res = await handleUploadIntentRoute(req, deps(supabaseAdmin));
     expect(res.status).toBe(429);
     const data = await res.json();
     expect(data.error).toMatch(/Quota de fichiers atteint/);
@@ -309,7 +322,7 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
       body: JSON.stringify(validVideoPayload),
     });
 
-    const res = await handleUploadIntentRoute(req, {}, { supabaseAdmin, s3Adapter });
+    const res = await handleUploadIntentRoute(req, deps(supabaseAdmin));
     expect(res.status).toBe(500);
     const data = await res.json();
     expect(data.error).toBe("Échec de création de l'intention d'upload");
@@ -320,14 +333,17 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
   // --------------------------------------------------------------------------
   it("13. returns HTTP 503 if R2 S3 adapter cannot be initialized", async () => {
     const supabaseAdmin = createMockSupabase();
-    // Pas d'adaptateur injecté et env vide sans variables R2
+    // Configuration R2 vide : le constructeur de l'adaptateur lève
     const req = new Request("http://localhost:3000/api/upload/intent", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify(validVideoPayload),
     });
 
-    const res = await handleUploadIntentRoute(req, {}, { supabaseAdmin });
+    const res = await handleUploadIntentRoute(
+      req,
+      deps(supabaseAdmin, () => new S3CompatibleR2Adapter({} as any)),
+    );
     expect(res.status).toBe(503);
     const data = await res.json();
     expect(data.error).toBe("Service de stockage Cloudflare R2 non disponible");
@@ -345,7 +361,10 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
       body: JSON.stringify(validVideoPayload),
     });
 
-    const res = await handleUploadIntentRoute(req, {}, { supabaseAdmin, s3Adapter: failingAdapter });
+    const res = await handleUploadIntentRoute(
+      req,
+      deps(supabaseAdmin, () => failingAdapter),
+    );
     expect(res.status).toBe(500);
     const data = await res.json();
     expect(data.error).toBe("Échec de génération de l'URL d'upload");
@@ -362,7 +381,7 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
       body: JSON.stringify(validVideoPayload),
     });
 
-    const res = await handleUploadIntentRoute(req, {}, { supabaseAdmin, s3Adapter });
+    const res = await handleUploadIntentRoute(req, deps(supabaseAdmin));
     const data = await res.json();
     expect(data.storage_key).toBeUndefined();
     expect(JSON.stringify(data)).not.toContain('"storage_key"');
@@ -376,7 +395,7 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
       body: JSON.stringify(validVideoPayload),
     });
 
-    const res = await handleUploadIntentRoute(req, {}, { supabaseAdmin, s3Adapter });
+    const res = await handleUploadIntentRoute(req, deps(supabaseAdmin));
     const data = await res.json();
     expect(data.draft_token).toBeUndefined();
     expect(data.draft_token_hash).toBeUndefined();
@@ -391,7 +410,7 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
       body: JSON.stringify(validVideoPayload),
     });
 
-    const res = await handleUploadIntentRoute(req, {}, { supabaseAdmin, s3Adapter });
+    const res = await handleUploadIntentRoute(req, deps(supabaseAdmin));
     const text = await res.text();
     expect(text).not.toContain(dummyR2Config.secretAccessKey);
     expect(text).not.toContain("service_role");
@@ -408,7 +427,7 @@ describe("MÉMORA Phase 3.0 / Étape 2 — POST /api/upload/intent Unit Tests", 
       body: JSON.stringify(validVideoPayload),
     });
 
-    const res = await handleUploadIntentRoute(req, {}, { supabaseAdmin, s3Adapter });
+    const res = await handleUploadIntentRoute(req, deps(supabaseAdmin));
     const data = await res.json();
     const url = new URL(data.upload_url);
     expect(url.searchParams.get("X-Amz-Expires")).toBe("900");

@@ -1,6 +1,6 @@
 import { Bell, BellOff, LogOut } from "lucide-react";
 import { supabase } from "../lib/supabase";
-import { publicSiteUrl } from "../lib/useAdminData";
+import { publicSiteUrl } from "../lib/api";
 import { usePush } from "../lib/usePush";
 
 function Notifications() {

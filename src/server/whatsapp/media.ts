@@ -2,7 +2,8 @@
  * Médias reçus sur WhatsApp : téléchargés tout de suite (les URLs Meta expirent),
  * puis rangés dans R2 sous whatsapp/{conversation}/{message}.{ext}.
  */
-import { sha256Hex, type R2StorageAdapter } from "../../lib/r2-backend";
+import type { R2StorageAdapter } from "../../lib/r2-backend";
+import { sha256Hex } from "../crypto";
 import type { WhatsAppClient } from "./client";
 import type { MediaInfo, MessageType } from "./store";
 

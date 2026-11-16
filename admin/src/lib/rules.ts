@@ -3,6 +3,8 @@
  * pour pouvoir les tester (voir rules.test.ts).
  */
 
+import { CUSTOMER_SERVICE_WINDOW_MS } from "../../../src/server/whatsapp/window";
+
 type StatOrder = { status: string; total: number | string };
 type StatMemory = { view_count: number | null };
 
@@ -44,7 +46,7 @@ export function whatsappMediaKey(item: Record<string, unknown>, kind: "photo" | 
 /** Plus de 24 h depuis le dernier message du client : WhatsApp refuse une réponse libre. */
 export function whatsappWindowClosed(lastInboundAt: string | null | undefined, now = Date.now()): boolean {
   if (!lastInboundAt) return true;
-  return now - new Date(lastInboundAt).getTime() > 24 * 60 * 60 * 1000;
+  return now - new Date(lastInboundAt).getTime() > CUSTOMER_SERVICE_WINDOW_MS;
 }
 
 /**
@@ -68,32 +70,6 @@ export function displayMediaUrl(stored: string | null | undefined, apiBase: stri
   const key = url.searchParams.get("key");
   if (url.pathname !== "/api/media" || !key) return stored;
   return `${apiBase.replace(/\/+$/, "")}${mediaPath(key)}`;
-}
-
-/**
- * Suppression d'une commande par le serveur, seul autorisé à supprimer.
- * Aucun repli direct sur la base : sans politique DELETE, Supabase ne supprime rien
- * et ne renvoie pas d'erreur, ce qui faisait croire à une suppression réussie.
- */
-export async function deleteOrderViaApi(params: {
-  apiBase: string;
-  accessToken: string;
-  orderId: string;
-  fetchImpl?: typeof fetch;
-}): Promise<void> {
-  const doFetch = params.fetchImpl ?? fetch;
-  let res: Response;
-  try {
-    res = await doFetch(`${params.apiBase}/api/admin/orders?id=${encodeURIComponent(params.orderId)}`, {
-      method: "DELETE",
-      headers: { Authorization: `Bearer ${params.accessToken}` },
-    });
-  } catch {
-    throw new Error("Serveur injoignable. Rien n'a été supprimé.");
-  }
-  if (res.ok) return;
-  const data = (await res.json().catch(() => null)) as { error?: string } | null;
-  throw new Error(data?.error || `Le serveur a refusé la suppression (code ${res.status}). Rien n'a été supprimé.`);
 }
 
 /** Taille d'une page de commandes : l'admin n'a jamais besoin de tout télécharger d'un coup. */

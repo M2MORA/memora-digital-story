@@ -183,7 +183,7 @@ function CartPage() {
                   {quote.isFreeShipping ? (
                     <strong className="font-semibold text-m-sage">{c.free}</strong>
                   ) : (
-                    t.money(quote.shippingCost)
+                    t.money(quote.shippingFee)
                   )}
                 </dd>
               </div>

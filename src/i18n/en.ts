@@ -4,11 +4,14 @@ import {
   INCLUDED_VIDEO_SECONDS,
   MAX_VIDEO_SECONDS,
   SURCHARGE_TND_PER_MIN,
+  TIERS_10X15,
 } from "@/lib/pricing";
 import type { Dict } from "./fr";
 
 const INCL = INCLUDED_VIDEO_SECONDS / 60;
 const MAX = MAX_VIDEO_SECONDS / 60;
+const BASE = TIERS_10X15[0]!.unitPriceTND;
+const TIER2 = TIERS_10X15[1]!.minQty;
 const money = (n: number) => `${Number.isInteger(n) ? n : n.toFixed(2)} TND`;
 
 export const en: Dict = {
@@ -230,7 +233,7 @@ export const en: Dict = {
           {
             id: "price",
             q: "How much is it?",
-            a: `${money(49)} per photo, envelope and card included. Cheaper from 5 copies.`,
+            a: `${money(BASE)} per photo, envelope and card included. Cheaper from ${TIER2} copies.`,
           },
           {
             id: "delivery",

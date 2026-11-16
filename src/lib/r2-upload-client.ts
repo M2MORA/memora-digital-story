@@ -7,6 +7,8 @@
  * 3. Vérification de l'intégrité auprès du backend (POST /api/upload/verify)
  */
 
+import { FILE_RULES } from "./file-rules";
+
 export interface CreateIntentRequest {
   draft_id: string;
   draft_token: string;
@@ -38,9 +40,10 @@ export interface VerifyIntentResponse {
  * Appelle le backend pour créer l'intention d'upload et obtenir l'URL présignée PUT.
  */
 export async function requestUploadIntent(
-  req: CreateIntentRequest
+  req: CreateIntentRequest,
+  fetchFn: typeof fetch = fetch,
 ): Promise<CreateIntentResponse> {
-  const response = await fetch("/api/upload/intent", {
+  const response = await fetchFn("/api/upload/intent", {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -65,6 +68,8 @@ export async function requestUploadIntent(
 export interface UploadTransferOptions {
   onProgress?: (loaded: number, total: number) => void;
   signal?: AbortSignal;
+  /** fetch injectable (tests) ; fetch global par défaut. */
+  fetch?: typeof fetch;
 }
 
 /**
@@ -87,12 +92,12 @@ function putFile(
   uploadUrl: string,
   headers: Record<string, string>,
   file: File,
-  options?: UploadTransferOptions
+  options?: UploadTransferOptions,
 ): Promise<{ ok: boolean; status: number }> {
-  const { onProgress, signal } = options ?? {};
+  const { onProgress, signal, fetch: fetchFn = fetch } = options ?? {};
 
   if (!onProgress || typeof XMLHttpRequest === "undefined") {
-    return fetch(uploadUrl, {
+    return fetchFn(uploadUrl, {
       method: "PUT",
       headers,
       body: file,
@@ -144,7 +149,7 @@ export async function uploadBinaryToR2(
   uploadUrl: string,
   requiredHeaders: Record<string, string>,
   file: File,
-  options?: UploadTransferOptions
+  options?: UploadTransferOptions,
 ): Promise<void> {
   // Respecter strictement les headers exigés (notamment Content-Type exact)
   // Ne JAMAIS ajouter d'en-tête Authorization ou de secrets
@@ -164,26 +169,27 @@ export async function uploadBinaryToR2(
     // Si l'upload direct échoue (ex: CORS browser "Failed to fetch"), basculer de manière transparente vers le proxy local
     const isNetworkOrCors =
       err?.name === "TypeError" ||
-      (typeof err?.message === "string" && (
-        err.message.includes("fetch") ||
-        err.message.includes("NetworkError") ||
-        err.message.includes("CORS")
-      ));
+      (typeof err?.message === "string" &&
+        (err.message.includes("fetch") ||
+          err.message.includes("NetworkError") ||
+          err.message.includes("CORS")));
 
     if (isNetworkOrCors && file.size > MAX_PROXY_UPLOAD_BYTES) {
       throw new Error(
-        "L'envoi de votre fichier a été interrompu. Vérifiez votre connexion internet puis réessayez."
+        "L'envoi de votre fichier a été interrompu. Vérifiez votre connexion internet puis réessayez.",
       );
     }
 
     if (isNetworkOrCors) {
-      console.warn("[R2 Upload] Upload direct bloqué par CORS, bascule automatique vers le proxy applicatif...");
+      console.warn(
+        "[R2 Upload] Upload direct bloqué par CORS, bascule automatique vers le proxy applicatif...",
+      );
       const proxyHeaders: Record<string, string> = {
         ...headers,
         "x-upload-url": uploadUrl,
       };
 
-      const proxyResponse = await fetch("/api/upload/proxy-put", {
+      const proxyResponse = await (options?.fetch ?? fetch)("/api/upload/proxy-put", {
         method: "PUT",
         headers: proxyHeaders,
         body: file,
@@ -192,7 +198,9 @@ export async function uploadBinaryToR2(
 
       if (!proxyResponse.ok) {
         const errText = await proxyResponse.text().catch(() => "");
-        throw new Error(`Échec du transfert via proxy R2 (HTTP ${proxyResponse.status}): ${errText || "Erreur"}`);
+        throw new Error(
+          `Échec du transfert via proxy R2 (HTTP ${proxyResponse.status}): ${errText || "Erreur"}`,
+        );
       }
 
       options?.onProgress?.(file.size, file.size);
@@ -208,9 +216,10 @@ export async function uploadBinaryToR2(
  */
 export async function verifyUploadedIntent(
   intentId: string,
-  draftToken: string
+  draftToken: string,
+  fetchFn: typeof fetch = fetch,
 ): Promise<VerifyIntentResponse> {
-  const response = await fetch("/api/upload/verify", {
+  const response = await fetchFn("/api/upload/verify", {
     method: "POST",
     headers: {
       "content-type": "application/json",
@@ -239,29 +248,44 @@ export async function verifyUploadedIntent(
  * Exécute le pipeline complet pour un fichier donné :
  * Intent -> Direct R2 PUT -> Verify
  */
-export async function uploadMediaWithR2Intent(params: {
-  draftId: string;
-  draftToken: string;
-  itemId: string;
-  fileKind: "photo" | "video";
-  file: File;
-} & UploadTransferOptions): Promise<string> {
-  const { draftId, draftToken, itemId, fileKind, file, onProgress, signal } = params;
+export async function uploadMediaWithR2Intent(
+  params: {
+    draftId: string;
+    draftToken: string;
+    itemId: string;
+    fileKind: "photo" | "video";
+    file: File;
+  } & UploadTransferOptions,
+): Promise<string> {
+  const {
+    draftId,
+    draftToken,
+    itemId,
+    fileKind,
+    file,
+    onProgress,
+    signal,
+    fetch: fetchFn = fetch,
+  } = params;
 
-  const extension = file.name.split(".").pop()?.toLowerCase() || (fileKind === "video" ? "mp4" : "jpg");
-  const mimeType = file.type || (fileKind === "video" ? "video/mp4" : "image/jpeg");
+  const extension =
+    file.name.split(".").pop()?.toLowerCase() || (fileKind === "video" ? "mp4" : "jpg");
+  const mimeType = file.type || FILE_RULES[fileKind].defaultMime;
 
   // 1. Obtenir l'intention et l'URL présignée
-  const intent = await requestUploadIntent({
-    draft_id: draftId,
-    draft_token: draftToken,
-    item_id: itemId,
-    file_kind: fileKind,
-    file_name: file.name,
-    mime_type: mimeType,
-    file_size_bytes: file.size,
-    file_extension: extension,
-  });
+  const intent = await requestUploadIntent(
+    {
+      draft_id: draftId,
+      draft_token: draftToken,
+      item_id: itemId,
+      file_kind: fileKind,
+      file_name: file.name,
+      mime_type: mimeType,
+      file_size_bytes: file.size,
+      file_extension: extension,
+    },
+    fetchFn,
+  );
 
   if (signal?.aborted) {
     throw createAbortError();
@@ -271,10 +295,11 @@ export async function uploadMediaWithR2Intent(params: {
   await uploadBinaryToR2(intent.upload_url, intent.required_headers, file, {
     ...(onProgress ? { onProgress } : {}),
     ...(signal ? { signal } : {}),
+    fetch: fetchFn,
   });
 
   // 3. Vérification backend HEAD sur R2
-  await verifyUploadedIntent(intent.intent_id, draftToken);
+  await verifyUploadedIntent(intent.intent_id, draftToken, fetchFn);
 
   return intent.intent_id;
 }

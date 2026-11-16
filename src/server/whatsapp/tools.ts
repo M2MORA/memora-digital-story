@@ -1,13 +1,14 @@
 import { z } from "zod";
+import { ADDRESS_MIN, CUSTOMER_NAME_MIN, normalizeTunisianPhone } from "../../lib/customer";
 import { TUNISIAN_GOVERNORATES } from "../../lib/governorates";
-import { calculateQuote, formatTND, type QuoteResult } from "../../lib/pricing";
+import { calculateQuote, formatTND, SHIPPING_MODES, type QuoteResult } from "../../lib/pricing";
 import { PRODUCT_NAME } from "./knowledge";
 import type { ToolDefinition } from "./llm/types";
 
 export const LANGUAGES = ["derja", "fr", "ar", "en"] as const;
 export type Language = (typeof LANGUAGES)[number];
 
-export const CARRIERS = ["aramex", "mondial_relay"] as const;
+export const CARRIERS = SHIPPING_MODES;
 export type Carrier = (typeof CARRIERS)[number];
 
 export const TOOL_DEFINITIONS: ToolDefinition[] = [
@@ -66,14 +67,6 @@ export const TOOL_DEFINITIONS: ToolDefinition[] = [
   },
 ];
 
-/** Numéro tunisien : 8 chiffres, enregistré au format du site « +216 XXXXXXXX ». */
-export function normalizeTunisianPhone(raw: string): string | null {
-  let digits = raw.replace(/\D/g, "");
-  if (digits.length === 11 && digits.startsWith("216")) digits = digits.slice(3);
-  if (digits.length === 13 && digits.startsWith("00216")) digits = digits.slice(5);
-  return /^\d{8}$/.test(digits) ? `+216 ${digits}` : null;
-}
-
 const optionalText = z
   .string()
   .trim()
@@ -81,12 +74,12 @@ const optionalText = z
   .optional()
   .transform((v) => (v ? v : undefined));
 
-// Mêmes règles que le formulaire du site (commander.tsx) : nom ≥ 2, adresse ≥ 4, 8 chiffres.
+// Mêmes règles que le formulaire du site : src/lib/customer.ts.
 export const orderRequestSchema = z.object({
-  customer_name: z.string().trim().min(2).max(120),
+  customer_name: z.string().trim().min(CUSTOMER_NAME_MIN).max(120),
   phone: optionalText,
   governorate: z.enum(TUNISIAN_GOVERNORATES),
-  address: z.string().trim().min(4).max(300),
+  address: z.string().trim().min(ADDRESS_MIN).max(300),
   quantity: z.coerce.number().int().min(1).max(500),
   with_frame: z.boolean().optional().default(false),
   carrier: z.enum(CARRIERS),
@@ -133,7 +126,7 @@ export function validateOrderRequest(
 
   const quote = calculateQuote(
     [{ format: "10x15", quantity: data.quantity, withFrame: data.with_frame }],
-    "TN",
+    null,
     data.carrier,
   );
   return {
@@ -153,9 +146,9 @@ const CARRIER_LABEL: Record<Language, Record<Carrier, string>> = {
 export function orderRecap(order: ValidatedOrder, orderNumber: string, hasPhoto: boolean): string {
   const { quote, language } = order;
   const shipping =
-    quote.shippingCost === 0
+    quote.shippingFee === 0
       ? { derja: "ballech", fr: "offerte", ar: "مجانية", en: "free" }[language]
-      : formatTND(quote.shippingCost);
+      : formatTND(quote.shippingFee);
   const carrier = CARRIER_LABEL[language][order.carrier];
   const frame = order.with_frame
     ? { derja: " + cadre", fr: " + cadre", ar: " + إطار", en: " + frame" }[language]

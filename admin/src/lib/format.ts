@@ -9,16 +9,35 @@ export const fmtDate = (d: string) =>
 export const statusLabel = (s: OrderStatus) => STATUSES.find((x) => x.value === s)?.label ?? s;
 
 /**
- * Étape suivante du parcours normal (null = fin). Paiement en espèces à la livraison,
- * et « Payée » verrouille la commande : c'est donc la dernière étape.
+ * Changements de statut autorisés. Copie du graphe de la fonction SQL set_order_status
+ * (qui décide) : paiement en espèces à la livraison, « Payée » verrouille la commande.
  */
-export const NEXT_STATUS: Record<OrderStatus, OrderStatus | null> = {
-  pending: "printing",
-  printing: "shipped",
-  shipped: "delivered",
-  delivered: "paid",
-  paid: null,
-  cancelled: null,
+export const TRANSITIONS: Record<OrderStatus, OrderStatus[]> = {
+  pending: ["printing", "cancelled"],
+  printing: ["shipped", "cancelled"],
+  shipped: ["delivered"],
+  delivered: ["paid"],
+  paid: [],
+  cancelled: [],
+};
+
+/** Étape suivante du parcours normal (null = fin). */
+export const nextStatus = (s: OrderStatus): OrderStatus | null =>
+  TRANSITIONS[s].find((x) => x !== "cancelled") ?? null;
+
+/** Message affiché quand set_order_status refuse le changement. */
+export const refusalMessage = (reason: string, from?: string, to?: string) => {
+  const label = (s?: string) => (s ? statusLabel(s as OrderStatus) : "?");
+  switch (reason) {
+    case "paid_locked":
+      return "Cette commande a été marquée comme 'Payée'. Elle est définitivement verrouillée et ne peut plus être modifiée ou supprimée.";
+    case "transition_not_allowed":
+      return `Changement refusé : une commande « ${label(from)} » ne peut pas passer à « ${label(to)} ».`;
+    case "not_found":
+      return "Commande introuvable (supprimée ou accès refusé). Actualise la page.";
+    default:
+      return `Changement de statut refusé (${reason}).`;
+  }
 };
 
 export const getFilename = (url: string, prefix: string, defaultExt: string) => {
