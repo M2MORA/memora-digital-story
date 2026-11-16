@@ -64,21 +64,6 @@ export const fr = {
     text: "Réessayez dans un instant.",
     retry: "Réessayer",
   },
-  product: {
-    name: "MÉMORA, la photo",
-    short: "Une photo 10 × 15 qui ouvre votre vidéo.",
-    materials: [
-      "Photo 10 × 15 sur papier 300 g",
-      "Puce invisible dans la photo",
-      "Enveloppe texturée",
-      "Carte avec votre mot",
-    ],
-    imageLabels: [
-      "La photo dans son enveloppe, avec sa carte",
-      "Trois photos MÉMORA sur une table",
-      "Une photo MÉMORA à côté d'un téléphone",
-    ],
-  },
   tiers: {
     caption: "Prix à l'unité selon la quantité",
     qty: "Quantité",
@@ -159,6 +144,11 @@ export const fr = {
     otherQuestions: "Autres questions",
   },
   productPage: {
+    imageLabels: [
+      "La photo dans son enveloppe, avec sa carte",
+      "Trois photos MÉMORA sur une table",
+      "Une photo MÉMORA à côté d'un téléphone",
+    ],
     reassure: ["Payé à la livraison", "Remplacé en cas de défaut"],
     specs: {
       format: "Format",

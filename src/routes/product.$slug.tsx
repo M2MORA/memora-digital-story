@@ -1,10 +1,11 @@
 import { createFileRoute, Link, notFound } from "@tanstack/react-router";
 import { useState } from "react";
 import { Check } from "lucide-react";
-import { getProduct } from "@/lib/products";
+import { getProduct, resolveProduct } from "@/lib/products";
+import { supabase } from "@/lib/supabase";
 import { PriceTiers } from "@/components/site/PriceTiers";
 import { buttonStyles } from "@/components/site/kit";
-import { dictFromMatches, useT } from "@/i18n";
+import { langFromMatches, useLang, useT } from "@/i18n";
 import { Img } from "@/components/site/Img";
 import { IMAGES } from "@/lib/images.gen";
 import { getUnitPrice } from "@/lib/pricing";
@@ -13,17 +14,19 @@ import { usePricing } from "@/hooks/use-pricing";
 const GALLERY = [IMAGES.envelope, IMAGES.moments, IMAGES.hero];
 
 export const Route = createFileRoute("/product/$slug")({
-  loader: ({ params }) => {
-    const product = getProduct(params.slug);
+  // Article inconnu ou désactivé : page introuvable. Base illisible : page d'erreur.
+  loader: async ({ params }) => {
+    const product = await getProduct(supabase, params.slug);
     if (!product) throw notFound();
     return { product };
   },
-  head: ({ matches }) => {
-    const t = dictFromMatches(matches);
+  head: ({ matches, loaderData }) => {
+    if (!loaderData) return {};
+    const product = resolveProduct(loaderData.product, langFromMatches(matches));
     return {
       meta: [
-        { title: `${t.product.name} — MÉMORA` },
-        { name: "description", content: t.product.short },
+        { title: `${product.name} — MÉMORA` },
+        { name: "description", content: product.tagline },
       ],
     };
   },
@@ -33,13 +36,13 @@ export const Route = createFileRoute("/product/$slug")({
 function ProductPage() {
   const t = useT();
   const p = t.productPage;
-  const { product } = Route.useLoaderData();
+  const product = resolveProduct(Route.useLoaderData().product, useLang());
   const pricing = usePricing();
   const [img, setImg] = useState(0);
 
   const specs: [string, string][] = [
     [p.specs.format, product.dimensions],
-    [p.specs.included, t.product.materials.join(", ")],
+    [p.specs.included, product.materials.join(", ")],
     [p.specs.video, p.videoSpec(pricing)],
     [p.specs.phones, p.phonesSpec],
     [p.specs.delivery, p.deliverySpec(pricing)],
@@ -53,7 +56,7 @@ function ProductPage() {
           <Img
             key={img}
             image={GALLERY[img] ?? IMAGES.envelope}
-            alt={t.product.imageLabels[img] ?? t.product.name}
+            alt={p.imageLabels[img] ?? product.name}
             sizes="(min-width: 768px) 55vw, 100vw"
             priority
             className="aspect-square w-full object-cover"
@@ -65,7 +68,7 @@ function ProductPage() {
               key={image.src}
               type="button"
               onClick={() => setImg(i)}
-              aria-label={p.imageN(i + 1, t.product.imageLabels[i] ?? t.product.name)}
+              aria-label={p.imageN(i + 1, p.imageLabels[i] ?? product.name)}
               aria-pressed={i === img}
               className={`h-20 w-20 overflow-hidden rounded-[4px] border-2 transition-colors ${
                 i === img ? "border-m-wine" : "border-transparent opacity-75 hover:opacity-100"
@@ -79,12 +82,12 @@ function ProductPage() {
 
       <div className="md:sticky md:top-24 md:self-start">
         <h1 className="font-serif text-[40px] leading-[1.05] text-m-ink sm:text-[52px]">
-          {t.product.name}
+          {product.name}
         </h1>
         <p className="mt-3 font-serif text-[32px] font-semibold text-m-wine">
           {t.money(getUnitPrice(pricing, product.formatCode, 1))}
         </p>
-        <p className="mt-3 text-[17px] text-m-muted">{t.product.short}</p>
+        <p className="mt-3 text-[17px] text-m-muted">{product.tagline}</p>
 
         <Link
           to="/commander"

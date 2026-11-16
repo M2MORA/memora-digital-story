@@ -74,6 +74,9 @@ export function useSetLang() {
 
 /** Pour les balises <title> : la langue est dans les données de la route racine */
 export function dictFromMatches(matches: readonly { loaderData?: unknown }[]): Dict {
-  const data = matches[0]?.loaderData as { lang?: Lang } | undefined;
-  return DICTS[data?.lang ?? "fr"];
+  return DICTS[langFromMatches(matches)];
+}
+
+export function langFromMatches(matches: readonly { loaderData?: unknown }[]): Lang {
+  return (matches[0]?.loaderData as { lang?: Lang } | undefined)?.lang ?? "fr";
 }

@@ -64,21 +64,6 @@ export const en: Dict = {
     text: "Please try again in a moment.",
     retry: "Try again",
   },
-  product: {
-    name: "MÉMORA, the photo",
-    short: "A 10 × 15 photo that opens your video.",
-    materials: [
-      "10 × 15 photo on 300 g paper",
-      "Hidden chip inside",
-      "Textured envelope",
-      "Card with your note",
-    ],
-    imageLabels: [
-      "The photo in its envelope, with its card",
-      "Three MÉMORA photos on a table",
-      "A MÉMORA photo next to a phone",
-    ],
-  },
   tiers: {
     caption: "Price per photo by quantity",
     qty: "Quantity",
@@ -159,6 +144,11 @@ export const en: Dict = {
     otherQuestions: "More questions",
   },
   productPage: {
+    imageLabels: [
+      "The photo in its envelope, with its card",
+      "Three MÉMORA photos on a table",
+      "A MÉMORA photo next to a phone",
+    ],
     reassure: ["Paid on delivery", "Replaced if faulty"],
     specs: {
       format: "Size",

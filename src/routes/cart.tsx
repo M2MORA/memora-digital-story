@@ -3,6 +3,7 @@ import { Copy, Minus, Plus, Trash2 } from "lucide-react";
 import { cart, useStore } from "@/lib/cart";
 import { getUnitPrice } from "@/lib/pricing";
 import { usePricing } from "@/hooks/use-pricing";
+import { useProducts } from "@/hooks/use-products";
 import { buttonStyles } from "@/components/site/kit";
 import { useHydrated } from "@/hooks/use-hydrated";
 import { dictFromMatches, useT } from "@/i18n";
@@ -30,6 +31,7 @@ function CartPage() {
   const { items } = useStore();
   const hydrated = useHydrated();
   const pricing = usePricing();
+  const products = useProducts();
   const quote = cart.getQuote(pricing);
 
   return (
@@ -77,7 +79,7 @@ function CartPage() {
                       <div className="flex items-start justify-between gap-3">
                         <div className="min-w-0">
                           <h2 className="font-serif text-[22px] leading-tight text-m-ink">
-                            {t.product.name}
+                            {products.find((p) => p.id === item.productId)?.name ?? "MÉMORA"}
                           </h2>
                           <p className="mt-1 truncate text-[15px] text-m-muted">
                             {c.video(item.videoName || c.yourVideo, minutes)}

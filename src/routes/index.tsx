@@ -1,6 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Check } from "lucide-react";
-import { PRODUCTS } from "@/lib/products";
 import { dictFromMatches, useT } from "@/i18n";
 import { FlipCardDemo } from "@/components/site/FlipCardDemo";
 import { HeroReveal } from "@/components/site/HeroReveal";
@@ -12,8 +11,8 @@ import { Img } from "@/components/site/Img";
 import { IMAGES } from "@/lib/images.gen";
 import { getUnitPrice } from "@/lib/pricing";
 import { pricingFromMatches, usePricing } from "@/hooks/use-pricing";
+import { productsFromMatches, useProducts } from "@/hooks/use-products";
 
-const PRODUCT = PRODUCTS[0]!;
 const DEMO = { memorySlug: "demo-leila-and-sami" };
 const OCCASION_IMAGES = [
   { image: IMAGES.tap },
@@ -26,14 +25,16 @@ export const Route = createFileRoute("/")({
   head: ({ matches }) => {
     const t = dictFromMatches(matches);
     const pricing = pricingFromMatches(matches);
+    const format = productsFromMatches(matches)[0]?.format;
     return {
       meta: [
         { title: t.home.metaTitle },
         {
           name: "description",
-          content: pricing
-            ? `${t.home.lead} ${t.home.priceLine(t.money(getUnitPrice(pricing, PRODUCT.formatCode, 1)))}`
-            : t.home.lead,
+          content:
+            pricing && format
+              ? `${t.home.lead} ${t.home.priceLine(t.money(getUnitPrice(pricing, format, 1)))}`
+              : t.home.lead,
         },
       ],
     };
@@ -45,7 +46,8 @@ function Home() {
   const t = useT();
   const h = t.home;
   const pricing = usePricing();
-  const price = getUnitPrice(pricing, PRODUCT.formatCode, 1);
+  const product = useProducts()[0];
+  const price = product ? getUnitPrice(pricing, product.formatCode, 1) : 0;
   const faqHighlights = t.faq
     .groups(pricing)
     .flatMap((g) => g.items)
@@ -81,7 +83,9 @@ function Home() {
               {t.common.demo}
             </Link>
           </div>
-          <p className="mt-6 text-[15px] text-m-linen/80">{h.priceLine(t.money(price))}</p>
+          {product && (
+            <p className="mt-6 text-[15px] text-m-linen/80">{h.priceLine(t.money(price))}</p>
+          )}
         </div>
       </HeroReveal>
 
@@ -132,57 +136,59 @@ function Home() {
       </section>
 
       {/* Le produit et ses prix */}
-      <section aria-labelledby="produit" className="container-x py-16 md:py-28">
-        <div className="grid gap-10 md:grid-cols-2 md:gap-16">
-          <Img
-            image={IMAGES.envelope}
-            alt={h.productAlt}
-            sizes="(min-width: 768px) 50vw, 100vw"
-            className="aspect-square w-full rounded-[4px] object-cover shadow-paper"
-          />
-          <div>
-            <h2
-              id="produit"
-              className="font-serif text-[34px] leading-tight text-m-ink sm:text-[44px]"
-            >
-              {h.productTitle}
-            </h2>
-            <p className="mt-3 font-serif text-[30px] font-semibold text-m-wine">
-              {t.money(price)}
-            </p>
-            <ul className="mt-6 space-y-2.5 text-[17px] text-m-ink">
-              {t.product.materials.map((m) => (
-                <li key={m} className="flex gap-3">
-                  <Check className="mt-1 h-5 w-5 shrink-0 text-m-sage" aria-hidden="true" />
-                  <span>{m}</span>
-                </li>
-              ))}
-            </ul>
-            <div className="mt-8">
-              <p className="text-[15px] font-semibold text-m-ink">{t.tiers.title}</p>
-              <div className="mt-2">
-                <PriceTiers />
+      {product && (
+        <section aria-labelledby="produit" className="container-x py-16 md:py-28">
+          <div className="grid gap-10 md:grid-cols-2 md:gap-16">
+            <Img
+              image={IMAGES.envelope}
+              alt={h.productAlt}
+              sizes="(min-width: 768px) 50vw, 100vw"
+              className="aspect-square w-full rounded-[4px] object-cover shadow-paper"
+            />
+            <div>
+              <h2
+                id="produit"
+                className="font-serif text-[34px] leading-tight text-m-ink sm:text-[44px]"
+              >
+                {h.productTitle}
+              </h2>
+              <p className="mt-3 font-serif text-[30px] font-semibold text-m-wine">
+                {t.money(price)}
+              </p>
+              <ul className="mt-6 space-y-2.5 text-[17px] text-m-ink">
+                {product.materials.map((m) => (
+                  <li key={m} className="flex gap-3">
+                    <Check className="mt-1 h-5 w-5 shrink-0 text-m-sage" aria-hidden="true" />
+                    <span>{m}</span>
+                  </li>
+                ))}
+              </ul>
+              <div className="mt-8">
+                <p className="text-[15px] font-semibold text-m-ink">{t.tiers.title}</p>
+                <div className="mt-2">
+                  <PriceTiers />
+                </div>
+              </div>
+              <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
+                <Link
+                  to="/commander"
+                  search={{ format: product.formatCode, stage: "video" }}
+                  className={buttonStyles()}
+                >
+                  {t.common.create}
+                </Link>
+                <Link
+                  to="/product/$slug"
+                  params={{ slug: product.slug }}
+                  className={buttonStyles({ variant: "link", size: "inline" })}
+                >
+                  {h.details}
+                </Link>
               </div>
             </div>
-            <div className="mt-8 flex flex-wrap items-center gap-x-6 gap-y-3">
-              <Link
-                to="/commander"
-                search={{ format: PRODUCT.formatCode, stage: "video" }}
-                className={buttonStyles()}
-              >
-                {t.common.create}
-              </Link>
-              <Link
-                to="/product/$slug"
-                params={{ slug: PRODUCT.slug }}
-                className={buttonStyles({ variant: "link", size: "inline" })}
-              >
-                {h.details}
-              </Link>
-            </div>
           </div>
-        </div>
-      </section>
+        </section>
+      )}
 
       {/* Questions courantes */}
       <section aria-labelledby="questions" className="border-t border-m-line bg-m-paper">

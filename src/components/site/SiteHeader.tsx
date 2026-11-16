@@ -3,13 +3,12 @@ import { Menu, ShoppingBag, X } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useStore } from "@/lib/cart";
 import { useHeroPassed } from "@/hooks/use-hero-passed";
-import { PRODUCTS } from "@/lib/products";
+import { useProducts } from "@/hooks/use-products";
 import { cn } from "@/lib/utils";
 import { useT } from "@/i18n";
 import { buttonStyles } from "./kit";
 import { LangSwitch } from "./LangSwitch";
 
-const PRODUCT_SLUG = PRODUCTS[0]!.slug;
 const DEMO = { memorySlug: "demo-leila-and-sami" };
 
 const LINK =
@@ -25,6 +24,7 @@ const MENU_LINK =
 export function SiteHeader() {
   const t = useT();
   const { items } = useStore();
+  const productSlug = useProducts()[0]?.slug;
   const [open, setOpen] = useState(false);
   const pathname = useRouterState({ select: (s) => s.location.pathname });
   const count = items.reduce((n, i) => n + i.qty, 0);
@@ -69,14 +69,16 @@ export function SiteHeader() {
           <Link to="/how-it-works" className={LINK} activeProps={ACTIVE}>
             {t.nav.how}
           </Link>
-          <Link
-            to="/product/$slug"
-            params={{ slug: PRODUCT_SLUG }}
-            className={LINK}
-            activeProps={ACTIVE}
-          >
-            {t.nav.product}
-          </Link>
+          {productSlug && (
+            <Link
+              to="/product/$slug"
+              params={{ slug: productSlug }}
+              className={LINK}
+              activeProps={ACTIVE}
+            >
+              {t.nav.product}
+            </Link>
+          )}
           <Link to="/m/$memorySlug" params={DEMO} className={LINK}>
             {t.nav.demo}
           </Link>
@@ -137,11 +139,13 @@ export function SiteHeader() {
                 {t.nav.how}
               </Link>
             </li>
-            <li>
-              <Link to="/product/$slug" params={{ slug: PRODUCT_SLUG }} className={MENU_LINK}>
-                {t.nav.product}
-              </Link>
-            </li>
+            {productSlug && (
+              <li>
+                <Link to="/product/$slug" params={{ slug: productSlug }} className={MENU_LINK}>
+                  {t.nav.product}
+                </Link>
+              </li>
+            )}
             <li>
               <Link to="/m/$memorySlug" params={DEMO} className={MENU_LINK}>
                 {t.nav.demo}

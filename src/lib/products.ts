@@ -1,57 +1,97 @@
-import envelopeImg from "@/assets/product-envelope-v2.jpg";
-import moments from "@/assets/product-moments-v2.jpg";
-import hero from "@/assets/hero-v2.jpg";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Lang } from "@/i18n";
 import type { Format } from "./pricing";
 
-export type Category = "enveloppe";
+/** Copy in the three site languages: `fr` is always there, `en` and `ar` may be missing. */
+export type Localized<T> = { fr: T; en?: T; ar?: T };
 
+/** A row of the products table, as the storefront reads it (active articles only). */
+export type ProductRow = {
+  id: string;
+  slug: string;
+  format: Format;
+  sort_order: number;
+  badge: string | null;
+  dimensions: string;
+  occasions: string[];
+  style: string;
+  included_video_min: number;
+  images: string[];
+  name: Localized<string>;
+  tagline: Localized<string>;
+  description: Localized<string>;
+  materials: Localized<string[]>;
+};
+
+/** An article with its copy in one language. */
 export type Product = {
   id: string;
   slug: string;
+  formatCode: Format;
+  badge: string | null;
+  dimensions: string;
+  occasions: string[];
+  style: string;
+  includedVideoMin: number;
+  images: string[];
   name: string;
   tagline: string;
   description: string;
-  category: Category;
-  formatCode: Format;
-  images: string[];
   materials: string[];
-  dimensions: string;
-  connectivity: ("nfc" | "qr")[];
-  occasions: string[];
-  style: "minimal" | "classic" | "romantic" | "modern";
-  delivery: string;
-  badge?: string;
-  includedVideoMin: number;
 };
 
-export const PRODUCTS: Product[] = [
-  {
-    id: "p1",
-    slug: "memora-simple-enveloppe",
-    name: "Mémora Simple (Enveloppe & Carte)",
-    tagline: "La photo souvenir avec puce NFC dans son enveloppe d'art et sa carte avec message.",
-    description:
-      "L'émotion à l'état pur. Un tirage photographique d'art 10×15 cm sur papier noble 300g/m² avec puce invisible. Glissé délicatement dans une élégante enveloppe texturée cachetée, accompagné d'une carte avec votre message personnalisé. Approchez votre smartphone sans aucune application requise : votre vidéo se lance instantanément.",
-    category: "enveloppe",
-    formatCode: "10x15",
-    images: [envelopeImg, moments, hero],
-    materials: [
-      "Tirage photo d'art 300g/m²",
-      "Puce NFC invisible intégrée",
-      "Enveloppe haut de gamme texturée",
-      "Carte avec message simple personnalisé",
-    ],
-    dimensions: "10 × 15 cm",
-    connectivity: ["nfc"],
-    occasions: ["love", "family", "special", "birthday", "travel"],
-    style: "classic",
-    delivery: "Fabriqué en 48 h, puis livré en 3 à 5 jours ouvrés partout en Tunisie.",
-    badge: "L'Essentiel",
-    includedVideoMin: 8,
-  },
-];
+const COLUMNS =
+  "id, slug, format, sort_order, badge, dimensions, occasions, style, included_video_min, images, name, tagline, description, materials";
 
-export const getProduct = (slugOrId: string) => {
-  const found = PRODUCTS.find((p) => p.slug === slugOrId || p.id === slugOrId);
-  return found ?? PRODUCTS[0]!;
-};
+/** The copy in `lang`, or the French copy when that language is missing or empty. */
+export function localize<T extends string | string[]>(copy: Localized<T>, lang: Lang): T {
+  const value = copy[lang];
+  return value && value.length > 0 ? value : copy.fr;
+}
+
+export function resolveProduct(row: ProductRow, lang: Lang): Product {
+  return {
+    id: row.id,
+    slug: row.slug,
+    formatCode: row.format,
+    badge: row.badge,
+    dimensions: row.dimensions,
+    occasions: row.occasions,
+    style: row.style,
+    includedVideoMin: row.included_video_min,
+    images: row.images,
+    name: localize(row.name, lang),
+    tagline: localize(row.tagline, lang),
+    description: localize(row.description, lang),
+    materials: localize(row.materials, lang),
+  };
+}
+
+// `active` is filtered here too: an admin signed in on the storefront may read inactive rows.
+/** Active articles, in shop order. Throws when the database cannot be read. */
+export async function fetchProducts(client: Pick<SupabaseClient, "from">): Promise<ProductRow[]> {
+  const { data, error } = await client
+    .from("products")
+    .select(COLUMNS)
+    .eq("active", true)
+    .order("sort_order")
+    .order("slug");
+  if (error || !data)
+    throw new Error(`Articles indisponibles : ${error?.message ?? "réponse vide"}`);
+  return data as ProductRow[];
+}
+
+/** The active article with this slug, or null. Throws when the database cannot be read. */
+export async function getProduct(
+  client: Pick<SupabaseClient, "from">,
+  slug: string,
+): Promise<ProductRow | null> {
+  const { data, error } = await client
+    .from("products")
+    .select(COLUMNS)
+    .eq("active", true)
+    .eq("slug", slug)
+    .maybeSingle();
+  if (error) throw new Error(`Article indisponible : ${error.message}`);
+  return data as ProductRow | null;
+}

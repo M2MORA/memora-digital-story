@@ -1,22 +1,23 @@
 import { Link } from "@tanstack/react-router";
 import { CONTACT_EMAIL, INSTAGRAM_URL, whatsappLink } from "@/lib/contact";
-import { PRODUCTS } from "@/lib/products";
+import { useProducts } from "@/hooks/use-products";
 import { useT, type Dict } from "@/i18n";
 import { LangSwitch } from "./LangSwitch";
 
 type FooterLink = { label: string; to: string; params?: Record<string, string> };
 
-function columns(t: Dict): { title: string; links: FooterLink[] }[] {
+function columns(
+  t: Dict,
+  productSlug: string | undefined,
+): { title: string; links: FooterLink[] }[] {
   return [
     {
       title: t.footer.order,
       links: [
         { to: "/commander", label: t.common.create },
-        {
-          to: "/product/$slug",
-          params: { slug: PRODUCTS[0]!.slug },
-          label: t.footer.productPrices,
-        },
+        ...(productSlug
+          ? [{ to: "/product/$slug", params: { slug: productSlug }, label: t.footer.productPrices }]
+          : []),
         { to: "/cart", label: t.footer.myCart },
       ],
     },
@@ -53,6 +54,7 @@ const LINK =
 
 export function SiteFooter() {
   const t = useT();
+  const productSlug = useProducts()[0]?.slug;
   return (
     <footer className="bg-m-night text-m-linen">
       <div className="container-x grid gap-12 py-16 md:grid-cols-[1.3fr_repeat(4,1fr)] md:gap-8">
@@ -83,7 +85,7 @@ export function SiteFooter() {
           <LangSwitch tone="light" className="-ms-2 mt-6" />
         </div>
 
-        {columns(t).map((col) => (
+        {columns(t, productSlug).map((col) => (
           <nav key={col.title} aria-label={col.title}>
             <p className="text-sm font-semibold text-m-rose">{col.title}</p>
             <ul className="mt-3">
