@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import { toast } from "sonner";
 import { cart, useStore, type CartItem } from "@/lib/cart";
-import { finalizeOrderWithIntents } from "@/lib/supabase";
+import { finalizeOrderWithIntents, supabase } from "@/lib/supabase";
 import { resumeUploads, submitOrder, type CheckoutDeps } from "@/lib/checkout";
 import {
   putCachedMedia,
@@ -28,7 +28,7 @@ import {
   useBackgroundUploads,
 } from "@/lib/background-uploads";
 import { clearDraftOrderNumber, getOrCreateDraftOrderNumber } from "@/lib/draft-manager";
-import { type Format, getVideoSurcharge } from "@/lib/pricing";
+import { checkPromoCode, type Format, getVideoSurcharge } from "@/lib/pricing";
 import { usePricing } from "@/hooks/use-pricing";
 import {
   defaultCrop,
@@ -209,7 +209,7 @@ function CommanderPage() {
   const money = t.money;
   const whatsappUrl = whatsappLink(o.whatsappMessage);
   const search = Route.useSearch();
-  const { items, promoCode, draftId, draftToken } = useStore();
+  const { items, promoCode, promoPercent, draftId, draftToken } = useStore();
   const isNarrow = useIsNarrowScreen();
 
   const [stage, setStage] = useState<Stage>(() => initialStage(search.stage));
@@ -239,6 +239,8 @@ function CommanderPage() {
   // Livraison
   const [customer, setCustomer] = useState({ name: "", phone: "" });
   const [shipping, setShipping] = useState({ city: "", address: "" });
+  const [promoInput, setPromoInput] = useState("");
+  const [isCheckingPromo, setIsCheckingPromo] = useState(false);
 
   // Commande
   type CheckoutStep =
@@ -497,6 +499,19 @@ function CommanderPage() {
   };
 
   // ---------- Commande : pipeline direct Cloudflare R2 ----------
+  // Le pourcentage sert à l'affichage ; le montant facturé vient du devis SQL à la finalisation
+  const applyPromo = async () => {
+    setIsCheckingPromo(true);
+    const result = await cart.applyPromoCode(promoInput, (code) => checkPromoCode(supabase, code));
+    setIsCheckingPromo(false);
+    if (result.ok) {
+      setPromoInput("");
+      toast.success(o.delivery.promoApplied(result.percent));
+    } else {
+      toast.error(result.reason === "invalid" ? o.delivery.promoInvalid : o.delivery.promoError);
+    }
+  };
+
   const handleConfirmOrder = async () => {
     if (isSubmitting) return;
     if (items.length === 0) {
@@ -521,6 +536,7 @@ function CommanderPage() {
         items,
         pricing,
         promoCode,
+        promoPercent,
         draftId,
         draftToken,
         customer: customerCheck.customer,
@@ -1060,6 +1076,41 @@ function CommanderPage() {
                     className={FIELD}
                   />
                 </div>
+
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    void applyPromo();
+                  }}
+                >
+                  <label htmlFor="cmd-promo" className={FIELD_LABEL}>
+                    {o.delivery.promo}
+                  </label>
+                  <div className="flex gap-2">
+                    <input
+                      id="cmd-promo"
+                      autoComplete="off"
+                      autoCapitalize="characters"
+                      value={promoInput}
+                      onChange={(e) => setPromoInput(e.target.value)}
+                      className={FIELD}
+                    />
+                    <button
+                      type="submit"
+                      disabled={isCheckingPromo || !promoInput.trim()}
+                      className="h-[54px] shrink-0 rounded-2xl border border-m-line-strong bg-m-paper px-5 text-[15px] font-semibold text-m-ink transition-colors hover:bg-m-blush disabled:opacity-50"
+                    >
+                      {isCheckingPromo ? (
+                        <Loader2
+                          className="h-5 w-5 animate-spin"
+                          aria-label={o.delivery.promoApply}
+                        />
+                      ) : (
+                        o.delivery.promoApply
+                      )}
+                    </button>
+                  </div>
+                </form>
 
                 <div className={`${BOX} text-[15px]`}>
                   <div className="flex justify-between py-1">

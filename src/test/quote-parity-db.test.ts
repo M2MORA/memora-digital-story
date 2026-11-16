@@ -4,7 +4,7 @@
  *   npx supabase start && LOCAL_DB_TEST=1 npx vitest run src/test/quote-parity-db.test.ts
  * Each cart is sent in the shape the checkout sends (src/routes/commander.tsx,
  * normalizedItems) to calculate_order_quote, and compared with calculateQuote fed
- * with get_pricing(). The raw SQL answers are also compared with
+ * with get_pricing() and the percent check_promo_code() gives for the cart's code. The raw SQL answers are also compared with
  * quote-parity-snapshot.json, recorded from the SQL Quote before prices moved to the
  * database (20261116120000): same bytes, lines included. To record it again on purpose:
  *   WRITE_QUOTE_SNAPSHOT=1 LOCAL_DB_TEST=1 npx vitest run src/test/quote-parity-db.test.ts
@@ -14,11 +14,11 @@ import { createClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
 import {
   calculateQuote,
+  checkPromoCode,
   fetchPricing,
   getFramePrice,
   getTiers,
   getUnitPrice,
-  PROMO_CODES,
   SHIPPING_MODES,
   type Format,
   type QuoteLine,
@@ -84,7 +84,8 @@ function buildMatrix(): Case[] {
     });
   }
   // Each promo code (plus messy casing, unknown and empty), below and above free shipping.
-  const promos = [...Object.keys(PROMO_CODES), " vip20 ", "bienvenue", "NOPE", ""];
+  // The codes seeded by 20261118120000 (hardcoded until then).
+  const promos = ["MEMORA10", "BIENVENUE", "VIP20", " vip20 ", "bienvenue", "NOPE", ""];
   for (const promo of promos) {
     for (const quantity of [1, 3]) {
       for (const shipping of SHIPPING_MODES) {
@@ -214,7 +215,8 @@ describe.skipIf(!process.env["LOCAL_DB_TEST"])("Quote parity TS vs SQL (local Su
     const pricing = await fetchPricing(service);
     const mismatches: string[] = [];
     for (const c of matrix) {
-      const ts = calculateQuote(c.lines, pricing, c.promo, c.shipping);
+      const percent = await checkPromoCode(service, c.promo ?? "");
+      const ts = calculateQuote(c.lines, pricing, percent, c.shipping);
       const sql = await sqlQuote(c);
       const pairs: [string, number, unknown][] = [
         ["itemsSubtotal", ts.itemsSubtotal, sql["items_subtotal"]],
@@ -294,7 +296,7 @@ describe.skipIf(!process.env["LOCAL_DB_TEST"])("Quote parity TS vs SQL (local Su
     if (error) throw error;
 
     const pricing = await fetchPricing(service);
-    const ts = calculateQuote(lines, pricing, "MEMORA10", "aramex");
+    const ts = calculateQuote(lines, pricing, await checkPromoCode(service, "MEMORA10"), "aramex");
     const { data: order, error: orderError } = await service
       .from("orders")
       .select("subtotal, shipping_fee, total, items")
@@ -331,7 +333,7 @@ describe.skipIf(!process.env["LOCAL_DB_TEST"])("Quote parity TS vs SQL (local Su
     try {
       const changed = await fetchPricing(service);
       expect(getUnitPrice(changed, "10x15", 5)).toBe(45);
-      const ts = calculateQuote(cart.lines, changed, null, cart.shipping);
+      const ts = calculateQuote(cart.lines, changed, 0, cart.shipping);
       const sql = await sqlQuote(cart);
       expect(ts.itemsSubtotal).toBe(225);
       expect(Number(sql["items_subtotal"])).toBe(225);

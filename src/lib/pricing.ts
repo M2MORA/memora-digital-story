@@ -112,16 +112,18 @@ export function getShippingOptions(pricing: Pricing, subtotalTND: number): Shipp
   ];
 }
 
-// Promo codes: percent off the subtotal (items + frames + video). Codes are matched trimmed and upper-cased.
-export const PROMO_CODES: Record<string, number> = {
-  MEMORA10: 10,
-  BIENVENUE: 10,
-  VIP20: 20,
-};
-
-/** Discount percent for a promo code, or 0 when the code is empty or unknown. */
-export function getPromoDiscountPercent(code: string | null | undefined): number {
-  return PROMO_CODES[(code ?? "").trim().toUpperCase()] ?? 0;
+/**
+ * Discount percent of one promo code with check_promo_code(): 0 when the code is empty, unknown or
+ * inactive. The code list stays in the database. Throws on failure: the caller must tell the customer.
+ */
+export async function checkPromoCode(
+  client: Pick<SupabaseClient, "rpc">,
+  code: string,
+): Promise<number> {
+  if (!code.trim()) return 0;
+  const { data, error } = await client.rpc("check_promo_code", { p_code: code });
+  if (error) throw new Error(`Vérification du code promo impossible : ${error.message}`);
+  return Number(data ?? 0);
 }
 
 export interface QuoteLine {
@@ -144,13 +146,14 @@ export interface QuoteResult {
 }
 
 /**
- * The storefront Quote: cart lines, the pricing (get_pricing()), an optional promo code and a
- * shipping mode in; totals out. Same inputs/outputs as the SQL calculate_order_quote(p_items, p_promo_code, p_shipping_carrier).
+ * The storefront Quote: cart lines, the pricing (get_pricing()), the promo percent
+ * (check_promo_code()) and a shipping mode in; totals out. Same outputs as the SQL
+ * calculate_order_quote(p_items, p_promo_code, p_shipping_carrier), which stays what is charged.
  */
 export function calculateQuote(
   lines: QuoteLine[],
   pricing: Pricing,
-  promoCode?: string | null,
+  promoPercent: number = 0,
   shipping: ShippingMode = "aramex",
 ): QuoteResult {
   const totalQuantity = lines.reduce((sum, line) => sum + line.quantity, 0);
@@ -172,7 +175,7 @@ export function calculateQuote(
   }
 
   const subtotal = Number((itemsSubtotal + framesSubtotal + videoSurcharges).toFixed(2));
-  const discount = Number(((subtotal * getPromoDiscountPercent(promoCode)) / 100).toFixed(2));
+  const discount = Number(((subtotal * promoPercent) / 100).toFixed(2));
   const discountedSubtotal = subtotal - discount;
 
   const shippingFee =

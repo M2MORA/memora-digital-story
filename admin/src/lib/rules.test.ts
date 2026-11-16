@@ -5,9 +5,12 @@ import {
   displayMediaUrl,
   mediaPath,
   mergeById,
+  normalizePromoCode,
   olderThanCursor,
   parseServerStats,
   validateFramePrice,
+  validateNewPromoCode,
+  validatePromoPercent,
   validateShippingVideo,
   validateTierGrid,
 } from "./rules";
@@ -158,5 +161,37 @@ describe("validateShippingVideo", () => {
   it("refuse plus de minutes incluses que la durée maximale d'une vidéo", () => {
     expect(validateShippingVideo({ ...ok, included_video_minutes: 31 }, 1800)).toMatch(/30 min au maximum/);
     expect(validateShippingVideo({ ...ok, included_video_minutes: 30 }, 1800)).toBeNull();
+  });
+});
+
+describe("codes promo", () => {
+  it("normalise le code comme la base : sans espaces, en majuscules", () => {
+    expect(normalizePromoCode("  ete-2027 ")).toBe("ETE-2027");
+  });
+
+  it("accepte un pourcentage de 0 à 100, refuse le reste", () => {
+    expect(validatePromoPercent(0)).toBeNull();
+    expect(validatePromoPercent(12.5)).toBeNull();
+    expect(validatePromoPercent(100)).toBeNull();
+    expect(validatePromoPercent(-1)).toMatch(/entre 0 et 100/);
+    expect(validatePromoPercent(101)).toMatch(/entre 0 et 100/);
+    expect(validatePromoPercent(NaN)).toMatch(/entre 0 et 100/);
+  });
+
+  it("refuse un code vide, trop court, trop long ou avec des caractères spéciaux", () => {
+    expect(validateNewPromoCode("ete_2027", 10, [])).toBeNull();
+    expect(validateNewPromoCode("", 10, [])).toMatch(/Code invalide/);
+    expect(validateNewPromoCode("AB", 10, [])).toMatch(/Code invalide/);
+    expect(validateNewPromoCode("A".repeat(33), 10, [])).toMatch(/Code invalide/);
+    expect(validateNewPromoCode("ÉTÉ", 10, [])).toMatch(/Code invalide/);
+    expect(validateNewPromoCode("NOEL 10", 10, [])).toMatch(/Code invalide/);
+  });
+
+  it("refuse un code déjà utilisé, même écrit autrement ou désactivé", () => {
+    expect(validateNewPromoCode(" vip20", 10, ["VIP20"])).toMatch(/VIP20 existe déjà/);
+  });
+
+  it("refuse un nouveau code avec un pourcentage hors limites", () => {
+    expect(validateNewPromoCode("NOEL", 150, [])).toMatch(/entre 0 et 100/);
   });
 });

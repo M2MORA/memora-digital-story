@@ -176,3 +176,27 @@ export function validateShippingVideo(s: ShippingVideoSettings, maxVideoSeconds:
     return `Minutes de vidéo incluses : ${maxVideoSeconds / 60} min au maximum (durée maximale d'une vidéo).`;
   return null;
 }
+
+export type PromoCode = { code: string; percent: number; active: boolean };
+
+/** Code promo tel que la base le stocke : sans espaces, en majuscules. */
+export const normalizePromoCode = (code: string) => code.trim().toUpperCase();
+
+/** Pourcentage de réduction : de 0 à 100. */
+export function validatePromoPercent(percent: number): string | null {
+  return Number.isFinite(percent) && percent >= 0 && percent <= 100
+    ? null
+    : "Réduction invalide : un pourcentage entre 0 et 100.";
+}
+
+/**
+ * Nouveau code promo (même format que la contrainte de la base) : 3 à 32 lettres, chiffres, - ou _,
+ * pas déjà utilisé (actif ou non : un code désactivé garde son nom).
+ */
+export function validateNewPromoCode(code: string, percent: number, existing: string[]): string | null {
+  const clean = normalizePromoCode(code);
+  if (!/^[A-Z0-9_-]{3,32}$/.test(clean))
+    return "Code invalide : 3 à 32 caractères, lettres sans accent, chiffres, - ou _.";
+  if (existing.includes(clean)) return `Le code ${clean} existe déjà.`;
+  return validatePromoPercent(percent);
+}

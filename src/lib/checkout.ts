@@ -36,6 +36,8 @@ export type CheckoutInput = {
   /** Tarifs (get_pricing) : servent seulement au total de repli si le serveur n'en renvoie pas. */
   pricing: Pricing;
   promoCode?: string | undefined;
+  /** Pourcentage du code promo (check_promo_code) : sert seulement au total de repli. */
+  promoPercent?: number | undefined;
   draftId: string;
   draftToken: string;
   /** Client déjà passé par validateCustomer (règles partagées avec WhatsApp). */
@@ -97,7 +99,7 @@ export async function submitOrder(
   input: CheckoutInput,
   deps: CheckoutDeps,
 ): Promise<CheckoutResult> {
-  const { items, pricing, promoCode, draftId, draftToken, customer, onStep } = input;
+  const { items, pricing, promoCode, promoPercent, draftId, draftToken, customer, onStep } = input;
   const orderNumber = deps.draft.getOrderNumber(draftId);
 
   try {
@@ -200,7 +202,7 @@ export async function submitOrder(
               videoDurationSec: i.videoDurationSec,
             })),
             pricing,
-            promoCode,
+            promoPercent ?? 0,
             "aramex",
           ).total;
 

@@ -3,11 +3,12 @@
  * Skipped unless LOCAL_DB_TEST is set. Usage:
  *   npx supabase start && LOCAL_DB_TEST=1 npx vitest run src/test/pricing-access-db.test.ts
  * Anyone reads the grid, only admins (app_metadata.role = 'admin') write it,
- * and every format keeps a first tier at quantity 1.
+ * and every format keeps a first tier at quantity 1. Promo codes: only admins
+ * read or write promo_codes; everyone else checks one code with check_promo_code().
  */
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import { describe, expect, it } from "vitest";
-import { fetchPricing } from "@/lib/pricing";
+import { checkPromoCode, fetchPricing } from "@/lib/pricing";
 import { TODAY_PRICING } from "./pricing-fixture";
 
 const LOCAL_URL = "http://127.0.0.1:54321";
@@ -150,5 +151,97 @@ describe.skipIf(!process.env["LOCAL_DB_TEST"])("pricing tables access (local Sup
     expect(duplicate.error?.code).toBe("23505");
     expect(await tierPrice("box", 1)).toBe(89);
     expect(await tierPrice("box", 5)).toBe(79);
+  });
+});
+
+describe.skipIf(!process.env["LOCAL_DB_TEST"])("promo codes access (local Supabase)", () => {
+  // Codes unique to this run: the parity test reads the seeded ones alongside.
+  const suffix = crypto.randomUUID().slice(0, 8).toUpperCase();
+  const box = [{ id: "item_0", productId: "p1", format: "box", withFrame: false, qty: 1 }];
+  const sqlDiscount = async (client: SupabaseClient, code: string) => {
+    const { data, error } = await client.rpc("calculate_order_quote", {
+      p_items: box,
+      p_promo_code: code,
+      p_shipping_carrier: "aramex",
+    });
+    if (error) throw error;
+    return Number((data as { discount: number }).discount);
+  };
+  const removeCode = (code: string) => service.from("promo_codes").delete().eq("code", code);
+
+  it("anonymous visitors and customers cannot read or write promo_codes", async () => {
+    const code = `NOPE-${suffix}`;
+    for (const client of [createClient(LOCAL_URL, ANON_KEY, opts), await signedIn(null)]) {
+      const read = await client.from("promo_codes").select("*");
+      expect(read.data ?? []).toEqual([]);
+      await client.from("promo_codes").insert({ code, percent: 90 });
+      await client.from("promo_codes").update({ percent: 90 }).eq("code", "VIP20");
+    }
+    const { data } = await service
+      .from("promo_codes")
+      .select("code, percent")
+      .in("code", [code, "VIP20"]);
+    expect(data).toEqual([{ code: "VIP20", percent: 20 }]);
+  });
+
+  it("check_promo_code gives the percent of an active code, 0 for an inactive or unknown one", async () => {
+    const off = `OFF-${suffix}`;
+    await service.from("promo_codes").insert({ code: off, percent: 30, active: false });
+    try {
+      const anon = createClient(LOCAL_URL, ANON_KEY, opts);
+      const customer = await signedIn(null);
+      for (const client of [anon, customer]) {
+        expect(await checkPromoCode(client, "MEMORA10")).toBe(10);
+        expect(await checkPromoCode(client, " vip20 ")).toBe(20);
+        expect(await checkPromoCode(client, off)).toBe(0);
+        expect(await checkPromoCode(client, `UNKNOWN-${suffix}`)).toBe(0);
+      }
+    } finally {
+      await removeCode(off);
+    }
+  });
+
+  it("an admin creates a code, a customer gets the discount; deactivating it removes the discount", async () => {
+    const code = `TEST-${suffix}`;
+    const admin = await signedIn("admin");
+    const customer = await signedIn(null);
+    try {
+      const insert = await admin.from("promo_codes").insert({ code, percent: 15 }).select();
+      expect(insert.error).toBeNull();
+      expect(insert.data).toHaveLength(1);
+      expect(await checkPromoCode(customer, code.toLowerCase())).toBe(15);
+      expect(await sqlDiscount(customer, code)).toBe(13.35); // 15 % of 89
+
+      const off = await admin
+        .from("promo_codes")
+        .update({ active: false })
+        .eq("code", code)
+        .select();
+      expect(off.data).toHaveLength(1);
+      expect(await checkPromoCode(customer, code)).toBe(0);
+      expect(await sqlDiscount(customer, code)).toBe(0);
+
+      // No delete: codes are deactivated.
+      await admin.from("promo_codes").delete().eq("code", code);
+      const { data } = await service.from("promo_codes").select("code").eq("code", code);
+      expect(data).toHaveLength(1);
+    } finally {
+      await removeCode(code);
+    }
+  });
+
+  it("rejects a lower-case code, a percent outside 0-100 and a duplicate", async () => {
+    const admin = await signedIn("admin");
+    expect(
+      (await admin.from("promo_codes").insert({ code: `low-${suffix}`.toLowerCase(), percent: 5 }))
+        .error?.code,
+    ).toBe("23514");
+    expect(
+      (await admin.from("promo_codes").insert({ code: `HIGH-${suffix}`, percent: 101 })).error
+        ?.code,
+    ).toBe("23514");
+    expect(
+      (await admin.from("promo_codes").insert({ code: "VIP20", percent: 5 })).error?.code,
+    ).toBe("23505");
   });
 });

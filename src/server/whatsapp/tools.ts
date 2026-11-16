@@ -134,7 +134,7 @@ export function validateOrderRequest(
   const quote = calculateQuote(
     [{ format: "10x15", quantity: data.quantity, withFrame: data.with_frame }],
     pricing,
-    null,
+    0,
     data.carrier,
   );
   return {

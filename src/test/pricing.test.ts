@@ -1,12 +1,11 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   getUnitPrice,
   getVideoSurcharge,
   calculateQuote,
-  getPromoDiscountPercent,
+  checkPromoCode,
   getTiers,
   getTierDiscountPercent,
-  PROMO_CODES,
 } from "@/lib/pricing";
 import { TODAY_PRICING as P, withPricing } from "./pricing-fixture";
 
@@ -198,38 +197,55 @@ describe("Pricing Engine (plan.md section 10 specification)", () => {
     });
 
     it("charges the selected shipping mode", () => {
-      expect(totals(calculateQuote([{ format: "10x15", quantity: 2 }], P, null, "aramex"))).toEqual(
-        [98, 0, 8, 106],
-      );
+      expect(totals(calculateQuote([{ format: "10x15", quantity: 2 }], P, 0, "aramex"))).toEqual([
+        98, 0, 8, 106,
+      ]);
       expect(
-        totals(calculateQuote([{ format: "10x15", quantity: 2 }], P, null, "mondial_relay")),
+        totals(calculateQuote([{ format: "10x15", quantity: 2 }], P, 0, "mondial_relay")),
       ).toEqual([98, 0, 6, 104]);
     });
 
-    it("applies each promo code, case- and space-insensitive", () => {
+    it("applies the promo percent (10 %, 20 %, 0 % or none)", () => {
       const two = [{ format: "10x15" as const, quantity: 2 }];
-      expect(totals(calculateQuote(two, P, "MEMORA10"))).toEqual([98, 9.8, 8, 96.2]);
-      expect(totals(calculateQuote(two, P, " bienvenue "))).toEqual([98, 9.8, 8, 96.2]);
-      expect(totals(calculateQuote(two, P, "VIP20"))).toEqual([98, 19.6, 8, 86.4]);
-      expect(totals(calculateQuote(two, P, "NOPE"))).toEqual([98, 0, 8, 106]);
-      expect(totals(calculateQuote(two, P, ""))).toEqual([98, 0, 8, 106]);
-    });
-
-    it("lists exactly the known promo codes", () => {
-      expect(PROMO_CODES).toEqual({ MEMORA10: 10, BIENVENUE: 10, VIP20: 20 });
-      expect(getPromoDiscountPercent("vip20")).toBe(20);
-      expect(getPromoDiscountPercent(undefined)).toBe(0);
+      expect(totals(calculateQuote(two, P, 10))).toEqual([98, 9.8, 8, 96.2]);
+      expect(totals(calculateQuote(two, P, 20))).toEqual([98, 19.6, 8, 86.4]);
+      expect(totals(calculateQuote(two, P, 0))).toEqual([98, 0, 8, 106]);
+      expect(totals(calculateQuote(two, P))).toEqual([98, 0, 8, 106]);
     });
 
     it("decides free shipping on the subtotal after discount", () => {
       const six = [{ format: "10x15" as const, quantity: 6 }];
       expect(P.settings.free_shipping_threshold).toBe(250);
       expect(totals(calculateQuote(six, P))).toEqual([252, 0, 0, 252]);
-      expect(totals(calculateQuote(six, P, null, "mondial_relay"))).toEqual([252, 0, 0, 252]);
+      expect(totals(calculateQuote(six, P, 0, "mondial_relay"))).toEqual([252, 0, 0, 252]);
       // 252 - 50,40 = 201,60 < 250 → shipping is charged again
-      const q = calculateQuote(six, P, "VIP20");
+      const q = calculateQuote(six, P, 20);
       expect(totals(q)).toEqual([252, 50.4, 8, 209.6]);
       expect(q.isFreeShipping).toBe(false);
+    });
+  });
+
+  describe("checkPromoCode (check_promo_code RPC)", () => {
+    const client = (result: { data: unknown; error: { message: string } | null }) => ({
+      rpc: vi.fn().mockResolvedValue(result),
+    });
+
+    it("returns the percent the database gives for one code", async () => {
+      const c = client({ data: "10.00", error: null });
+      expect(await checkPromoCode(c as never, "memora10")).toBe(10);
+      expect(c.rpc).toHaveBeenCalledWith("check_promo_code", { p_code: "memora10" });
+      expect(await checkPromoCode(client({ data: 0, error: null }) as never, "NOPE")).toBe(0);
+    });
+
+    it("does not call the database for an empty code", async () => {
+      const c = client({ data: 50, error: null });
+      expect(await checkPromoCode(c as never, "  ")).toBe(0);
+      expect(c.rpc).not.toHaveBeenCalled();
+    });
+
+    it("throws when the check fails, so the customer is told", async () => {
+      const c = client({ data: null, error: { message: "network" } });
+      await expect(checkPromoCode(c as never, "VIP20")).rejects.toThrow(/code promo impossible/);
     });
   });
 
@@ -286,7 +302,7 @@ describe("Pricing Engine (plan.md section 10 specification)", () => {
       expect(totals(calculateQuote(two, cheap))).toEqual([98, 0, 0, 98]);
       expect(calculateQuote(two, cheap).isFreeShipping).toBe(true);
       const one = [{ format: "10x15" as const, quantity: 1 }];
-      expect(totals(calculateQuote(one, cheap, null, "mondial_relay"))).toEqual([49, 0, 7, 56]);
+      expect(totals(calculateQuote(one, cheap, 0, "mondial_relay"))).toEqual([49, 0, 7, 56]);
     });
 
     it("follows changed frame prices and video settings", () => {

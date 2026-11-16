@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { Plus, RefreshCw, Save, Trash2, Undo2 } from "lucide-react";
 import { usePricing, type PricingData, type PricingFormat, type PricingSettings } from "../lib/usePricing";
+import { usePromoCodes, type PromoCodesData } from "../lib/usePromoCodes";
+import { normalizePromoCode, type PromoCode } from "../lib/rules";
 
 type Status = { saving: boolean; message: string; ok: boolean };
 const IDLE: Status = { saving: false, message: "", ok: false };
@@ -178,6 +180,151 @@ function ShippingVideo({ settings, save }: { settings: PricingSettings; save: Pr
   );
 }
 
+const promoDraft = (codes: PromoCode[]) => codes.map((c) => ({ percent: String(c.percent), active: c.active }));
+
+/** Codes existants : pourcentage et activation, enregistrés ensemble. Pas de suppression. */
+function PromoList({ codes, update }: { codes: PromoCode[]; update: PromoCodesData["update"] }) {
+  const [draft, setDraft] = useState(() => promoDraft(codes));
+  const [status, setStatus] = useState<Status>(IDLE);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(promoDraft(codes));
+
+  const setRow = (i: number, patch: Partial<(typeof draft)[number]>) =>
+    setDraft((d) => d.map((r, j) => (j === i ? { ...r, ...patch } : r)));
+
+  const onSave = async () => {
+    setStatus({ saving: true, message: "", ok: false });
+    const rows = draft.map((r) => ({ percent: num(r.percent), active: r.active }));
+    for (const [i, c] of codes.entries()) {
+      const row = rows[i]!;
+      if (row.percent === c.percent && row.active === c.active) continue;
+      const err = await update(c.code, row);
+      if (err) return setStatus({ saving: false, message: `${c.code} : ${err}`, ok: false });
+    }
+    setDraft(rows.map((r) => ({ percent: String(r.percent), active: r.active })));
+    setStatus({ saving: false, message: "Codes promo enregistrés.", ok: true });
+  };
+
+  return (
+    <div className="panel">
+      <h3 className="panel-title">Codes existants</h3>
+      {codes.length === 0 ? (
+        <p className="muted">Aucun code promo.</p>
+      ) : (
+        <table className="tier-table">
+          <thead>
+            <tr>
+              <th scope="col">Code</th>
+              <th scope="col">Réduction (%)</th>
+              <th scope="col">Actif</th>
+            </tr>
+          </thead>
+          <tbody>
+            {codes.map((c, i) => (
+              <tr key={c.code}>
+                <td>{c.code}</td>
+                <td>
+                  <input
+                    inputMode="decimal"
+                    value={draft[i]!.percent}
+                    aria-label={`Réduction du code ${c.code}`}
+                    onChange={(e) => setRow(i, { percent: e.target.value })}
+                  />
+                </td>
+                <td>
+                  <input
+                    type="checkbox"
+                    checked={draft[i]!.active}
+                    aria-label={`Code ${c.code} actif`}
+                    onChange={(e) => setRow(i, { active: e.target.checked })}
+                  />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      )}
+      <p className="hint">Un code désactivé ne donne plus de réduction ; il reste dans la liste.</p>
+      <SaveRow
+        dirty={dirty}
+        status={status}
+        onSave={() => void onSave()}
+        onReset={() => {
+          setDraft(promoDraft(codes));
+          setStatus(IDLE);
+        }}
+      />
+    </div>
+  );
+}
+
+/** Nouveau code promo, actif dès sa création. */
+function NewPromo({ create }: { create: PromoCodesData["create"] }) {
+  const [draft, setDraft] = useState({ code: "", percent: "" });
+  const [status, setStatus] = useState<Status>(IDLE);
+  const dirty = draft.code !== "" || draft.percent !== "";
+
+  const onSave = async () => {
+    setStatus({ saving: true, message: "", ok: false });
+    const err = await create(draft.code, num(draft.percent));
+    if (err) return setStatus({ saving: false, message: err, ok: false });
+    setStatus({ saving: false, message: `Code ${normalizePromoCode(draft.code)} créé.`, ok: true });
+    setDraft({ code: "", percent: "" });
+  };
+
+  return (
+    <div className="panel">
+      <h3 className="panel-title">Nouveau code</h3>
+      <label className="field">
+        Code
+        <input
+          value={draft.code}
+          autoCapitalize="characters"
+          onChange={(e) => setDraft((d) => ({ ...d, code: e.target.value }))}
+        />
+      </label>
+      <label className="field">
+        Réduction (%)
+        <input inputMode="decimal" value={draft.percent} onChange={(e) => setDraft((d) => ({ ...d, percent: e.target.value }))} />
+      </label>
+      <SaveRow
+        dirty={dirty}
+        status={status}
+        onSave={() => void onSave()}
+        onReset={() => {
+          setDraft({ code: "", percent: "" });
+          setStatus(IDLE);
+        }}
+      />
+    </div>
+  );
+}
+
+/** Section « Codes promo » : la liste n'est lisible que par les admins (droits de la base). */
+function PromoCodes() {
+  const promos = usePromoCodes();
+
+  if (!promos.codes) {
+    return promos.loading ? (
+      <p className="muted">Chargement des codes promo…</p>
+    ) : (
+      <div className="panel">
+        <p className="error" role="alert">{promos.error}</p>
+        <button type="button" className="btn" onClick={() => void promos.load()}>
+          <RefreshCw size={16} aria-hidden /> Réessayer
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <>
+      {/* Remonte la liste quand un code est créé : le brouillon suit les lignes. */}
+      <PromoList key={promos.codes.map((c) => c.code).join()} codes={promos.codes} update={promos.update} />
+      <NewPromo create={promos.create} />
+    </>
+  );
+}
+
 function SaveRow({ dirty, status, onSave, onReset }: { dirty: boolean; status: Status; onSave: () => void; onReset: () => void }) {
   return (
     <>
@@ -201,8 +348,8 @@ function SaveRow({ dirty, status, onSave, onReset }: { dirty: boolean; status: S
 }
 
 /**
- * Onglet Catalogue. Chaque section enregistre seule ; une nouvelle section (codes promo…)
- * s'ajoute comme un panneau de plus dans <section className="settings catalogue">.
+ * Onglet Catalogue. Chaque section enregistre seule et s'ajoute comme un panneau de plus
+ * dans <section className="settings catalogue">.
  * Les commandes passées gardent leurs prix : order_items stocke les prix facturés.
  */
 export default function Catalogue() {
@@ -234,6 +381,8 @@ export default function Catalogue() {
         <FormatPrices key={`${f.code}-${pricing.version}`} format={f} save={pricing.saveFormat} />
       ))}
       <ShippingVideo key={`settings-${pricing.version}`} settings={settings} save={pricing.saveShippingVideo} />
+      <h2 className="sub-title">Codes promo</h2>
+      <PromoCodes />
     </section>
   );
 }
