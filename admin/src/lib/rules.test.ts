@@ -1,6 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 import {
   chunk,
+  cleanArticle,
+  compactCopy,
   computeStats,
   displayMediaUrl,
   mediaPath,
@@ -8,6 +10,7 @@ import {
   normalizePromoCode,
   olderThanCursor,
   parseServerStats,
+  validateArticle,
   validateFramePrice,
   validateNewPromoCode,
   validatePromoPercent,
@@ -193,5 +196,93 @@ describe("codes promo", () => {
 
   it("refuse un nouveau code avec un pourcentage hors limites", () => {
     expect(validateNewPromoCode("NOEL", 150, [])).toMatch(/entre 0 et 100/);
+  });
+});
+
+describe("validateArticle", () => {
+  const article = {
+    id: "p1",
+    slug: "memora-photo",
+    format: "10x15",
+    sort_order: 0,
+    included_video_min: 8,
+    name: { fr: "MÉMORA, la photo" },
+    tagline: { fr: "Une photo qui ouvre votre vidéo." },
+    description: { fr: "Un tirage d'art." },
+    materials: { fr: ["Photo 10 × 15"] },
+  };
+  const others = [{ id: "p1", slug: "memora-photo" }, { id: "p2", slug: "memora-cadre" }];
+  const formats = ["10x15", "a5"];
+  const check = (patch: Partial<typeof article>) => validateArticle({ ...article, ...patch }, others, formats);
+
+  it("accepte un article valide, y compris son propre slug", () => {
+    expect(check({})).toBeNull();
+  });
+
+  it("refuse un slug hors format", () => {
+    for (const slug of ["", "Memora", "memora photo", "memora--photo", "-memora", "memora-", "mémora"])
+      expect(check({ slug })).toMatch(/Slug invalide/);
+  });
+
+  it("refuse un slug déjà pris par un autre article", () => {
+    expect(check({ slug: "memora-cadre" })).toBe("Le slug memora-cadre est déjà utilisé.");
+  });
+
+  it("refuse un format qui n'existe pas", () => {
+    expect(check({ format: "a3" })).toBe("Format inconnu : a3.");
+  });
+
+  it("exige le texte français", () => {
+    expect(check({ name: { fr: "  " } })).toMatch(/nom en français/);
+    expect(check({ tagline: { fr: "" } })).toMatch(/accroche/);
+    expect(check({ description: { fr: "" } })).toMatch(/description/);
+    expect(check({ materials: { fr: [] } })).toMatch(/contenu/);
+  });
+
+  it("exige des minutes de vidéo entières positives ou nulles", () => {
+    expect(check({ included_video_min: 0 })).toBeNull();
+    expect(check({ included_video_min: -1 })).toMatch(/Minutes/);
+    expect(check({ included_video_min: 1.5 })).toMatch(/Minutes/);
+    expect(check({ included_video_min: NaN })).toMatch(/Minutes/);
+  });
+
+  it("exige un ordre d'affichage entier", () => {
+    expect(check({ sort_order: -3 })).toBeNull();
+    expect(check({ sort_order: 1.5 })).toMatch(/Ordre/);
+    expect(check({ sort_order: NaN })).toMatch(/Ordre/);
+  });
+});
+
+describe("compactCopy", () => {
+  it("retire les langues facultatives vides pour que la boutique affiche le français", () => {
+    expect(compactCopy({ fr: " Bonjour ", en: "  ", ar: "" })).toEqual({ fr: "Bonjour" });
+    expect(compactCopy({ fr: "Bonjour", en: "Hello" })).toEqual({ fr: "Bonjour", en: "Hello" });
+  });
+
+  it("nettoie les listes et retire les lignes vides", () => {
+    expect(compactCopy({ fr: [" Photo ", "", "Carte"], en: ["", " "] })).toEqual({ fr: ["Photo", "Carte"] });
+  });
+});
+
+describe("cleanArticle", () => {
+  it("retire les espaces et met un badge vide à aucun", () => {
+    const a = cleanArticle({
+      slug: " memora-photo ",
+      badge: "  ",
+      dimensions: " 10 × 15 cm ",
+      name: { fr: "Nom", en: "" },
+      tagline: { fr: "Accroche" },
+      description: { fr: "Texte", ar: " نص " },
+      materials: { fr: ["Photo", " "] },
+    });
+    expect(a).toEqual({
+      slug: "memora-photo",
+      badge: null,
+      dimensions: "10 × 15 cm",
+      name: { fr: "Nom" },
+      tagline: { fr: "Accroche" },
+      description: { fr: "Texte", ar: "نص" },
+      materials: { fr: ["Photo"] },
+    });
   });
 });

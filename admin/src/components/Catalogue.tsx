@@ -1,11 +1,11 @@
 import { useState } from "react";
-import { Plus, RefreshCw, Save, Trash2, Undo2 } from "lucide-react";
+import { Plus, RefreshCw, Trash2 } from "lucide-react";
 import { usePricing, type PricingData, type PricingFormat, type PricingSettings } from "../lib/usePricing";
 import { usePromoCodes, type PromoCodesData } from "../lib/usePromoCodes";
 import { normalizePromoCode, type PromoCode } from "../lib/rules";
 
-type Status = { saving: boolean; message: string; ok: boolean };
-const IDLE: Status = { saving: false, message: "", ok: false };
+import { Articles } from "./Articles";
+import { IDLE, SaveRow, type Status } from "./SaveRow";
 
 // Champ vide = invalide (NaN) : la règle le refusera avec un message clair.
 const num = (s: string) => (s.trim() === "" ? NaN : Number(s.replace(",", ".")));
@@ -325,28 +325,6 @@ function PromoCodes() {
   );
 }
 
-function SaveRow({ dirty, status, onSave, onReset }: { dirty: boolean; status: Status; onSave: () => void; onReset: () => void }) {
-  return (
-    <>
-      {status.message ? (
-        <p className={`note ${status.ok && !dirty ? "is-ok" : status.ok ? "" : "is-error"}`} role={status.ok ? "status" : "alert"}>
-          {status.message}
-        </p>
-      ) : (
-        dirty && <p className="hint">Modifications non enregistrées.</p>
-      )}
-      <div className="actions-row">
-        <button type="button" className="btn primary" onClick={onSave} disabled={!dirty || status.saving}>
-          <Save size={16} aria-hidden /> {status.saving ? "Enregistrement…" : "Enregistrer"}
-        </button>
-        <button type="button" className="btn" onClick={onReset} disabled={!dirty || status.saving}>
-          <Undo2 size={16} aria-hidden /> Annuler
-        </button>
-      </div>
-    </>
-  );
-}
-
 /**
  * Onglet Catalogue. Chaque section enregistre seule et s'ajoute comme un panneau de plus
  * dans <section className="settings catalogue">.
@@ -383,6 +361,8 @@ export default function Catalogue() {
       <ShippingVideo key={`settings-${pricing.version}`} settings={settings} save={pricing.saveShippingVideo} />
       <h2 className="sub-title">Codes promo</h2>
       <PromoCodes />
+      <h2 className="sub-title">Articles</h2>
+      <Articles formats={formats.map((f) => f.code)} />
     </section>
   );
 }

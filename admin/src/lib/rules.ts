@@ -200,3 +200,82 @@ export function validateNewPromoCode(code: string, percent: number, existing: st
   if (existing.includes(clean)) return `Le code ${clean} existe déjà.`;
   return validatePromoPercent(percent);
 }
+
+/** Texte d'un article dans les trois langues du site : `fr` toujours là, `en` et `ar` facultatifs. */
+export type Localized<T> = { fr: T; en?: T; ar?: T };
+
+/** Article tel que l'admin le lit et l'écrit (table products). */
+export type Article = {
+  id: string;
+  slug: string;
+  format: string;
+  active: boolean;
+  sort_order: number;
+  badge: string | null;
+  dimensions: string;
+  occasions: string[];
+  style: string;
+  included_video_min: number;
+  images: string[];
+  name: Localized<string>;
+  tagline: Localized<string>;
+  description: Localized<string>;
+  materials: Localized<string[]>;
+};
+
+/** Même format que la contrainte de la base : minuscules, chiffres, mots séparés par un tiret. */
+export const SLUG_PATTERN = /^[a-z0-9]+(-[a-z0-9]+)*$/;
+
+/**
+ * Texte prêt à enregistrer : espaces retirés, langue facultative vide → clé absente
+ * (la boutique affiche alors le français).
+ */
+export function compactCopy<T extends string | string[]>(copy: Localized<T>): Localized<T> {
+  const clean = (v: T | undefined) =>
+    (Array.isArray(v) ? v.map((s) => s.trim()).filter(Boolean) : String(v ?? "").trim()) as T;
+  const out: Localized<T> = { fr: clean(copy.fr) };
+  for (const lang of ["en", "ar"] as const) {
+    const v = clean(copy[lang]);
+    if (v.length > 0) out[lang] = v;
+  }
+  return out;
+}
+
+type ArticleText = Pick<Article, "slug" | "badge" | "dimensions" | "name" | "tagline" | "description" | "materials">;
+
+/** Article prêt à enregistrer : espaces retirés, badge vide → aucun, langues facultatives vides retirées. */
+export function cleanArticle<T extends ArticleText>(a: T): T {
+  return {
+    ...a,
+    slug: a.slug.trim(),
+    badge: a.badge?.trim() || null,
+    dimensions: a.dimensions.trim(),
+    name: compactCopy(a.name),
+    tagline: compactCopy(a.tagline),
+    description: compactCopy(a.description),
+    materials: compactCopy(a.materials),
+  };
+}
+
+/**
+ * Article vérifié avant l'envoi : slug valide et libre (parmi les autres articles, actifs ou non),
+ * format existant, texte français complet, minutes de vidéo et ordre entiers.
+ */
+export function validateArticle(
+  a: Pick<Article, "id" | "slug" | "format" | "sort_order" | "included_video_min" | "name" | "tagline" | "description" | "materials">,
+  others: Pick<Article, "id" | "slug">[],
+  formats: string[],
+): string | null {
+  if (!SLUG_PATTERN.test(a.slug))
+    return "Slug invalide : minuscules sans accent et chiffres, mots séparés par un tiret (ex. photo-cadre).";
+  if (others.some((o) => o.id !== a.id && o.slug === a.slug)) return `Le slug ${a.slug} est déjà utilisé.`;
+  if (!formats.includes(a.format)) return `Format inconnu : ${a.format}.`;
+  if (!a.name.fr.trim()) return "Le nom en français est obligatoire.";
+  if (!a.tagline.fr.trim()) return "L'accroche en français est obligatoire.";
+  if (!a.description.fr.trim()) return "La description en français est obligatoire.";
+  if (!a.materials.fr.some((m) => m.trim())) return "Le contenu en français est obligatoire (au moins une ligne).";
+  if (!Number.isInteger(a.included_video_min) || a.included_video_min < 0)
+    return "Minutes de vidéo incluses invalides : un nombre entier positif ou nul.";
+  if (!Number.isInteger(a.sort_order)) return "Ordre d'affichage invalide : un nombre entier.";
+  return null;
+}
