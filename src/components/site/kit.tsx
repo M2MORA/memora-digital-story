@@ -1,6 +1,7 @@
 import { cva, type VariantProps } from "class-variance-authority";
 import type { ComponentPropsWithoutRef, ReactNode } from "react";
 import { cn } from "@/lib/utils";
+import { reveal } from "./reveal";
 
 /**
  * Briques partagées du site vitrine (direction « Le Verso »).
@@ -8,7 +9,7 @@ import { cn } from "@/lib/utils";
  * texte 16px en casse normale, vin sur lin.
  */
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-60",
+  "inline-flex items-center justify-center gap-2 rounded-full font-semibold transition-[color,background-color,text-decoration-color,scale] duration-200 ease-out active:scale-[0.97] disabled:cursor-not-allowed disabled:opacity-60 disabled:active:scale-100",
   {
     variants: {
       variant: {
@@ -47,11 +48,16 @@ export function PageHero({
 }) {
   return (
     <section className="container-x pb-12 pt-12 md:pb-16 md:pt-20">
-      <h1 className="max-w-3xl font-serif text-[40px] leading-[1.05] text-m-ink sm:text-[56px]">
+      <h1
+        {...reveal("line")}
+        className="max-w-3xl font-serif text-[40px] leading-[1.05] text-m-ink sm:text-[56px]"
+      >
         {title}
       </h1>
-      {intro && <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-m-muted">{intro}</p>}
-      {children}
+      <div {...reveal("rise", 150)}>
+        {intro && <p className="mt-5 max-w-xl text-[17px] leading-relaxed text-m-muted">{intro}</p>}
+        {children}
+      </div>
     </section>
   );
 }
@@ -70,10 +76,18 @@ export function SectionTitle({
 }) {
   return (
     <div className={cn("max-w-2xl", className)}>
-      <h2 id={id} className="font-serif text-[30px] leading-[1.1] text-m-ink sm:text-[40px]">
+      <h2
+        id={id}
+        {...reveal("line")}
+        className="font-serif text-[30px] leading-[1.1] text-m-ink sm:text-[40px]"
+      >
         {title}
       </h2>
-      {intro && <p className="mt-4 text-[17px] leading-relaxed text-m-muted">{intro}</p>}
+      {intro && (
+        <p {...reveal("rise", 120)} className="mt-4 text-[17px] leading-relaxed text-m-muted">
+          {intro}
+        </p>
+      )}
     </div>
   );
 }

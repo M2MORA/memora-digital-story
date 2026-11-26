@@ -56,82 +56,18 @@ export function HeroReveal({
     };
   }, []);
 
-  // Arrêt au texte : un geste qui descend depuis le haut s'arrête au point
-  // d'arrêt (texte entièrement visible), inertie comprise. Le geste suivant
-  // continue normalement. Seulement pour un défilement fait par la personne
-  // (molette, doigt, clavier) : un lien interne comme #occasions passe sans arrêt.
-  // Le CSS scroll-snap ne suffit pas : Chrome ignore scroll-snap-stop en mode
-  // « proximity », et « mandatory » bloquerait le reste de la page.
-  useEffect(() => {
-    const marker = stopRef.current;
-    if (!marker) return;
-    const IDLE_MS = 180;
-    const stopY = () => marker.getBoundingClientRect().top + window.scrollY;
-    let armed = window.scrollY < stopY() - 4;
-    let holding = false;
-    let lastInput = 0;
-    let idle: ReturnType<typeof setTimeout> | undefined;
-
-    const markInput = () => {
-      lastInput = performance.now();
-    };
-    const onKey = (e: KeyboardEvent) => {
-      if (["PageDown", "ArrowDown", " ", "End"].includes(e.key)) markInput();
-    };
-    const holdUntilIdle = () => {
-      clearTimeout(idle);
-      idle = setTimeout(() => {
-        holding = false;
-      }, IDLE_MS);
-    };
-    const onScroll = () => {
-      const y = window.scrollY;
-      const stop = stopY();
-      if (holding) {
-        if (y > stop) window.scrollTo(0, stop);
-        holdUntilIdle();
-        return;
-      }
-      if (y < stop - 4) {
-        armed = true;
-        return;
-      }
-      const byUser = performance.now() - lastInput < 600;
-      if (armed && byUser && y > stop + 1) {
-        armed = false;
-        holding = true;
-        window.scrollTo(0, stop);
-        holdUntilIdle();
-      } else {
-        armed = false;
-      }
-    };
-
-    window.addEventListener("wheel", markInput, { passive: true });
-    window.addEventListener("touchmove", markInput, { passive: true });
-    window.addEventListener("keydown", onKey);
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => {
-      clearTimeout(idle);
-      window.removeEventListener("wheel", markInput);
-      window.removeEventListener("touchmove", markInput);
-      window.removeEventListener("keydown", onKey);
-      window.removeEventListener("scroll", onScroll);
-    };
-  }, []);
-
   const reveal = "var(--reveal)";
 
   return (
     <section
       ref={ref}
       id="hero"
-      // La section fait 1,6 écran : le défilement fait apparaître le texte
+      // La section fait 1,5 écran : le défilement fait apparaître le texte
       // pendant que la photo reste fixe, puis la page continue normalement.
-      className="relative -mt-16 h-[160svh] bg-m-night"
+      className="relative -mt-16 h-[150svh] bg-m-night"
       style={{ "--reveal": 0 } as CSSProperties}
     >
-      {/* Point d'arrêt : texte entièrement visible (voir l'effet « Arrêt au texte ») */}
+      {/* Point où le texte est entièrement visible (le défilement reste libre) */}
       <div
         ref={stopRef}
         aria-hidden="true"

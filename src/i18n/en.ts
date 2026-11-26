@@ -92,7 +92,7 @@ export const en: Dict = {
     tagline: "Turn memories into something you can hold.",
     lead: "A printed photo. A phone held over it. Your video comes alive.",
     priceLine: (p: string) => `${p}, paid on delivery anywhere in Tunisia.`,
-    stepsTitle: "Three steps.",
+    stepsTitle: "Three steps. That's it.",
     steps: [
       ["Your video", "Picked from your phone."],
       ["Your photo", "Printed, with the chip hidden inside."],
@@ -108,7 +108,7 @@ export const en: Dict = {
     productTitle: "The photo, the envelope, your note.",
     productAlt: "A MÉMORA photo in its envelope, with its card",
     details: "All the details",
-    questions: "Your questions",
+    questions: "Got a question? We've got you.",
     allQuestions: "All questions",
     businessTitle: "Company greetings people keep.",
     businessLead: "From 50 copies. Free sample.",
