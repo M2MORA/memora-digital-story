@@ -92,7 +92,7 @@ export const fr = {
     tagline: "Vos souvenirs, enfin entre vos mains.",
     lead: "Une photo imprimée. Un téléphone posé dessus. Votre vidéo prend vie.",
     priceLine: (p: string) => `${p}, payé à la livraison partout en Tunisie.`,
-    stepsTitle: "Trois gestes.",
+    stepsTitle: "Trois gestes, c'est tout.",
     steps: [
       ["Votre vidéo", "Choisie sur votre téléphone."],
       ["Votre photo", "Imprimée, la puce cachée dedans."],
@@ -108,7 +108,7 @@ export const fr = {
     productTitle: "La photo, l'enveloppe, votre mot.",
     productAlt: "Une photo MÉMORA dans son enveloppe, avec sa carte",
     details: "Tous les détails",
-    questions: "Vos questions",
+    questions: "Une question ? On a la réponse.",
     allQuestions: "Toutes les questions",
     businessTitle: "Des vœux d'entreprise qu'on garde.",
     businessLead: "Dès 50 exemplaires. Échantillon offert.",

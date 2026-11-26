@@ -435,3 +435,100 @@
   animation-duration: 180ms;
   animation-timing-function: ease-out;
 }
+
+/*
+ * Mouvement au défilement — « les tirages qu'on pose sur la table ».
+ * Les photos arrivent un peu de travers, comme jetées, puis se posent ;
+ * les titres montent depuis leur ligne ; les listes suivent en cascade.
+ *
+ * Le contenu reste visible par défaut : la classe .js-motion n'est ajoutée
+ * sur <html> que si le script tourne et que « réduire les animations » est off
+ * (voir __root.tsx). Sans JS, tout s'affiche normalement.
+ *
+ * Usage : {...reveal("rise" | "print" | "line", délai_ms)} (components/site/reveal.ts)
+ */
+:root {
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.js-motion [data-reveal] {
+  transition:
+    opacity 0.7s var(--ease-out-expo),
+    transform 0.95s var(--ease-out-expo),
+    clip-path 0.9s var(--ease-out-expo);
+  transition-delay: var(--d, 0ms);
+}
+
+.js-motion [data-reveal]:not([data-shown]) {
+  opacity: 0;
+}
+
+.js-motion [data-reveal="rise"]:not([data-shown]) {
+  transform: translateY(28px);
+}
+
+/* Une photo jetée sur la table : décalée, inclinée, un peu plus grande */
+.js-motion [data-reveal="print"]:not([data-shown]) {
+  transform: translateY(72px) rotate(var(--toss, -7deg)) scale(0.94);
+}
+
+/* Un titre qui monte depuis sa ligne */
+.js-motion [data-reveal="line"] {
+  clip-path: inset(-20% -6% -25% -6%);
+}
+
+.js-motion [data-reveal="line"]:not([data-shown]) {
+  clip-path: inset(100% -6% -25% -6%);
+  transform: translateY(0.45em);
+}
+
+/* Défilement lié : la photo glisse doucement dans son cadre (parallaxe légère) */
+@keyframes drift {
+  from {
+    translate: 0 -7%;
+  }
+
+  to {
+    translate: 0 7%;
+  }
+}
+
+/* La carte retournable arrive de travers et se pose pendant qu'on descend */
+@keyframes toss-in {
+  from {
+    transform: translateY(90px) rotate(-14deg);
+  }
+
+  to {
+    transform: translateY(0) rotate(-2deg);
+  }
+}
+
+@utility drift {
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: view()) {
+      animation: drift linear both;
+      animation-timeline: view();
+    }
+  }
+}
+
+@utility toss-in {
+  transform: rotate(-2deg);
+
+  @media (prefers-reduced-motion: no-preference) {
+    @supports (animation-timeline: view()) {
+      animation: toss-in linear both;
+      animation-timeline: view();
+      animation-range: entry 0% cover 45%;
+    }
+  }
+}
+
+/* Un tirage : bord papier blanc, ombre portée, posé légèrement de travers */
+@utility print-frame {
+  border: 10px solid var(--paper);
+  border-radius: 6px;
+  background: var(--paper);
+  box-shadow: var(--shadow-paper);
+}

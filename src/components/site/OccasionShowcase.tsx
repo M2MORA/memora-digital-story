@@ -3,6 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { cn } from "@/lib/utils";
 import type { OptimizedImage } from "@/lib/images.gen";
 import { Img } from "./Img";
+import { reveal } from "./reveal";
 
 const DELAY_MS = 4500;
 
@@ -48,7 +49,11 @@ export function OccasionShowcase({
       onBlur={() => setPaused(false)}
     >
       <div className="order-2 md:order-1">
-        <h2 id={titleId} className="font-serif text-[30px] leading-[1.1] text-m-ink sm:text-[40px]">
+        <h2
+          id={titleId}
+          {...reveal("line")}
+          className="font-serif text-[30px] leading-[1.1] text-m-ink sm:text-[40px]"
+        >
           {title}
         </h2>
         <ul className="mt-6 flex gap-2 md:mt-8 md:flex-col md:gap-1">
@@ -93,20 +98,27 @@ export function OccasionShowcase({
         </Link>
       </div>
 
-      <div className="relative order-1 aspect-[4/3] overflow-hidden rounded-[4px] bg-m-stage shadow-paper md:order-2">
-        {items.map((o, i) => (
-          <Img
-            key={o.label}
-            image={o.image}
-            alt=""
-            sizes="(min-width: 768px) 60vw, 100vw"
-            {...(o.pos ? { objectPosition: o.pos } : {})}
-            className={cn(
-              "absolute inset-0 h-full w-full object-cover transition-[opacity,transform] duration-[1200ms] ease-out",
-              i === active ? "scale-100 opacity-100" : "scale-[1.04] opacity-0",
-            )}
-          />
-        ))}
+      <div {...reveal("print", 0, 6)} className="order-1 md:order-2">
+        <div className="print-frame rotate-[1.2deg]">
+          <div className="relative aspect-[4/3] overflow-hidden rounded-[2px] bg-m-stage">
+            {/* Parallaxe légère : la photo glisse dans son cadre pendant qu'on descend */}
+            <div className="drift absolute inset-x-0 -inset-y-[8%]">
+              {items.map((o, i) => (
+                <Img
+                  key={o.label}
+                  image={o.image}
+                  alt=""
+                  sizes="(min-width: 768px) 60vw, 100vw"
+                  {...(o.pos ? { objectPosition: o.pos } : {})}
+                  className={cn(
+                    "absolute inset-0 h-full w-full object-cover transition-[opacity,transform] duration-[1200ms] ease-out",
+                    i === active ? "scale-100 opacity-100" : "scale-[1.04] opacity-0",
+                  )}
+                />
+              ))}
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );

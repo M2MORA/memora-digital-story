@@ -149,11 +149,56 @@ function useActiveLang(): Lang {
   return effectiveLang(data?.lang ?? "fr", pathname);
 }
 
+/**
+ * Active les apparitions au défilement avant le premier affichage (pas de
+ * clignotement). Filet de sécurité : si React ne démarre pas dans les 4 s,
+ * on retire la classe pour que rien ne reste caché.
+ */
+const MOTION_BOOT = `(function(){try{if(matchMedia("(prefers-reduced-motion: reduce)").matches)return;var d=document.documentElement;d.classList.add("js-motion");setTimeout(function(){if(!window.__memoraMotion)d.classList.remove("js-motion")},4000)}catch(e){}})();`;
+
+/**
+ * Apparitions au défilement : un élément [data-reveal] est montré dès que son
+ * haut entre dans les 92 % de l'écran — ou s'il est déjà au-dessus (saut
+ * d'ancre, défilement rapide), pour que rien ne reste jamais caché.
+ * Un seul écouteur pour toute la page, relancé quand le contenu change.
+ */
+function useScrollReveal() {
+  useEffect(() => {
+    const root = document.documentElement;
+    if (!root.classList.contains("js-motion")) return;
+    (window as Window & { __memoraMotion?: boolean }).__memoraMotion = true;
+    let frame = 0;
+    const check = () => {
+      frame = 0;
+      const limit = window.innerHeight * 0.92;
+      document.querySelectorAll("[data-reveal]:not([data-shown])").forEach((el) => {
+        if (el.getBoundingClientRect().top < limit) el.setAttribute("data-shown", "");
+      });
+    };
+    const schedule = () => {
+      if (!frame) frame = requestAnimationFrame(check);
+    };
+    check();
+    window.addEventListener("scroll", schedule, { passive: true });
+    window.addEventListener("resize", schedule);
+    const mo = new MutationObserver(schedule);
+    mo.observe(document.body, { childList: true, subtree: true });
+    return () => {
+      window.removeEventListener("scroll", schedule);
+      window.removeEventListener("resize", schedule);
+      mo.disconnect();
+      cancelAnimationFrame(frame);
+    };
+  }, []);
+}
+
 function RootShell({ children }: { children: ReactNode }) {
   const lang = useActiveLang();
   return (
-    <html lang={lang} dir={dirOf(lang)}>
+    // suppressHydrationWarning : le script ci-dessous ajoute .js-motion avant React
+    <html lang={lang} dir={dirOf(lang)} suppressHydrationWarning>
       <head>
+        <script dangerouslySetInnerHTML={{ __html: MOTION_BOOT }} />
         <HeadContent />
       </head>
       <body>
@@ -173,6 +218,7 @@ function RootComponent() {
   const lang = useActiveLang();
   // Le fournisseur de langue est rendu ici : on lit donc le dictionnaire directement
   const t = dictFor(lang);
+  useScrollReveal();
 
   return (
     <LangProvider lang={lang}>
