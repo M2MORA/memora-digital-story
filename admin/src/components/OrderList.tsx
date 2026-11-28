@@ -6,6 +6,9 @@ import StatusBadge from "./StatusBadge";
 
 type Filter = OrderStatus | "all";
 
+/** Commandes affichées d'un coup ; « Voir plus » en ajoute autant. */
+const PAGE = 10;
+
 export default function OrderList({
   orders,
   loading,
@@ -28,6 +31,7 @@ export default function OrderList({
 }) {
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
+  const [visible, setVisible] = useState(PAGE);
 
   const q = search.trim().toLowerCase();
   const shown = orders.filter(
@@ -53,7 +57,10 @@ export default function OrderList({
           type="search"
           placeholder="N°, nom ou téléphone"
           value={search}
-          onChange={(e) => setSearch(e.target.value)}
+          onChange={(e) => {
+            setSearch(e.target.value);
+            setVisible(PAGE);
+          }}
         />
       </label>
 
@@ -64,7 +71,10 @@ export default function OrderList({
             type="button"
             aria-pressed={filter === c.value}
             className={`segment ${filter === c.value ? "active" : ""}`}
-            onClick={() => setFilter(c.value)}
+            onClick={() => {
+              setFilter(c.value);
+              setVisible(PAGE);
+            }}
           >
             {c.label}
             <span className="segment-count">{countOf(c.value)}</span>
@@ -86,7 +96,7 @@ export default function OrderList({
         </p>
       ) : (
         <ul className="rows">
-          {shown.map((o) => (
+          {shown.slice(0, visible).map((o) => (
             <li key={o.id}>
               <button
                 type="button"
@@ -111,14 +121,30 @@ export default function OrderList({
         </ul>
       )}
 
-      {hasMore && (
+      {(shown.length > visible || hasMore) && (
         <div className="load-more">
-          <p className="muted">
-            {orders.length} commandes affichées. La recherche et le filtre portent sur celles-ci.
-          </p>
-          <button type="button" className="btn" onClick={onLoadMore} disabled={loadingMore}>
-            {loadingMore ? "Chargement…" : "Charger les commandes plus anciennes"}
-          </button>
+          {shown.length > visible ? (
+            <button type="button" className="btn" onClick={() => setVisible((v) => v + PAGE)}>
+              Voir plus ({shown.length - visible} restante{shown.length - visible > 1 ? "s" : ""})
+            </button>
+          ) : (
+            <>
+              <p className="muted">
+                {orders.length} commandes chargées. La recherche et le filtre portent sur celles-ci.
+              </p>
+              <button
+                type="button"
+                className="btn"
+                disabled={loadingMore}
+                onClick={() => {
+                  onLoadMore();
+                  setVisible((v) => v + PAGE);
+                }}
+              >
+                {loadingMore ? "Chargement…" : "Voir les commandes plus anciennes"}
+              </button>
+            </>
+          )}
         </div>
       )}
     </section>
