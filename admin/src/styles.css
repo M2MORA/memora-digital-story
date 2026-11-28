@@ -342,6 +342,9 @@ input:focus, select:focus { outline: none; border-color: var(--accent); box-shad
   .orders-layout { display: grid; grid-template-columns: minmax(320px, 400px) 1fr; gap: 20px; align-items: start; }
   .orders-layout.has-detail .list-pane { display: flex; }
   .orders-layout .list-pane { position: sticky; top: calc(var(--topbar) + 24px); max-height: calc(100vh - var(--topbar) - 48px); overflow-y: auto; }
+  /* Sans cela, la liste (overflow: hidden) est écrasée à la hauteur de la colonne : les
+     commandes du bas sont coupées et la colonne n'a rien à faire défiler. */
+  .orders-layout .list-pane > * { flex-shrink: 0; }
   .segments { margin: 0; padding: 0; flex-wrap: wrap; overflow: visible; }
   .detail-placeholder {
     display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
